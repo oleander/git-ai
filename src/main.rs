@@ -25,7 +25,7 @@ fn main() {
     println!("▶ {}", commit_message);
 
     for line in files_to_add {
-        println!("\t🔸{}", line);
+        println!("   🔸{}", line);
     }
 }
 
