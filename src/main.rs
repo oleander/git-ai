@@ -1,5 +1,6 @@
 use std::process::{Command, exit};
 use ansi_term::Colour::{Green, Yellow};
+use ansi_term::Colour::{Blue, Cyan};
 
 fn main() {
     let files_to_add = get_git_status();
@@ -21,10 +22,10 @@ fn main() {
 
     let commit_message = get_latest_commit_message();
 
-    println!("{}:", Green.paint(commit_message));
+    println!("{}:", Blue.paint(commit_message));
 
     for line in files_to_add {
-        println!("  {}", Yellow.paint(line));
+        println!("  {}", Cyan.paint(line));
     }
 }
 
