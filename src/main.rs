@@ -4,6 +4,13 @@ use std::env;
 use std::path::Path;
 use std::process::{exit, Command};
 
+macro_rules! report {
+  ($($arg:tt)*) => ({
+    use std::io::Write;
+    writeln!(&mut ::std::io::stderr(), $($arg)*).expect("Error writing to stderr");
+  })
+}
+
 fn main() {
   if !ensure_aicommit_hooks_installed() {
     eprintln!("Error: aicommit hooks are not installed.");
@@ -14,13 +21,8 @@ fn main() {
   println!("Changes detected:");
 
   if should_add_all() {
-    println!("Adding all changes to git...");
-    match run_git_add() {
-      Ok(_) => println!("Added all changes to git."),
-      Err(err) => {
-        eprintln!("Error adding changes to git: {}", err);
-        exit(1);
-      },
+    if let Err(err) = run_git_add() {
+      report!("Error adding changes to git: {}", err);
     }
   }
 
