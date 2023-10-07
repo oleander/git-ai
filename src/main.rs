@@ -8,6 +8,7 @@ macro_rules! report {
   ($($arg:tt)*) => ({
     use std::io::Write;
     writeln!(&mut ::std::io::stderr(), $($arg)*).expect("Error writing to stderr");
+    exit(1);
   })
 }
 
@@ -28,15 +29,11 @@ fn main() {
 
   let files_to_add = match get_git_status() {
     Ok(files) => files,
-    Err(err) => {
-      eprintln!("Error getting git status: {}", err);
-      exit(1);
-    },
+    Err(err) => report!("Error getting git status: {}", err)
   };
 
   if files_to_add.is_empty() {
-    println!("No changes detected.");
-    exit(0);
+    report!("No changes to commit.");
   }
 
   println!("Committing changes...");
