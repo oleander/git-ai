@@ -14,12 +14,8 @@ macro_rules! report {
 
 fn main() {
   if !ensure_aicommit_hooks_installed() {
-    eprintln!("Error: aicommit hooks are not installed.");
-    exit(1);
+    report!("Error: aicommit hooks are not installed.");
   }
-
-
-  println!("Changes detected:");
 
   if should_add_all() {
     if let Err(err) = run_git_add() {
@@ -36,22 +32,14 @@ fn main() {
     report!("No changes to commit.");
   }
 
-  println!("Committing changes...");
-
   match run_git_commit() {
     Ok(_) => {},
-    Err(err) => {
-      eprintln!("Error committing changes: {}", err);
-      exit(1);
-    },
+    Err(err) => report!("Error committing changes: {}", err)
   }
 
   let commit_message = match get_latest_commit_message() {
     Ok(message) => message,
-    Err(err) => {
-      eprintln!("Failed to fetch the latest commit message: {}", err);
-      exit(1);
-    },
+    Err(err) => report!("Error getting latest commit message: {}", err)
   };
 
   println!("▶ {}", commit_message);
@@ -108,7 +96,6 @@ fn get_git_status() -> Result<Vec<String>, git2::Error> {
     if status.skipable() {
       continue;
     }
-    // Skip untracked files
 
     if let Some(path) = entry.path() {
       files.push(format!("{} {}", status.colorized(), path));
