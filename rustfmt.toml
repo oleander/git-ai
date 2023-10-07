@@ -1,0 +1,18 @@
+match_block_trailing_comma = true
+use_small_heuristics = "Max"
+normalize_comments = false
+reorder_impl_items = true
+align_assignments = true
+fn_args_density = "Tall"
+newline_style = "Auto"
+reorder_imports = true
+align_params = true
+fn_call_width = 60
+hard_tabs = false
+max_width = 100
+tab_spaces = 2
+
+align_open_brace_with_fn = true
+align_where_bounds = true
+align_number_left = true
+imports_indent = "Block"
