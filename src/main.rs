@@ -29,7 +29,7 @@ fn main() {
   };
 
   if files_to_add.is_empty() {
-    report!("No changes to commit.");
+    report!("No changes to commit");
   }
 
   match run_git_commit() {
@@ -37,6 +37,7 @@ fn main() {
     Err(err) => report!("Error committing changes: {}", err)
   }
 
+  println!("🤖 AI Commit");
   let commit_message = match get_latest_commit_message() {
     Ok(message) => message,
     Err(err) => report!("Error getting latest commit message: {}", err)
