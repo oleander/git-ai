@@ -1,4 +1,4 @@
-use git2::{IndexAddOption, Repository, StatusOptions};
+use git2::{IndexAddOption, Repository, StatusOptions, StatusShow};
 use std::env;
 use std::path::Path;
 use std::process::{exit, Command};
@@ -12,7 +12,7 @@ fn main() {
   let files_to_add = match get_git_status() {
     Ok(files) => files,
     Err(err) => {
-      eprintln!("Failed to fetch git status: {}", err);
+      eprintln!("Error getting git status: {}", err);
       exit(1);
     },
   };
@@ -58,32 +58,26 @@ fn main() {
 fn get_git_status() -> Result<Vec<String>, git2::Error> {
   let repo = Repository::open(".")?;
   let mut options = StatusOptions::new();
-  options.include_untracked(true).renames_head_to_index(true);
+  options.show(StatusShow::IndexAndWorkdir);
+  options.include_untracked(true);
 
   let statuses = repo.statuses(Some(&mut options))?;
 
   let mut files = Vec::new();
-
-  for entry in statuses.iter() {
-    let status = entry.status();
-    let path = entry.path().unwrap_or_default();
-
-    let status_str = match status {
+  for entry in statuses.iter().filter(|e| e.status() != git2::Status::CURRENT) {
+    let status = match entry.status() {
       s if s.is_index_new() => "A",
       s if s.is_index_modified() => "M",
       s if s.is_index_deleted() => "D",
-      s if s.is_index_renamed() => "R",
-      s if s.is_index_typechange() => "T",
-      s if s.is_wt_new() => "?",
+      s if s.is_wt_new() => "??",
       s if s.is_wt_modified() => "M",
       s if s.is_wt_deleted() => "D",
-      s if s.is_wt_typechange() => "T",
-      s if s.is_wt_renamed() => "R",
-      s if s.is_ignored() => "!",
-      _ => " ",
+      _ => "",
     };
 
-    files.push(format!("{} {}", status_str, path));
+    if let Some(path) = entry.path() {
+      files.push(format!("{} {}", status, path));
+    }
   }
 
   Ok(files)
