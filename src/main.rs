@@ -1,5 +1,5 @@
-use git2::{IndexAddOption, Repository, StatusOptions, StatusShow};
 use ansi_term::Colour::*;
+use git2::{IndexAddOption, Repository, StatusOptions, StatusShow};
 use std::env;
 use std::path::Path;
 use std::process::{exit, Command};
@@ -25,7 +25,7 @@ fn main() {
 
   let files_to_add = match get_git_status() {
     Ok(files) => files,
-    Err(err) => report!("Error getting git status: {}", err)
+    Err(err) => report!("Error getting git status: {}", err),
   };
 
   if files_to_add.is_empty() {
@@ -34,12 +34,12 @@ fn main() {
 
   match run_git_commit() {
     Ok(_) => {},
-    Err(err) => report!("Error committing changes: {}", err)
+    Err(err) => report!("Error committing changes: {}", err),
   }
 
   let commit_message = match get_latest_commit_message() {
     Ok(message) => message,
-    Err(err) => report!("Error getting latest commit message: {}", err)
+    Err(err) => report!("Error getting latest commit message: {}", err),
   };
 
   println!("▶ {}", commit_message);
@@ -89,7 +89,7 @@ fn get_git_status() -> Result<Vec<String>, git2::Error> {
       s if s.is_wt_new() => GitStatus::U,
       s if s.is_wt_deleted() => GitStatus::U,
       s if s.is_wt_modified() => GitStatus::U,
-      _ => panic!("Unexpected git status: {:?}", entry.status())
+      _ => panic!("Unexpected git status: {:?}", entry.status()),
     };
 
     if status.skipable() {
