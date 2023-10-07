@@ -28,7 +28,6 @@ fn main() {
     Err(err) => report!("Error getting git status: {}", err)
   };
 
-  println!("🤖 AI Commit");
   if files_to_add.is_empty() {
     report!("No changes to commit");
   }
@@ -93,7 +92,6 @@ fn get_git_status() -> Result<Vec<String>, git2::Error> {
       _ => panic!("Unexpected git status: {:?}", entry.status())
     };
 
-    println!("{:?}", status);
     if status.skipable() {
       continue;
     }
