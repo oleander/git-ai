@@ -22,7 +22,7 @@ fn main() {
 
     let commit_message = get_latest_commit_message();
 
-    println!("{}:", Blue.paint(commit_message));
+    println!("▶ Commit: {}:", Blue.paint(commit_message));
 
     for line in files_to_add {
         println!("  {}", Cyan.paint(line));
