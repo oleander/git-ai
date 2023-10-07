@@ -69,13 +69,17 @@ fn get_git_status() -> Result<Vec<String>, git2::Error> {
       s if s.is_index_new() => "A",
       s if s.is_index_modified() => "M",
       s if s.is_index_deleted() => "D",
+
       s if s.is_wt_new() => "??",
       s if s.is_wt_deleted() => "DX",
       s if s.is_wt_modified() => "MX",
       _ => "",
     };
 
-    // Only include files which has been added to the current index
+    match status {
+      "A" | "M" | "D" => {},
+      _ => continue,
+    }
 
     if let Some(path) = entry.path() {
       files.push(format!("{} {}", status, path));
