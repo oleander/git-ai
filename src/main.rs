@@ -23,13 +23,13 @@ fn main() {
     }
   }
 
-  println!("🤖 AI Commit");
   let files_to_add = match get_git_status() {
     Ok(files) => files,
     Err(err) => report!("Error getting git status: {}", err)
   };
 
   if files_to_add.is_empty() {
+  println!("🤖 AI Commit");
     report!("No changes to commit");
   }
 
