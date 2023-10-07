@@ -28,8 +28,8 @@ fn main() {
     Err(err) => report!("Error getting git status: {}", err)
   };
 
-  if files_to_add.is_empty() {
   println!("🤖 AI Commit");
+  if files_to_add.is_empty() {
     report!("No changes to commit");
   }
 
