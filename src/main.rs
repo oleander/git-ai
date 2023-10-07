@@ -1,8 +1,12 @@
 use std::process::{Command, exit};
-use ansi_term::Colour::{Green, Yellow};
-use ansi_term::Colour::{Blue, Cyan};
+use std::path::Path;
 
 fn main() {
+    if !ensure_aicommit_hooks_installed() {
+        eprintln!("Error: aicommit hooks are not installed.");
+        exit(1);
+    }
+
     let files_to_add = get_git_status();
 
     if files_to_add.is_empty() {
@@ -71,4 +75,8 @@ fn get_latest_commit_message() -> String {
         .expect("Failed to execute git log");
 
     String::from_utf8_lossy(&output.stdout).trim().to_string()
+}
+
+fn ensure_aicommit_hooks_installed() -> bool {
+    Path::new(".git/hooks/prepare-commit-msg").exists()
 }
