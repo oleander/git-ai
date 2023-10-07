@@ -1,4 +1,4 @@
-use git2::Repository;
+use git2::{Repository, StatusOptions};
 use std::env;
 use std::path::Path;
 use std::process::{exit, Command};
@@ -9,7 +9,13 @@ fn main() {
     exit(1);
   }
 
-  let files_to_add = get_git_status();
+  let files_to_add = match get_git_status() {
+    Ok(files) => files,
+    Err(err) => {
+      eprintln!("Failed to fetch git status: {}", err);
+      exit(1);
+    },
+  };
 
   if files_to_add.is_empty() {
     println!("No changes detected.");
@@ -44,14 +50,38 @@ fn main() {
   }
 }
 
-fn get_git_status() -> Vec<String> {
-  let output = Command::new("git")
-    .arg("status")
-    .arg("--porcelain")
-    .output()
-    .expect("Failed to execute git status");
+fn get_git_status() -> Result<Vec<String>, git2::Error> {
+  let repo = Repository::open(".")?;
+  let mut options = StatusOptions::new();
+  options.include_untracked(true).renames_head_to_index(true);
 
-  String::from_utf8_lossy(&output.stdout).lines().map(String::from).collect()
+  let statuses = repo.statuses(Some(&mut options))?;
+
+  let mut files = Vec::new();
+
+  for entry in statuses.iter() {
+    let status = entry.status();
+    let path = entry.path().unwrap_or_default();
+
+    let status_str = match status {
+      s if s.is_index_new() => "A",
+      s if s.is_index_modified() => "M",
+      s if s.is_index_deleted() => "D",
+      s if s.is_index_renamed() => "R",
+      s if s.is_index_typechange() => "T",
+      s if s.is_wt_new() => "?",
+      s if s.is_wt_modified() => "M",
+      s if s.is_wt_deleted() => "D",
+      s if s.is_wt_typechange() => "T",
+      s if s.is_wt_renamed() => "R",
+      s if s.is_ignored() => "!",
+      _ => " ",
+    };
+
+    files.push(format!("{} {}", status_str, path));
+  }
+
+  Ok(files)
 }
 
 fn run_git_add() -> bool {
