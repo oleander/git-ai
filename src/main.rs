@@ -2,6 +2,11 @@ use ansi_term::Colour::*;
 use git2::{IndexAddOption, Repository, StatusOptions, StatusShow};
 use std::env;
 use std::process::{exit, Command};
+use std::path::Path;
+use lazy_static::lazy_static;
+
+lazy_static! {
+}
 
 macro_rules! report {
   ($($arg:tt)*) => ({
@@ -9,6 +14,10 @@ macro_rules! report {
     writeln!(&mut ::std::io::stderr(), $($arg)*).expect("Error writing to stderr");
     exit(1);
   })
+}
+
+fn get_repo() -> Repository {
+  Repository::open_ext(".", git2::RepositoryOpenFlags::empty(), Vec::<&Path>::new()).expect("Error opening git repo.")
 }
 
 fn main() {
@@ -74,7 +83,7 @@ impl GitStatus {
 }
 
 fn get_git_status() -> Result<Vec<String>, git2::Error> {
-  let repo = Repository::open(".")?;
+  let repo = get_repo();
   let mut options = StatusOptions::new();
   options.show(StatusShow::IndexAndWorkdir);
   options.include_untracked(true);
@@ -106,7 +115,7 @@ fn get_git_status() -> Result<Vec<String>, git2::Error> {
 }
 
 fn run_git_add() -> Result<(), git2::Error> {
-  let repo = Repository::open(".")?;
+  let repo = get_repo();
   let mut index = repo.index()?;
 
   index.add_all(["*"], IndexAddOption::DEFAULT, None)?;
@@ -136,14 +145,14 @@ fn run_git_commit() -> Result<(), String> {
 }
 
 fn get_latest_commit_message() -> Result<String, git2::Error> {
-  let repo = Repository::open(".")?;
+  let repo = get_repo();
   let head = repo.head()?;
   let commit = head.peel_to_commit()?;
   Ok(commit.message().unwrap_or("").to_string())
 }
 
 fn ensure_aicommit_hooks_installed() -> Result<bool, git2::Error> {
-  let repo = Repository::open(".")?;
+  let repo = get_repo();
   let root_path = repo.path().parent().unwrap();
   Ok(root_path.join(".git/hooks/prepare-commit-msg").exists())
 }
