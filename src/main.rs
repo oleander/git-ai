@@ -23,6 +23,7 @@ fn main() {
     }
   }
 
+  println!("🤖 AI Commit");
   let files_to_add = match get_git_status() {
     Ok(files) => files,
     Err(err) => report!("Error getting git status: {}", err)
@@ -37,7 +38,6 @@ fn main() {
     Err(err) => report!("Error committing changes: {}", err)
   }
 
-  println!("🤖 AI Commit");
   let commit_message = match get_latest_commit_message() {
     Ok(message) => message,
     Err(err) => report!("Error getting latest commit message: {}", err)
