@@ -10,6 +10,20 @@ fn main() {
     exit(1);
   }
 
+
+  println!("Changes detected:");
+
+  if should_add_all() {
+    println!("Adding all changes to git...");
+    match run_git_add() {
+      Ok(_) => println!("Added all changes to git."),
+      Err(err) => {
+        eprintln!("Error adding changes to git: {}", err);
+        exit(1);
+      },
+    }
+  }
+
   let files_to_add = match get_git_status() {
     Ok(files) => files,
     Err(err) => {
@@ -23,15 +37,7 @@ fn main() {
     exit(0);
   }
 
-  if should_add_all() {
-    match run_git_add() {
-      Ok(_) => {},
-      Err(err) => {
-        eprintln!("Error adding changes to git: {}", err);
-        exit(1);
-      },
-    }
-  }
+  println!("Committing changes...");
 
   match run_git_commit() {
     Ok(_) => {},
@@ -114,6 +120,7 @@ fn get_git_status() -> Result<Vec<String>, git2::Error> {
 }
 
 fn run_git_add() -> Result<(), git2::Error> {
+  println!("Adding all changes to git...");
   let repo = Repository::open(".")?;
   let mut index = repo.index()?;
 
