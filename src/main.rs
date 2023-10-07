@@ -1,4 +1,4 @@
-use git2::{Repository, StatusOptions};
+use git2::{IndexAddOption, Repository, StatusOptions};
 use std::env;
 use std::path::Path;
 use std::process::{exit, Command};
@@ -22,9 +22,14 @@ fn main() {
     exit(0);
   }
 
-  if should_add_all() && !run_git_add() {
-    eprintln!("Error adding changes to git.");
-    exit(1);
+  if should_add_all() {
+    match run_git_add() {
+      Ok(_) => {},
+      Err(err) => {
+        eprintln!("Error adding changes to git: {}", err);
+        exit(1);
+      },
+    }
   }
 
   match run_git_commit() {
@@ -84,10 +89,14 @@ fn get_git_status() -> Result<Vec<String>, git2::Error> {
   Ok(files)
 }
 
-fn run_git_add() -> bool {
-  let output = Command::new("git").arg("add").arg(".").output().expect("Failed to execute git add");
+fn run_git_add() -> Result<(), git2::Error> {
+  let repo = Repository::open(".")?;
+  let mut index = repo.index()?;
 
-  output.status.success()
+  index.add_all(["*"], IndexAddOption::DEFAULT, None)?;
+  index.write()?;
+
+  Ok(())
 }
 
 fn run_git_commit() -> Result<(), String> {
