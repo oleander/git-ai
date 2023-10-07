@@ -22,9 +22,8 @@ fn main() {
 
     let commit_message = get_latest_commit_message();
 
-    println!("▶ Commit: {}", commit_message);
+    println!("▶ {}", commit_message);
 
-    println!("\tFiles:");
     for line in files_to_add {
         println!("\t🔸{}", line);
     }
