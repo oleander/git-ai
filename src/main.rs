@@ -1,7 +1,6 @@
 use ansi_term::Colour::*;
 use git2::{IndexAddOption, Repository, StatusOptions, StatusShow};
 use std::env;
-use std::path::Path;
 use std::process::{exit, Command};
 
 macro_rules! report {
@@ -13,8 +12,10 @@ macro_rules! report {
 }
 
 fn main() {
-  if !ensure_aicommit_hooks_installed() {
-    report!("Error: aicommit hooks are not installed.");
+  match ensure_aicommit_hooks_installed() {
+    Ok(true) => {},
+    Ok(false) => report!("Error: aicommit hooks are not installed."),
+    Err(err) => report!("Error: {}", err),
   }
 
   if should_add_all() {
@@ -141,8 +142,10 @@ fn get_latest_commit_message() -> Result<String, git2::Error> {
   Ok(commit.message().unwrap_or("").to_string())
 }
 
-fn ensure_aicommit_hooks_installed() -> bool {
-  Path::new(".git/hooks/prepare-commit-msg").exists()
+fn ensure_aicommit_hooks_installed() -> Result<bool, git2::Error> {
+  let repo = Repository::open(".")?;
+  let root_path = repo.path().parent().unwrap();
+  Ok(root_path.join(".git/hooks/prepare-commit-msg").exists())
 }
 
 fn should_add_all() -> bool {
