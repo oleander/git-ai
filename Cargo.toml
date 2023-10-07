@@ -8,4 +8,3 @@ edition = "2021"
 [dependencies]
 ansi_term = "0.12.1"
 git2 = "0.18.1"
-lazy_static = "1.4.0"

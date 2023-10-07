@@ -3,10 +3,6 @@ use git2::{IndexAddOption, Repository, StatusOptions, StatusShow};
 use std::env;
 use std::process::{exit, Command};
 use std::path::Path;
-use lazy_static::lazy_static;
-
-lazy_static! {
-}
 
 macro_rules! report {
   ($($arg:tt)*) => ({
