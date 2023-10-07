@@ -1,4 +1,5 @@
 use git2::{IndexAddOption, Repository, StatusOptions, StatusShow};
+use ansi_term::Colour::*;
 use std::env;
 use std::path::Path;
 use std::process::{exit, Command};
@@ -55,6 +56,29 @@ fn main() {
   }
 }
 
+#[derive(PartialEq, Copy, Clone, Debug)]
+enum GitStatus {
+  A,
+  M,
+  D,
+  U,
+}
+
+impl GitStatus {
+  fn skipable(self) -> bool {
+    self == GitStatus::U
+  }
+
+  fn colorized(self) -> ansi_term::ANSIString<'static> {
+    match self {
+      GitStatus::A => Green.paint("A"),
+      GitStatus::M => Yellow.paint("M"),
+      GitStatus::D => Red.paint("D"),
+      GitStatus::U => White.paint("U"),
+    }
+  }
+}
+
 fn get_git_status() -> Result<Vec<String>, git2::Error> {
   let repo = Repository::open(".")?;
   let mut options = StatusOptions::new();
@@ -66,23 +90,23 @@ fn get_git_status() -> Result<Vec<String>, git2::Error> {
   let mut files = Vec::new();
   for entry in statuses.iter().filter(|e| e.status() != git2::Status::CURRENT) {
     let status = match entry.status() {
-      s if s.is_index_new() => "A",
-      s if s.is_index_modified() => "M",
-      s if s.is_index_deleted() => "D",
-
-      s if s.is_wt_new() => "??",
-      s if s.is_wt_deleted() => "DX",
-      s if s.is_wt_modified() => "MX",
-      _ => "",
+      s if s.is_index_new() => GitStatus::A,
+      s if s.is_index_modified() => GitStatus::M,
+      s if s.is_index_deleted() => GitStatus::D,
+      s if s.is_wt_new() => GitStatus::U,
+      s if s.is_wt_deleted() => GitStatus::U,
+      s if s.is_wt_modified() => GitStatus::U,
+      _ => panic!("Unexpected git status: {:?}", entry.status())
     };
 
-    match status {
-      "A" | "M" | "D" => {},
-      _ => continue,
+    println!("{:?}", status);
+    if status.skipable() {
+      continue;
     }
+    // Skip untracked files
 
     if let Some(path) = entry.path() {
-      files.push(format!("{} {}", status, path));
+      files.push(format!("{} {}", status.colorized(), path));
     }
   }
 
