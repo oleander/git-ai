@@ -106,7 +106,6 @@ fn get_git_status() -> Result<Vec<String>, git2::Error> {
 }
 
 fn run_git_add() -> Result<(), git2::Error> {
-  println!("Adding all changes to git...");
   let repo = Repository::open(".")?;
   let mut index = repo.index()?;
 
