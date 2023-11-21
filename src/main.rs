@@ -1,158 +1,42 @@
-use ansi_term::Colour::*;
-use git2::{IndexAddOption, Repository, StatusOptions, StatusShow};
-use std::env;
+#![feature(lazy_cell)]
+
+pub mod git;
+pub mod chat;
+
+use std::os::unix::process::CommandExt;
 use std::process::{exit, Command};
-use std::path::Path;
+use dotenv::dotenv;
+use anyhow::Result;
+use clap::Parser;
+use log::error;
 
-macro_rules! report {
-  ($($arg:tt)*) => ({
-    use std::io::Write;
-    writeln!(&mut ::std::io::stderr(), $($arg)*).expect("Error writing to stderr");
+#[derive(Parser, Debug)]
+#[clap(author, version, about)]
+struct Cli {
+  #[clap(long, help = "Enables debug logging", default_value = "false")]
+  debug: bool,
+
+  #[clap(long, default_value = "false", help = "git add .")]
+  all: bool
+}
+
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> Result<()> {
+  env_logger::init();
+  dotenv().ok();
+
+  let cli = Cli::parse();
+
+  if cli.debug {
+    std::env::set_var("RUST_LOG", "info");
+  }
+
+  if let Err(e) = git::repo().commit(cli.all).await {
+    error!("Failed to commit: {}", e);
     exit(1);
-  })
-}
-
-fn get_repo() -> Repository {
-  Repository::open_ext(".", git2::RepositoryOpenFlags::empty(), Vec::<&Path>::new()).expect("Error opening git repo.")
-}
-
-fn main() {
-  match ensure_aicommit_hooks_installed() {
-    Ok(true) => {},
-    Ok(false) => report!("Error: aicommit hooks are not installed."),
-    Err(err) => report!("Error: {}", err),
   }
 
-  if should_add_all() {
-    if let Err(err) = run_git_add() {
-      report!("Error adding changes to git: {}", err);
-    }
-  }
-
-  let files_to_add = match get_git_status() {
-    Ok(files) => files,
-    Err(err) => report!("Error getting git status: {}", err),
-  };
-
-  if files_to_add.is_empty() {
-    report!("No changes to commit");
-  }
-
-  match run_git_commit() {
-    Ok(_) => {},
-    Err(err) => report!("Error committing changes: {}", err),
-  }
-
-  let commit_message = match get_latest_commit_message() {
-    Ok(message) => message,
-    Err(err) => report!("Error getting latest commit message: {}", err),
-  };
-
-  println!("▶ {}", commit_message);
-
-  for line in files_to_add {
-    println!("   🔸{}", line);
-  }
-}
-
-#[derive(PartialEq, Copy, Clone, Debug)]
-enum GitStatus {
-  A,
-  M,
-  D,
-  U,
-}
-
-impl GitStatus {
-  fn skipable(self) -> bool {
-    self == GitStatus::U
-  }
-
-  fn colorized(self) -> ansi_term::ANSIString<'static> {
-    match self {
-      GitStatus::A => Green.paint("A"),
-      GitStatus::M => Yellow.paint("M"),
-      GitStatus::D => Red.paint("D"),
-      GitStatus::U => White.paint("U"),
-    }
-  }
-}
-
-fn get_git_status() -> Result<Vec<String>, git2::Error> {
-  let repo = get_repo();
-  let mut options = StatusOptions::new();
-  options.show(StatusShow::IndexAndWorkdir);
-  options.include_untracked(true);
-
-  let statuses = repo.statuses(Some(&mut options))?;
-
-  let mut files = Vec::new();
-  for entry in statuses.iter().filter(|e| e.status() != git2::Status::CURRENT) {
-    let status = match entry.status() {
-      s if s.is_index_new() => GitStatus::A,
-      s if s.is_index_modified() => GitStatus::M,
-      s if s.is_index_deleted() => GitStatus::D,
-      s if s.is_wt_new() => GitStatus::U,
-      s if s.is_wt_deleted() => GitStatus::U,
-      s if s.is_wt_modified() => GitStatus::U,
-      _ => panic!("Unexpected git status: {:?}", entry.status()),
-    };
-
-    if status.skipable() {
-      continue;
-    }
-
-    if let Some(path) = entry.path() {
-      files.push(format!("{} {}", status.colorized(), path));
-    }
-  }
-
-  Ok(files)
-}
-
-fn run_git_add() -> Result<(), git2::Error> {
-  let repo = get_repo();
-  let mut index = repo.index()?;
-
-  index.add_all(["*"], IndexAddOption::DEFAULT, None)?;
-  index.write()?;
+  Command::new("git").args(&["--no-pager", "log", "-1", "--name-only"]).exec();
 
   Ok(())
-}
-
-fn run_git_commit() -> Result<(), String> {
-  let output = Command::new("git").arg("commit").arg("--no-edit").output();
-
-  match output {
-    Ok(output) => {
-      if output.status.success() {
-        Ok(())
-      } else {
-        let err_msg = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        if err_msg.is_empty() {
-          Err(String::from("Git commit failed for an unknown reason."))
-        } else {
-          Err(err_msg)
-        }
-      }
-    },
-    Err(err) => Err(err.to_string()),
-  }
-}
-
-fn get_latest_commit_message() -> Result<String, git2::Error> {
-  let repo = get_repo();
-  let head = repo.head()?;
-  let commit = head.peel_to_commit()?;
-  Ok(commit.message().unwrap_or("").to_string())
-}
-
-fn ensure_aicommit_hooks_installed() -> Result<bool, git2::Error> {
-  let repo = get_repo();
-  let root_path = repo.path().parent().unwrap();
-  Ok(root_path.join(".git/hooks/prepare-commit-msg").exists())
-}
-
-fn should_add_all() -> bool {
-  env::args().any(|arg| arg == "--all")
 }

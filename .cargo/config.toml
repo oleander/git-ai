@@ -1,0 +1,4 @@
+[env]
+
+RUST_LOG = "debug"
+RUST_BACKTRACE = "1"
