@@ -130,6 +130,8 @@ impl Repo {
     let diff_output =
       String::from_utf8(diff_str).expect("Diff output is not valid UTF-8");
 
+    info!("Diff: {}", diff_output);
+
     Ok(diff_output)
   }
 
