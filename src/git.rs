@@ -63,8 +63,23 @@ impl Repo {
   pub fn diff(&self, max_token_count: usize) -> Result<(String, Vec<String>)> {
     let repo = self.repo.read().expect("Failed to lock repo");
     let mut opts = Repo::opts();
-    let tree = repo.head()?.peel(ObjectType::Tree)?.into_tree().unwrap();
-    let diff = repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))?;
+    let diff = match repo.head() {
+      Ok(ref head) => {
+        let tree = head
+          .resolve()
+          .context("Failed to resolve head")?
+          .peel(ObjectType::Commit)
+          .context("Failed to peel head")?
+          .into_commit()
+          .map_err(|_| anyhow!("Failed to resolve commit"))?
+          .tree()
+          .context("Failed to get tree")?;
+          repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))?
+      },
+      Err(_) => {
+        repo.diff_tree_to_workdir_with_index(None, Some(&mut opts))?
+      }
+    };
 
     // Get names of staged files
     let mut files = Vec::new();
