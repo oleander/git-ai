@@ -84,14 +84,12 @@ impl Repo {
       repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))?;
 
     // Get names of staged files
-    // let mut files = Vec::new();
+    let mut files = Vec::new();
     diff.foreach(
       &mut |delta, _| {
         if let Some(file) = delta.new_file().path() {
           let file_path = file.to_string_lossy().into_owned();
-          // if !pathspec.contains(&file_path) {
-          //   files.push(file_path);
-          // }
+          files.push(file_path);
         }
         true
       },
@@ -99,6 +97,10 @@ impl Repo {
       None,
       None
     )?;
+
+    if files.is_empty() {
+      bail!("No files to commit");
+    }
 
     // Get the full diff
     let mut diff_str = Vec::new();
