@@ -78,6 +78,7 @@ async fn fetch_completion(payload: Value) -> Result<String> {
     .post(API_URL)
     .bearer_auth(API_KEY.as_str())
     .json(&payload)
+    .timeout(std::time::Duration::from_secs(10))
     .send()
     .await.context("Failed to send request")?
     .text()
