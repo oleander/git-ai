@@ -162,10 +162,11 @@ mod tests {
 
 
   impl Git2Helpers {
-    pub fn new() -> Self {
+    pub fn new() -> (Self, Repo) {
       let dir = TempDir::new().expect("Could not create temp dir");
       let repo = Repository::init(dir.path()).expect("Could not initialize repo");
-      Self { repo, dir }
+      let helper = Self { repo, dir };
+      (helper, helper.into_repo())
     }
 
     pub fn path(&self) -> &Path {
@@ -241,8 +242,7 @@ mod tests {
   // 5. Test `git diff` to ensure it shows the unstaged changes.
   #[test]
   fn new_file_addition() {
-    let helpers = Git2Helpers::new();
-    let repo: Repo = helpers.into_repo();
+    let (helpers, repo) = Git2Helpers::new();
     helpers.create_file("test.txt", "Hello, world!");
     helpers.commit_changes("Initial commit");
     helpers.modify_file("test.txt", "Hello, world!\nHello, world!");
