@@ -166,7 +166,8 @@ mod tests {
       let dir = TempDir::new().expect("Could not create temp dir");
       let repo = Repository::init(dir.path()).expect("Could not initialize repo");
       let helper = Self { repo, dir };
-      (helper, helper.into_repo())
+      let repo2 = helper.into_repo();
+      (helper, repo2)
     }
 
     pub fn path(&self) -> &Path {
@@ -243,11 +244,11 @@ mod tests {
   #[test]
   fn new_file_addition() {
     let (helpers, repo) = Git2Helpers::new();
-    helpers.create_file("test.txt", "Hello, world!");
+    helpers.create_file("test.txt", "A\n");
     helpers.commit_changes("Initial commit");
-    helpers.modify_file("test.txt", "Hello, world!\nHello, world!");
+    helpers.modify_file("test.txt", "A\nB\n");
     let (diff, _) = repo.diff(usize::MAX).expect("Could not generate diff");
-    assert_eq!(diff.lines().count(), 1);
+    assert_eq!(diff, "\nB\n");
   }
 }
 
