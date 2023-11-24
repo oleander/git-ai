@@ -176,17 +176,16 @@ mod tests {
 
   impl Git2Helpers {
     pub fn new() -> (Self, Repo) {
-      let dir = TempDir::new().expect("Could not create temp dir");
-      Command::new("git")
-        .args(["init", dir.path().to_str().unwrap()])
-        .status()
-        .expect("Could not initialize repo");
+      let helper = Git2Helpers {
+        dir: TempDir::new().expect("Could not create temp dir")
+      };
 
-      let repo = Repo::new_with_path(dir.path().to_str().unwrap().to_string())
-        .expect("Could not open repo");
+      helper.git(&["init"]);
 
-      let h = Git2Helpers { dir};
-      (h, repo)
+      let repo = Repo::new_with_path(helper.path().to_str().unwrap().to_string())
+.expect("Could not open repo");
+
+      (helper, repo)
     }
 
     pub fn path(&self) -> &Path {
@@ -252,7 +251,6 @@ mod tests {
       self.git(&["commit", "-m", &message]);
     }
   }
-
 
   fn setup() {
     _ = env_logger::builder().is_test(true).try_init();
