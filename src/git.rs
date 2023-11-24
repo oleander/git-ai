@@ -39,7 +39,7 @@ impl Repo {
 
   pub fn opts() -> DiffOptions {
     let mut opts = DiffOptions::new();
-    // opts
+    opts
     //   .enable_fast_untracked_dirs(true)
     //   .ignore_whitespace_change(true)
     //   .recurse_untracked_dirs(false)
@@ -48,8 +48,8 @@ impl Repo {
     //   .recurse_untracked_dirs(false)
     //   .ignore_blank_lines(true)
     //   .ignore_submodules(true)
-    // .include_untracked(false);
-    //   .include_ignored(false)
+    .include_untracked(false)
+      .include_ignored(false);
     //   .interhunk_lines(0)
     //   .context_lines(0);
     opts
@@ -67,7 +67,7 @@ impl Repo {
 
     // Pass the index explicitly to ensure that we are diffing against the staged changes only
     let diff =
-      repo.diff_tree_to_index(Some(&tree), Some(&index), Some(&mut opts))?;
+      repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))?;
     diff.stats().context("Failed to get diff stats")
   }
 
@@ -95,8 +95,13 @@ impl Repo {
     let mut opts = Repo::opts();
     let head = repo.head()?.peel_to_tree()?;
     let index = repo.index()?;
+    let tree = repo
+      .head()
+      .context("Failed to get head")?
+      .peel_to_tree()
+      .context("Failed to peel head to tree")?;
     let diff =
-      repo.diff_tree_to_index(Some(&head), Some(&index), Some(&mut opts))?;
+      repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))?;
 
     // Get names of staged files
     let mut files = Vec::new();
@@ -350,6 +355,10 @@ mod tests {
     }
   }
 
+  fn setup() {
+   _ = env_logger::builder().is_test(true).try_init();
+  }
+
   // **New File Addition**:
   // 1. Create a new file in the repository.
   // 2. Stage the new file with `git add`.
@@ -374,6 +383,8 @@ mod tests {
   // 5. Test `git diff` to ensure it shows the unstaged changes since the last commit.
   #[test]
   fn file_replacement() {
+    setup();
+
     let (helpers, repo) = Git2Helpers::new();
 
     /*  A file is created and committed */
@@ -389,6 +400,7 @@ mod tests {
     helpers.create_file("other.txt");
     helpers.stage_file("other.txt");
     let stats = repo.stats().expect("Could not get diff stats");
+
     assert_eq!(stats.files_changed(), 1);
     assert_eq!(stats.insertions(), 1);
     assert_eq!(stats.deletions(), 0);
@@ -404,9 +416,13 @@ mod tests {
     assert_eq!(stats.insertions(), 1);
     assert_eq!(stats.deletions(), 1);
 
+    /* Reset */
+    helpers.commit();
+
     /* The file is modified again without staging */
     helpers.create_file("new.txt");
     let stats = repo.stats().expect("Could not get diff stats");
+    info!("Diff: {:?}", repo.diff(10000).expect("Could not generate diff"));
     assert_eq!(stats.files_changed(), 0);
     assert_eq!(stats.insertions(), 0);
     assert_eq!(stats.deletions(), 0);
