@@ -324,11 +324,8 @@ mod tests {
     helpers.create_file("new_file.txt");
     helpers.stage_file("new_file.txt");
     helpers.commit();
-    let (diff, files) = repo.diff(usize::MAX).unwrap();
-    info!("Status: {}", helpers.status());
-    info!("Diff: \n{}", diff);
-    info!("Files: {:?}", files);
-    assert!(files.is_empty());
+    let res = repo.diff(usize::MAX);
+    assert!(res.is_err());
   }
 
   // Test case for deleting a file and committing the deletion
