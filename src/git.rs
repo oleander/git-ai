@@ -6,19 +6,20 @@ use git2::{
 };
 use anyhow::{anyhow, bail, Context, Result};
 use log::{debug, error, info, trace, warn};
-use std::sync::{LazyLock, Mutex};
+use std::sync::{Arc, LazyLock, Mutex, RwLock};
 use lazy_static::lazy_static;
 use std::process::Command;
 use std::path::Path;
+use std::collections::HashSet;
 use crate::chat;
 
-lazy_static! {
-  pub static ref REPO: Repo =
-    Repo::new().expect("Failed to initialize git repository");
-}
+// lazy_static! {
+//   pub static ref REPO: Repo =
+//     Repo::new().expect("Failed to initialize git repository");
+// }
 
 pub struct Repo {
-  repo: Mutex<Repository>
+  repo: Arc<RwLock<Repository>>
 }
 
 impl Repo {
@@ -32,11 +33,11 @@ impl Repo {
         .with_context(|| format!("Failed to open the git repository at"))?;
 
     Ok(Repo {
-      repo: Mutex::new(repo)
+      repo: Arc::new(RwLock::new(repo))
     })
   }
 
-  pub fn opts(&self) -> DiffOptions {
+  pub fn opts() -> DiffOptions {
     let mut opts = DiffOptions::new();
     // opts
     //   .enable_fast_untracked_dirs(true)
@@ -47,7 +48,7 @@ impl Repo {
     //   .recurse_untracked_dirs(false)
     //   .ignore_blank_lines(true)
     //   .ignore_submodules(true)
-      // .include_untracked(false);
+    // .include_untracked(false);
     //   .include_ignored(false)
     //   .interhunk_lines(0)
     //   .context_lines(0);
@@ -55,8 +56,8 @@ impl Repo {
   }
 
   pub fn stats(&self) -> Result<git2::DiffStats> {
-    let mut opts = self.opts();
-    let repo = self.repo.lock().expect("Failed to lock repo");
+    let mut opts = Repo::opts();
+    let repo = self.repo.read().expect("Failed to lock repo");
     let tree = repo
       .head()
       .context("Failed to get head")?
@@ -68,13 +69,13 @@ impl Repo {
     let diff =
       repo.diff_tree_to_index(Some(&tree), Some(&index), Some(&mut opts))?;
     diff.stats().context("Failed to get diff stats")
-    
   }
 
-  fn staged_diff(
-    repo: &Repository, exclude_files: Option<Vec<&str>>
-  ) -> Result<(Vec<String>, String), Error> {
+  pub fn diff(&self, max_token_count: usize) -> Result<String> {
+    let mut opts = Repo::opts();
+    let repo = self.repo.read().expect("Failed to lock repo");
     let mut pathspec = HashSet::new();
+    let exclude_files: Option<Vec<String>> = None;
 
     // Include patterns to exclude files
     if let Some(ex_files) = exclude_files {
@@ -91,11 +92,11 @@ impl Repo {
       pathspec.insert(file.to_string());
     }
 
-    let mut opts = self.opts();
+    let mut opts = Repo::opts();
     let head = repo.head()?.peel_to_tree()?;
     let index = repo.index()?;
     let diff =
-      repo.diff_tree_to_index(Some(&head), Some(&index), Some(&opts))?;
+      repo.diff_tree_to_index(Some(&head), Some(&index), Some(&mut opts))?;
 
     // Get names of staged files
     let mut files = Vec::new();
@@ -123,13 +124,13 @@ impl Repo {
 
     let diff_output =
       String::from_utf8(diff_str).expect("Diff output is not valid UTF-8");
+    
+    Ok(diff_output)
+  }
 
-    Ok((files, diff_output))
-}
-
-  pub fn diff(&self, max_token_count: usize) -> Result<String> {
-    let mut opts = self.opts();
-    let repo = self.repo.lock().expect("Failed to lock repo");
+  pub fn diff2(&self, max_token_count: usize) -> Result<String> {
+    let mut opts = Repo::opts();
+    let repo = self.repo.read().expect("Failed to lock repo");
     let tree = repo
       .head()
       .context("Failed to get head")?
@@ -189,7 +190,7 @@ impl Repo {
   pub async fn commit(&self, add_all: bool) -> Result<()> {
     debug!("[commit] Committing with message");
 
-    let repo = self.repo.lock().expect("Failed to lock repo");
+    let repo = self.repo.read().expect("Failed to lock repo");
     let mut index = repo.index().expect("Failed to get index");
 
     if add_all {
@@ -227,8 +228,8 @@ impl Repo {
   }
 }
 
-pub fn repo() -> &'static Repo {
-  &REPO
+pub fn repo() -> Repo {
+  Repo::new().expect("Failed to initialize git repository")
 }
 
 #[cfg(test)]
