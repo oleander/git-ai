@@ -96,7 +96,6 @@ impl Repo {
       bail!("No files to commit");
     }
 
-    // Get the full diff
     let mut diff_str = Vec::new();
     diff.print(git2::DiffFormat::Patch, |_, _, line| {
       diff_str.extend_from_slice(line.content());
@@ -106,7 +105,6 @@ impl Repo {
     let mut diff_output =
       String::from_utf8(diff_str).expect("Diff output is not valid UTF-8");
 
-    
     diff_output.truncate(max_token_count);
 
     trace!("Diff: {}", diff_output);
@@ -355,4 +353,53 @@ mod tests {
     let res = repo.diff(usize::MAX);
     assert!(res.is_err());
   }
+
+  // Test case for adding a new file and committing it
+  #[test]
+  fn add_and_commit_new_file() {
+    setup();
+    let (helpers, repo) = Git2Helpers::new();
+    helpers.create_file("new_file.txt");
+    helpers.stage_file("new_file.txt");
+    helpers.commit();
+    let res = repo.diff(usize::MAX);
+    assert!(res.is_err());
+  }
+
+  // Test case for deleting a file and committing the deletion
+  #[test]
+  fn delete_and_commit_file() {
+    setup();
+    let (helpers, repo) = Git2Helpers::new();
+    helpers.create_file("deletable_file.txt");
+    helpers.stage_file("deletable_file.txt");
+    helpers.commit();
+    helpers.delete_file("deletable_file.txt");
+    helpers.stage_deleted_file("deletable_file.txt");
+    helpers.commit();
+    let res = repo.diff(usize::MAX);
+    assert!(res.is_err());
+  }
+
+  // Test case for modifying a file and partially staging the changes
+  #[test]
+  fn modify_and_partially_stage_file() {
+    setup();
+    let (helpers, repo) = Git2Helpers::new();
+    helpers.create_file("modifiable_file.txt");
+    helpers.commit();
+    helpers.replace_file("modifiable_file.txt"); // Unstaged changes
+    helpers.stage_file("modifiable_file.txt"); // Stage only the initial content
+    let (diff, _) = repo.diff(usize::MAX).expect("Could not generate diff");
+    assert!(!diff.is_empty(), "Diff should not be empty after partial staging");
+  }
+
+  // // Test case for committing with an empty repository (no changes)
+  // #[test]
+  // fn commit_with_no_changes() {
+  //   setup();
+  //   let (_, repo) = Git2Helpers::new();
+  //   let commit_result = repo.commit(false);
+  //   assert!(commit_result.is_err(), "Commit should fail with no changes");
+  // }
 }
