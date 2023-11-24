@@ -209,20 +209,21 @@ mod tests {
     }
 
     pub fn random_content() -> String {
-      (0..5)
-        .map(|_| rand::random::<char>())
-        .filter(|c| c.is_ascii_alphanumeric())
-        .collect::<String>()
-        + "\n"
+      format!("Random content {}", rand::random::<u8>())
     }
 
     pub fn replace_file(&self, file_name: &str) {
+      info!("FRom: {:?}", self.read_file(file_name));
       let random_content = Self::random_content();
+      info!("Random content: {}", random_content);
       let file_path = self.path().join(file_name);
-      let mut file = File::create(&file_path).expect("Could not open file");
-      file
-        .write_all(random_content.as_bytes())
-        .expect("Could not write to file");
+      std::fs::write(&file_path, random_content).unwrap();
+      info!("To: {:?}", self.read_file(file_name));
+    }
+
+    pub fn read_file(&self, file_name: &str) -> String {
+      let file_path = self.path().join(file_name);
+      std::fs::read_to_string(&file_path).expect("Could not read file")
     }
 
     pub fn create_file(&self, file_name: &str) {
@@ -243,32 +244,45 @@ mod tests {
       self.path().to_str().unwrap()
     }
 
-    pub fn status(&self) -> String {
-      self.git(&["status", "--porcelain"])
+    pub fn status(&self) -> Result<String> {
+      self.git(&["status"])
     }
 
-    pub fn stage_file(&self, file_name: &str) {
-      self.git(&["add", file_name]);
+    pub fn stage_file(&self, file_name: &str) -> Result<String> {
+      self.git(&["add", file_name])
     }
 
-    fn git(&self, args: &[&str]) -> String {
-      Command::new("git")
+    pub fn debug(&self) -> Result<()> {
+      let status = self.status()?;
+      info!("Status: {}", status);
+      let diff = self.git(&["diff" , "--cached"])?;
+      info!("Diff: {}", diff);
+      Ok(())
+    }
+
+    fn git(&self, args: &[&str]) -> Result<String> {
+      let output = Command::new("git")
         .args(args)
         .env("OVERCOMMIT_DISABLE", "1")
         .current_dir(self.path())
         .output()
-        .context("Could not run git command")
-        .unwrap()
-        .stdout.into_iter().map(|b| b as char).collect::<String>()
+        .context("Could not run git command")?;
+
+      if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("Git command failed: {}", stderr);  
+      }
+
+      Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 
-    pub fn stage_deleted_file(&self, file_name: &str) {
-      self.git(&["add", file_name]);
+    pub fn stage_deleted_file(&self, file_name: &str) -> Result<String> {
+      self.git(&["add", file_name])
     }
 
-    pub fn commit(&self) {
+    pub fn commit(&self) -> Result<String> {
       let message = format!("Commit {}", rand::random::<u8>());
-      self.git(&["commit", "-m", &message]);
+      self.git(&["commit", "-m", &message])
     }
   }
 
@@ -307,10 +321,10 @@ mod tests {
     let (_, files) = repo.diff(usize::MAX).expect("Could not generate diff");
     assert_eq!(files, vec!["test.txt"]);
 
-    /* Reset */
+    // /* Reset */
     helpers.commit();
 
-    /* The file is modified again without staging */
+    // /* The file is modified again without staging */
     helpers.create_file("new.txt");
     let res = repo.diff(usize::MAX);
     assert!(res.is_err());
@@ -381,18 +395,14 @@ mod tests {
     helpers.stage_file("file2.txt");
     helpers.commit();
 
-    // helpers.replace_file("file1.txt"); // Modify file1
-    // helpers.delete_file("file2.txt"); // Delete file2
-    // helpers.stage_file("file1.txt"); // Stage modification of file1
-    // helpers.stage_deleted_file("file2.txt"); // Stage deletion of file2
-    // helpers.commit();
+    helpers.replace_file("file1.txt"); // Modify file1
+    helpers.delete_file("file2.txt"); // Delete file2
+    helpers.stage_file("file1.txt"); // Stage modification of file1
+    helpers.stage_deleted_file("file2.txt"); // Stage deletion of file2
+    helpers.commit();
 
-    info!("Stats: {:?}", repo.stats());
-    let (diff, files) = repo.diff(usize::MAX).expect("Could not generate diff");
-    info!("Diff: \n{}", diff);
-    info!("Files: {:?}", files);
-    assert!(files.is_empty());
-    // assert_eq!(files, vec!["file1.txt", "file2.txt"]);
+    let res = repo.diff(usize::MAX);
+    assert!(res.is_err());
   }
 
   // Test case for unstaged changes after committing
