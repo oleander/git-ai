@@ -40,14 +40,14 @@ impl Repo {
   pub fn opts() -> DiffOptions {
     let mut opts = DiffOptions::new();
     opts
-        .enable_fast_untracked_dirs(true)
-        .ignore_whitespace_change(true)
-        .recurse_untracked_dirs(false)
-        .recurse_ignored_dirs(false)
-        .ignore_whitespace_eol(true)
-        .recurse_untracked_dirs(false)
-        .ignore_blank_lines(true)
-        .ignore_submodules(true)
+      .enable_fast_untracked_dirs(true)
+      .ignore_whitespace_change(true)
+      .recurse_untracked_dirs(false)
+      .recurse_ignored_dirs(false)
+      .ignore_whitespace_eol(true)
+      .recurse_untracked_dirs(false)
+      .ignore_blank_lines(true)
+      .ignore_submodules(true)
       .include_untracked(false)
       .include_ignored(false)
       .interhunk_lines(0)
@@ -128,10 +128,8 @@ impl Repo {
       true
     })?;
 
-
     let diff_output =
       String::from_utf8(diff_str).expect("Diff output is not valid UTF-8");
-
 
     debug!("Diff: {}", diff_output);
 
