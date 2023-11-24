@@ -165,42 +165,38 @@ mod tests {
   use anyhow::{anyhow, bail, Context, Result};
   use std::io::Write;
   use parsepatch::PatchReader;
-  use std::path::Path;
+  use std::path::{Path, PathBuf};
   use tempfile::TempDir;
   use crate::git::Repo;
+  use std::process::Command;
 
   pub struct Git2Helpers {
-    pub repo: Repository,
-    pub dir:  TempDir
+    dir: TempDir
   }
 
   impl Git2Helpers {
     pub fn new() -> (Self, Repo) {
       let dir = TempDir::new().expect("Could not create temp dir");
-      let repo =
-        Repository::init(dir.path()).expect("Could not initialize repo");
-      let helper = Self {
-        repo,
-        dir
-      };
-      let repo2 = helper.into_repo();
-      (helper, repo2)
+      Command::new("git")
+        .args(["init", dir.path().to_str().unwrap()])
+        .status()
+        .expect("Could not initialize repo");
+
+      let repo = Repo::new_with_path(dir.path().to_str().unwrap().to_string())
+        .expect("Could not open repo");
+
+      let h = Git2Helpers { dir};
+      (h, repo)
     }
 
     pub fn path(&self) -> &Path {
-      self.repo.path().parent().unwrap()
+      self.dir.path()
     }
 
-    pub fn into_repo(&self) -> Repo {
-      Repo::new_with_path(self.path().to_str().unwrap().to_string())
-        .expect("Could not create repo")
-    }
-
-    fn random_content() -> String {
-      std::iter::repeat(())
-        .map(|()| rand::random::<char>())
+    pub fn random_content() -> String {
+      (0..5)
+        .map(|_| rand::random::<char>())
         .filter(|c| c.is_ascii_alphanumeric())
-        .take(5)
         .collect::<String>()
         + "\n"
     }
@@ -208,94 +204,55 @@ mod tests {
     pub fn replace_file(&self, file_name: &str) {
       let random_content = Self::random_content();
       let file_path = self.path().join(file_name);
-      let mut file = File::create(file_path).expect("Could not open file");
+      let mut file = File::create(&file_path).expect("Could not open file");
       file
         .write_all(random_content.as_bytes())
         .expect("Could not write to file");
+      self.stage_file(file_name);
     }
 
     pub fn create_file(&self, file_name: &str) {
       let random_content = Self::random_content();
       let file_path = self.path().join(file_name);
-      let mut file = File::create(file_path).expect("Could not create file");
+      let mut file = File::create(&file_path).expect("Could not create file");
       file
         .write_all(random_content.as_bytes())
         .expect("Could not write to file");
+      self.stage_file(file_name);
     }
 
     pub fn delete_file(&self, file_name: &str) {
       let file_path = self.path().join(file_name);
-      std::fs::remove_file(file_path).expect("Could not delete file");
+      std::fs::remove_file(&file_path).expect("Could not delete file");
+      self.stage_deleted_file(file_name);
     }
 
-    fn stage_file(&self, file_name: &str) {
-      let mut index = self.repo.index().expect("Could not get repo index");
-      index
-        .add_path(Path::new(file_name))
-        .expect("Could not add file to index");
-      index.write().expect("Could not write index");
+    pub fn str_path(&self) -> &str {
+      self.path().to_str().unwrap()
     }
 
-    fn stage_deleted_file(&self, file_name: &str) {
-      let mut index = self.repo.index().expect("Could not get repo index");
-      index
-        .remove_path(Path::new(file_name))
-        .expect("Could not remove file from index");
-      index.write().expect("Could not write index");
+    pub fn stage_file(&self, file_name: &str) {
+      self.git(&["add", file_name]);
+    }
+
+    fn git(&self, args: &[&str]) {
+      Command::new("git")
+        .args(args)
+        .current_dir(self.path())
+        .status()
+        .expect("Could not execute git command");
+    }
+
+    pub fn stage_deleted_file(&self, file_name: &str) {
+      self.git(&["add", "-u", file_name]);
     }
 
     pub fn commit(&self) {
-      let random_number = rand::random::<u8>();
-      let message = format!("Commit {}", random_number);
-
-      let mut index = self.repo.index().unwrap();
-      let oid = index.write_tree().unwrap();
-      let tree = self.repo.find_tree(oid).unwrap();
-      let signature = self.repo.signature().unwrap();
-
-      let result = match self.repo.head() {
-        Ok(ref head) => {
-          let parent = head
-            .resolve()
-            .unwrap()
-            .peel(ObjectType::Commit)
-            .unwrap()
-            .into_commit()
-            .unwrap();
-
-          self.repo.commit(
-            Some("HEAD"),
-            &signature,
-            &signature,
-            &message,
-            &tree,
-            &[&parent]
-          )
-        },
-        Err(_) => {
-          self.repo.commit(
-            Some("HEAD"),
-            &signature,
-            &signature,
-            &message,
-            &tree,
-            &[]
-          )
-        },
-      };
-
-      result.unwrap();
-    }
-
-    fn find_last_commit(&self) -> Option<git2::Commit> {
-      self
-        .repo
-        .head()
-        .ok()
-        .and_then(|ref_head| ref_head.resolve().ok())
-        .and_then(|head| head.peel_to_commit().ok())
+      let message = format!("Commit {}", rand::random::<u8>());
+      self.git(&["commit", "-m", &message]);
     }
   }
+
 
   fn setup() {
     _ = env_logger::builder().is_test(true).try_init();
