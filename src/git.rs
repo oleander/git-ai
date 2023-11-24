@@ -218,41 +218,27 @@ mod tests {
         + "\n"
     }
 
-    pub fn replace_file(&self, file_name: &str) -> String {
+    pub fn replace_file(&self, file_name: &str) {
       let random_content = Self::random_content();
       let file_path = self.path().join(file_name);
       let mut file = File::create(file_path).expect("Could not open file");
       file
         .write_all(random_content.as_bytes())
         .expect("Could not write to file");
-      self.stage_file(file_name);
-
-      random_content
     }
 
-    pub fn create_file(&self, file_name: &str) -> String {
+    pub fn create_file(&self, file_name: &str) {
       let random_content = Self::random_content();
       let file_path = self.path().join(file_name);
       let mut file = File::create(file_path).expect("Could not create file");
       file
         .write_all(random_content.as_bytes())
         .expect("Could not write to file");
-      self.stage_file(file_name);
-
-      random_content
-    }
-
-    pub fn modify_file(&self, file_name: &str, content: &str) {
-      let file_path = self.path().join(file_name);
-      let mut file = File::create(file_path).expect("Could not open file");
-      file.write_all(content.as_bytes()).expect("Could not write to file");
-      self.stage_file(file_name);
     }
 
     pub fn delete_file(&self, file_name: &str) {
       let file_path = self.path().join(file_name);
       std::fs::remove_file(file_path).expect("Could not delete file");
-      self.stage_deleted_file(file_name);
     }
 
     fn stage_file(&self, file_name: &str) {
@@ -327,130 +313,39 @@ mod tests {
   fn file_replacement() {
     let (helpers, repo) = Git2Helpers::new();
 
+    /*  A file is created and committed */
     helpers.create_file("test.txt");
+    helpers.stage_file("test.txt");
     helpers.commit();
-
     let stats = repo.stats().expect("Could not get diff stats");
     assert_eq!(stats.files_changed(), 0);
     assert_eq!(stats.insertions(), 0);
     assert_eq!(stats.deletions(), 0);
 
+    /* A new file is created and committed */
     helpers.create_file("other.txt");
-
+    helpers.stage_file("other.txt");
     let stats = repo.stats().expect("Could not get diff stats");
     assert_eq!(stats.files_changed(), 1);
     assert_eq!(stats.insertions(), 1);
     assert_eq!(stats.deletions(), 0);
-    
+
     /* Reset */
     helpers.commit();
 
+    /* The file is modified and committed */
     helpers.replace_file("test.txt");
+    helpers.stage_file("test.txt");
     let stats = repo.stats().expect("Could not get diff stats");
     assert_eq!(stats.files_changed(), 1);
     assert_eq!(stats.insertions(), 1);
     assert_eq!(stats.deletions(), 1);
+
+    /* The file is modified again without staging */
+    helpers.replace_file("test.txt");
+    let stats = repo.stats().expect("Could not get diff stats");
+    assert_eq!(stats.files_changed(), 0);
+    assert_eq!(stats.insertions(), 0);
+    assert_eq!(stats.deletions(), 0);
   }
-
-  // **File Deletion**:
-  // 1. Delete a file from the repository.
-  // 2. Stage the deletion with `git rm`.
-  // 3. Commit the deletion.
-  // 4. Test `git diff` with a previous commit to ensure it shows the file as deleted.
-  // #[test]
-  // fn file_deletion() {
-  //   let (helpers, repo) = Git2Helpers::new();
-  //   helpers.create_file("test.txt", "A\n");
-  //   helpers.commit_changes("Initial commit");
-  //   helpers.delete_file("test.txt");
-  //   let (diff, _) = repo.diff(usize::MAX).expect("Could not generate diff");
-  //   assert_eq!(diff, "-A\n");
-  // }
 }
-
-// **File Renaming**:
-// 1. Rename an existing file in the repository.
-// 2. Stage the rename with `git add` (for the new name) and `git rm` (for the old name).
-// 3. Commit the changes.
-// 4. Test `git diff` to ensure it shows the file as renamed.
-
-// **Directory Changes**:
-// 1. Make changes within a directory (add, modify, delete files).
-// 2. Stage the directory changes.
-// 3. Commit the directory changes.
-// 4. Test `git diff` to ensure it shows all the changes made within the directory.
-
-// **File Permissions Change**:
-// 1. Change the permissions of a file without altering its content.
-// 2. Stage the permission changes.
-// 3. Commit the changes.
-// 4. Test `git diff` to ensure it shows the permission changes.
-
-// **Binary Files**:
-// 1. Add or modify a binary file in the repository.
-// 2. Stage and commit the binary file.
-// 3. Modify the binary file again without staging.
-// 4. Test `git diff` to ensure it indicates a binary file has changed.
-
-// **Large Changes**:
-// 1. Make a large number of changes to a file or multiple files.
-// 2. Stage and commit these changes.
-// 3. Make more large changes without staging.
-// 4. Test `git diff` to ensure it shows all the large changes accurately.
-
-// **Conflict Resolution**:
-// 1. Create a merge conflict by editing the same part of a file in two different branches.
-// 2. Attempt to merge the branches and observe the conflict.
-// 3. Resolve the conflict manually.
-// 4. Stage and commit the resolution.
-// 5. Test `git diff` to ensure no differences are shown between the two branches now.
-
-// **Submodule Updates**:
-// 1. Update a submodule to a new commit.
-// 2. Stage the submodule changes.
-// 3. Commit the submodule changes.
-// 4. Test `git diff` to ensure it shows the new commit reference for the submodule.
-
-// **Line Endings**:
-// 1. Change the line endings in a file from LF to CRLF or vice versa.
-// 2. Stage and commit the line ending changes.
-// 3. Test `git diff` with `--ignore-space-at-eol` to ensure it does/doesn't show the line ending changes based on the flag.
-
-// **Whitespace Changes**:
-// 1. Make whitespace changes in a file (add spaces or tabs).
-// 2. Stage and commit these whitespace changes.
-// 3. Test `git diff` with `--ignore-all-space` to ensure it doesn't show whitespace changes.
-
-// **Empty Repository**:
-// 1. Initialize an empty Git repository.
-// 2. Test `git diff` to ensure it shows no output or changes.
-
-// **Untracked Files**:
-// 1. Add new files to the repository without staging them.
-// 2. Test `git diff` to ensure it does not show untracked files.
-
-// **Staged vs Unstaged**:
-// 1. Make changes to a file and stage it.
-// 2. Make additional changes to the same file without staging.
-// 3. Test `git diff` and `git diff --staged` to ensure they show the correct staged and unstaged changes respectively.
-
-// **Multiple File Changes**:
-// 1. Make changes to multiple files in the repository.
-// 2. Stage some files and leave others unstaged.
-// 3. Commit the staged files.
-// 4. Test `git diff` to ensure it shows only the changes in the unstaged files.
-
-// **Branch Diffs**:
-// 1. Create two branches and make different changes in each.
-// 2. Commit the changes in each branch.
-// 3. Test `git diff branch1..branch2` to ensure it shows the differences between the two branches.
-
-// **Tag Diffs**:
-// 1. Commit changes and tag the commit.
-// 2. Make further changes and commit them.
-// 3. Test `git diff tag..HEAD` to ensure it shows the changes made after the tag.
-
-// **Undo Last Commit**:
-// 1. Make and commit changes to a file.
-// 2. Undo the commit with `git reset --soft HEAD~1`.
-// 3. Test `git diff` to ensure it shows the changes that were in the undone commit.
