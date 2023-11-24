@@ -58,9 +58,9 @@ impl Repo {
     let mut buf = Vec::new();
     let mut opts = self.opts();
     let mut count = 0;
-    let tree = repo.head()?.peel_to_tree()?;
+    let tree = repo.head().context("Failed to get head")?.peel_to_tree()?;
     let diff =
-      repo.diff_tree_to_index(Some(&tree), Some(&index), Some(&mut opts))?;
+      repo.diff_tree_to_index(Some(&tree), Some(&index), Some(&mut opts)).context("Failed to diff tree to index")?;
 
     diff.foreach(
       &mut |_file, _progress| true,
@@ -80,13 +80,13 @@ impl Repo {
         count = new_count;
         true
       })
-    )?;
+    ).context("Failed to iterate over diff")?;
 
     if buf.is_empty() {
       bail!("Nothing to commit");
     }
 
-    let str = String::from_utf8(buf)?;
+    let str = String::from_utf8(buf).context("Failed to convert diff to string")?;
     Ok((str, index))
   }
 
@@ -99,22 +99,22 @@ impl Repo {
     if add_all {
       debug!("Adding all files to index(--all)");
 
-      index.add_all(["*"], IndexAddOption::DEFAULT, None)?;
-      index.write()?;
+      index.add_all(["*"], IndexAddOption::DEFAULT, None).context("Failed to add all files to index")?;
+      index.write().context("Failed to write index")?;
     }
 
-    let (diff, mut index) = self.diff(1000, &repo, index)?;
-    let oid = index.write_tree()?;
-    let tree = repo.find_tree(oid)?;
-    let signature = repo.signature()?;
+    let (diff, mut index) = self.diff(1000, &repo, index).context("Failed to generate diff")?;
+    let oid = index.write_tree().context("Failed to write tree")?;
+    let tree = repo.find_tree(oid).context("Failed to find tree")?;
+    let signature = repo.signature().context("Failed to get signature")?;
     let parent = repo
-      .head()?
-      .resolve()?
-      .peel(ObjectType::Commit)?
+      .head().context("Failed to get head (2)")?
+      .resolve().context("Failed to resolve head")?
+      .peel(ObjectType::Commit).context("Failed to peel head")?
       .into_commit()
       .map_err(|_| anyhow!("Failed to resolve parent commit"))?;
 
-    let message = chat::suggested_commit_message(diff).await?;
+    let message = chat::suggested_commit_message(diff).await.context("Failed to generate commit message")?;
 
     repo.commit(
       Some("HEAD"),
@@ -123,7 +123,7 @@ impl Repo {
       &message,
       &tree,
       &[&parent]
-    )?;
+    ).context("Failed to commit")?;
 
     Ok(())
   }
