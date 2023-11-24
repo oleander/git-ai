@@ -382,11 +382,8 @@ mod tests {
     /* A new file is created and committed */
     helpers.create_file("other.txt");
     helpers.stage_file("other.txt");
-    let stats = repo.stats().expect("Could not get diff stats");
-
-    assert_eq!(stats.files_changed(), 1);
-    assert_eq!(stats.insertions(), 1);
-    assert_eq!(stats.deletions(), 0);
+    let (_, files) = repo.diff(usize::MAX).expect("Could not generate diff");
+    assert_eq!(files, vec!["other.txt"]);
 
     /* Reset */
     helpers.commit();
@@ -394,19 +391,15 @@ mod tests {
     /* The file is modified and committed */
     helpers.replace_file("test.txt");
     helpers.stage_file("test.txt");
-    let stats = repo.stats().expect("Could not get diff stats");
-    assert_eq!(stats.files_changed(), 1);
-    assert_eq!(stats.insertions(), 1);
-    assert_eq!(stats.deletions(), 1);
+    let (_, files) = repo.diff(usize::MAX).expect("Could not generate diff");
+    assert_eq!(files, vec!["test.txt"]);
 
     /* Reset */
     helpers.commit();
 
     /* The file is modified again without staging */
     helpers.create_file("new.txt");
-    let stats = repo.stats().expect("Could not get diff stats");
-    assert_eq!(stats.files_changed(), 0);
-    assert_eq!(stats.insertions(), 0);
-    assert_eq!(stats.deletions(), 0);
+    let res = repo.diff(usize::MAX);
+    assert!(res.is_err());
   }
 }
