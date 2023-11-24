@@ -191,7 +191,7 @@ impl Repo {
       index.write().context("Failed to write index")?;
     }
 
-    let diff = self.diff(1000).context("Failed to generate diff")?;
+    let diff = self.diff(1000)?;
     let oid = index.write_tree().context("Failed to write tree")?;
     let tree = repo.find_tree(oid).context("Failed to find tree")?;
     let signature = repo.signature().context("Failed to get signature")?;
