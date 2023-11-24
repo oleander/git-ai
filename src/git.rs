@@ -271,7 +271,9 @@ mod tests {
       index.write().expect("Could not write index");
     }
 
-    pub fn commit_changes(&self, message: &str) {
+    pub fn commit(&self) {
+      let random_number = rand::random::<u8>();
+      let message = format!("Commit {}", random_number);
       let sig = self.repo.signature().expect("Could not create signature");
       let mut index = self.repo.index().expect("Could not get repo index");
       let oid = index.write_tree().expect("Could not write tree");
@@ -285,7 +287,7 @@ mod tests {
 
       self
         .repo
-        .commit(Some("HEAD"), &sig, &sig, message, &tree, &parents)
+        .commit(Some("HEAD"), &sig, &sig, message.as_str(), &tree, &parents)
         .expect("Could not commit");
     }
 
@@ -324,8 +326,9 @@ mod tests {
   #[test]
   fn file_replacement() {
     let (helpers, repo) = Git2Helpers::new();
+
     helpers.create_file("test.txt");
-    helpers.commit_changes("Initial commit");
+    helpers.commit();
 
     let stats = repo.stats().expect("Could not get diff stats");
     assert_eq!(stats.files_changed(), 0);
@@ -338,6 +341,15 @@ mod tests {
     assert_eq!(stats.files_changed(), 1);
     assert_eq!(stats.insertions(), 1);
     assert_eq!(stats.deletions(), 0);
+    
+    /* Reset */
+    helpers.commit();
+
+    helpers.replace_file("test.txt");
+    let stats = repo.stats().expect("Could not get diff stats");
+    assert_eq!(stats.files_changed(), 1);
+    assert_eq!(stats.insertions(), 1);
+    assert_eq!(stats.deletions(), 1);
   }
 
   // **File Deletion**:
