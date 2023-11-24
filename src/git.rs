@@ -71,7 +71,7 @@ impl Repo {
     diff.stats().context("Failed to get diff stats")
   }
 
-  pub fn diff(&self, max_token_count: usize) -> Result<String> {
+  pub fn diff(&self, max_token_count: usize) -> Result<(String, Vec<String>)> {
     let mut opts = Repo::opts();
     let repo = self.repo.read().expect("Failed to lock repo");
     let mut opts = Repo::opts();
@@ -114,7 +114,7 @@ impl Repo {
 
     trace!("Diff: {}", diff_output);
 
-    Ok(diff_output)
+    Ok((diff_output, files))
   }
 
   pub fn diff2(&self, max_token_count: usize) -> Result<String> {
@@ -191,7 +191,7 @@ impl Repo {
       index.write().context("Failed to write index")?;
     }
 
-    let diff = self.diff(1000)?;
+    let (diff, _) = self.diff(1000)?;
     let oid = index.write_tree().context("Failed to write tree")?;
     let tree = repo.find_tree(oid).context("Failed to find tree")?;
     let signature = repo.signature().context("Failed to get signature")?;
@@ -205,9 +205,7 @@ impl Repo {
       .into_commit()
       .map_err(|_| anyhow!("Failed to resolve parent commit"))?;
 
-    let message = chat::suggested_commit_message(diff)
-      .await
-      .context("Failed to generate commit message")?;
+    let message = chat::suggested_commit_message(diff).await?;
 
     repo
       .commit(Some("HEAD"), &signature, &signature, &message, &tree, &[&parent])
