@@ -40,15 +40,15 @@ impl Repo {
   pub fn opts() -> DiffOptions {
     let mut opts = DiffOptions::new();
     opts
-    //   .enable_fast_untracked_dirs(true)
-    //   .ignore_whitespace_change(true)
-    //   .recurse_untracked_dirs(false)
-    //   .recurse_ignored_dirs(false)
-    //   .ignore_whitespace_eol(true)
-    //   .recurse_untracked_dirs(false)
-    //   .ignore_blank_lines(true)
-    //   .ignore_submodules(true)
-    .include_untracked(false)
+      //   .enable_fast_untracked_dirs(true)
+      //   .ignore_whitespace_change(true)
+      //   .recurse_untracked_dirs(false)
+      //   .recurse_ignored_dirs(false)
+      //   .ignore_whitespace_eol(true)
+      //   .recurse_untracked_dirs(false)
+      //   .ignore_blank_lines(true)
+      //   .ignore_submodules(true)
+      .include_untracked(false)
       .include_ignored(false);
     //   .interhunk_lines(0)
     //   .context_lines(0);
@@ -356,7 +356,7 @@ mod tests {
   }
 
   fn setup() {
-   _ = env_logger::builder().is_test(true).try_init();
+    _ = env_logger::builder().is_test(true).try_init();
   }
 
   // **New File Addition**:
