@@ -199,13 +199,17 @@ mod tests {
         .expect("Could not create repo")
     }
 
-    pub fn append_file(&self, file_name: &str) -> String {
-      let random_content = std::iter::repeat(())
+    fn random_content() -> String {
+      std::iter::repeat(())
         .map(|()| rand::random::<char>())
         .filter(|c| c.is_ascii_alphanumeric())
-        .take(100)
-        .collect::<String>();
+        .take(5)
+        .collect::<String>() + "\n"
+    }
+
+    pub fn append_file(&self, file_name: &str) -> String {
       let file_path = self.path().join(file_name);
+      let random_content = Self::random_content();
       let mut file = std::fs::OpenOptions::new()
         .append(true)
         .open(file_path)
@@ -219,15 +223,12 @@ mod tests {
     }
 
     pub fn create_file(&self, file_name: &str) -> String {
-      // max 100 random characters
-      let random_content = std::iter::repeat(())
-        .map(|()| rand::random::<char>())
-        .filter(|c| c.is_ascii_alphanumeric())
-        .take(100)
-        .collect::<String>();
+      let random_content = Self::random_content();
       let file_path = self.path().join(file_name);
       let mut file = File::create(file_path).expect("Could not create file");
-      writeln!(file, "{}", random_content).expect("Could not write to file");
+      file
+        .write_all(random_content.as_bytes())
+        .expect("Could not write to file");
       self.stage_file(file_name);
 
       random_content
@@ -237,7 +238,6 @@ mod tests {
       let file_path = self.path().join(file_name);
       let mut file = File::create(file_path).expect("Could not open file");
       file.write_all(content.as_bytes()).expect("Could not write to file");
-      // writeln!(file, "{}", content).expect("Could not write to file");
       self.stage_file(file_name);
     }
 
