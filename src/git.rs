@@ -326,6 +326,7 @@ mod tests {
 
     let stats = repo.stats().expect("Could not get diff stats");
     assert_eq!(stats.files_changed(), 1);
+    assert_eq!(stats.insertions(), content2.len());
   }
 
   // **File Deletion**:
