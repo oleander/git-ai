@@ -250,15 +250,27 @@ mod tests {
     let (diff, _) = repo.diff(usize::MAX).expect("Could not generate diff");
     assert_eq!(diff, "\nB\n");
   }
+
+  // **File Modification**:
+  // 1. Modify an existing file in the repository.
+  // 2. Stage the modifications.
+  // 3. Commit the changes.
+  // 4. Further modify the file without staging the changes.
+  // 5. Test `git diff` to ensure it shows the unstaged changes since the last commit.
+  #[test]
+  fn file_modification() {
+    let (helpers, repo) = Git2Helpers::new();
+    helpers.create_file("test.txt", "A\n");
+    helpers.commit_changes("Initial commit");
+    helpers.modify_file("test.txt", "A\nB\n");
+    helpers.commit_changes("Second commit");
+    helpers.modify_file("test.txt", "A\nB\nC\n");
+    let (diff, _) = repo.diff(usize::MAX).expect("Could not generate diff");
+    assert_eq!(diff, "C\n");
+  }
 }
 
 
-// **File Modification**:
-// 1. Modify an existing file in the repository.
-// 2. Stage the modifications.
-// 3. Commit the changes.
-// 4. Further modify the file without staging the changes.
-// 5. Test `git diff` to ensure it shows the unstaged changes since the last commit.
 
 // **File Deletion**:
 // 1. Delete a file from the repository.
