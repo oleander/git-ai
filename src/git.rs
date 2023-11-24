@@ -74,11 +74,9 @@ impl Repo {
           .map_err(|_| anyhow!("Failed to resolve commit"))?
           .tree()
           .context("Failed to get tree")?;
-          repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))?
+        repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))?
       },
-      Err(_) => {
-        repo.diff_tree_to_workdir_with_index(None, Some(&mut opts))?
-      }
+      Err(_) => repo.diff_tree_to_workdir_with_index(None, Some(&mut opts))?
     };
 
     // Get names of staged files
@@ -255,7 +253,7 @@ mod tests {
     pub fn debug(&self) -> Result<()> {
       let status = self.status()?;
       info!("Status: {}", status);
-      let diff = self.git(&["diff" , "--cached"])?;
+      let diff = self.git(&["diff", "--cached"])?;
       info!("Diff: {}", diff);
       Ok(())
     }
@@ -270,7 +268,7 @@ mod tests {
 
       if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("Git command failed: {}", stderr);  
+        bail!("Git command failed: {}", stderr);
       }
 
       Ok(String::from_utf8_lossy(&output.stdout).to_string())
