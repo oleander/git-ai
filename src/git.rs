@@ -67,7 +67,6 @@ impl Repo {
   }
 
   pub fn diff(&self, max_token_count: usize) -> Result<(String, Vec<String>)> {
-    let mut opts = Repo::opts();
     let repo = self.repo.read().expect("Failed to lock repo");
     let mut opts = Repo::opts();
     let tree = repo
@@ -104,8 +103,11 @@ impl Repo {
       true
     })?;
 
-    let diff_output =
+    let mut diff_output =
       String::from_utf8(diff_str).expect("Diff output is not valid UTF-8");
+
+    
+    diff_output.truncate(max_token_count);
 
     trace!("Diff: {}", diff_output);
 
@@ -124,28 +126,6 @@ impl Repo {
 
     let mut buf = Vec::new();
     let mut count = 0;
-
-    // diff
-    //   .foreach(
-    //     &mut |_file, _progress| true,
-    //     None,
-    //     None,
-    //     Some(&mut |_delta, _hunk, line| {
-    //       let content = line.content();
-    //       let tokens: Vec<&[u8]> =
-    //         content.split(|c| c.is_ascii_whitespace()).collect();
-    //       let new_count = count + tokens.len();
-
-    //       if new_count > max_token_count {
-    //         return false;
-    //       }
-
-    //       buf.extend_from_slice(content);
-    //       count = new_count;
-    //       true
-    //     })
-    //   )
-    //   .context("Failed to iterate over diff")?;
 
     diff
       .print(DiffFormat::Patch, |_delta, _hunk, line| {
