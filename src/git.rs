@@ -153,11 +153,13 @@ mod tests {
   use std::io::Write;
   use std::path::Path;
   use tempfile::TempDir;
+  use crate::git::Repo;
 
   pub struct Git2Helpers {
     pub repo: Repository,
     pub dir: TempDir
   }
+
 
   impl Git2Helpers {
     pub fn new() -> Self {
@@ -168,6 +170,10 @@ mod tests {
 
     pub fn path(&self) -> &Path {
       self.repo.path().parent().unwrap()
+    }
+
+    pub fn into_repo(&self) -> Repo {
+      Repo::new_with_path(self.path().to_str().unwrap().to_string()).expect("Could not create repo")
     }
 
     pub fn create_file(&self, file_name: &str, content: &str) {
@@ -236,9 +242,7 @@ mod tests {
   #[test]
   fn new_file_addition() {
     let helpers = Git2Helpers::new();
-    // info!("======");
-    // panic!("Path: {}", helpers.path().to_str().unwrap());
-    let repo = crate::git::Repo::new_with_path(helpers.path().to_str().unwrap().to_string()).expect("Could not create repo");
+    let repo: Repo = helpers.into_repo();
     helpers.create_file("test.txt", "Hello, world!");
     helpers.commit_changes("Initial commit");
     helpers.modify_file("test.txt", "Hello, world!\nHello, world!");
