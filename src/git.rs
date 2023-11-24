@@ -2,7 +2,7 @@
 #![allow(unused_imports)]
 
 use git2::{
-  Commit, Delta, DiffFormat, DiffOptions, Index, IndexAddOption, ObjectType, Oid, Repository, RepositoryInitOptions, RepositoryOpenFlags as Flag, StatusOptions, StatusShow, Diff
+  Commit, Delta, Diff, DiffFormat, DiffOptions, Index, IndexAddOption, ObjectType, Oid, Repository, RepositoryInitOptions, RepositoryOpenFlags as Flag, StatusOptions, StatusShow
 };
 use anyhow::{anyhow, bail, Context, Result};
 use log::{debug, error, info, trace, warn};
@@ -57,19 +57,24 @@ impl Repo {
   pub fn stats(&self) -> Result<git2::DiffStats> {
     let mut opts = self.opts();
     let repo = self.repo.lock().expect("Failed to lock repo");
-    let diff = repo.diff_tree_to_index(None, None, Some(&mut opts))?;
+    let tree = repo
+      .head()
+      .context("Failed to get head")?
+      .peel_to_tree()
+      .context("Failed to peel head to tree")?;
+    let diff = repo.diff_tree_to_index(Some(&tree), None, Some(&mut opts))?;
     diff.stats().context("Failed to get diff stats")
   }
 
   pub fn diff(&self, max_token_count: usize) -> Result<String> {
     let mut opts = self.opts();
     let repo = self.repo.lock().expect("Failed to lock repo");
-
-    let diff = repo.diff_tree_to_index(
-      None,
-      None,
-      Some(&mut opts)
-    )?;
+    let tree = repo
+      .head()
+      .context("Failed to get head")?
+      .peel_to_tree()
+      .context("Failed to peel head to tree")?;
+    let diff = repo.diff_tree_to_index(Some(&tree), None, Some(&mut opts))?;
 
     let mut buf = Vec::new();
     let mut count = 0;
@@ -135,8 +140,7 @@ impl Repo {
       index.write().context("Failed to write index")?;
     }
 
-    let diff =
-      self.diff(1000).context("Failed to generate diff")?;
+    let diff = self.diff(1000).context("Failed to generate diff")?;
     let oid = index.write_tree().context("Failed to write tree")?;
     let tree = repo.find_tree(oid).context("Failed to find tree")?;
     let signature = repo.signature().context("Failed to get signature")?;
@@ -173,7 +177,7 @@ mod tests {
   use log::info;
   use anyhow::{anyhow, bail, Context, Result};
   use std::io::Write;
-  use parsepatch::{PatchReader};
+  use parsepatch::PatchReader;
   use std::path::Path;
   use tempfile::TempDir;
   use crate::git::Repo;
@@ -210,7 +214,8 @@ mod tests {
         .map(|()| rand::random::<char>())
         .filter(|c| c.is_ascii_alphanumeric())
         .take(5)
-        .collect::<String>() + "\n"
+        .collect::<String>()
+        + "\n"
     }
 
     pub fn replace_file(&self, file_name: &str) -> String {
@@ -318,15 +323,21 @@ mod tests {
   // 5. Test `git diff` to ensure it shows the unstaged changes since the last commit.
   #[test]
   fn file_replacement() {
-      use parsepatch::Patch;
     let (helpers, repo) = Git2Helpers::new();
-    let content1 = helpers.create_file("test.txt");
+    helpers.create_file("test.txt");
     helpers.commit_changes("Initial commit");
-    let content2 = helpers.replace_file("test.txt");
+
+    let stats = repo.stats().expect("Could not get diff stats");
+    assert_eq!(stats.files_changed(), 0);
+    assert_eq!(stats.insertions(), 0);
+    assert_eq!(stats.deletions(), 0);
+
+    helpers.create_file("other.txt");
 
     let stats = repo.stats().expect("Could not get diff stats");
     assert_eq!(stats.files_changed(), 1);
-    assert_eq!(stats.insertions(), content2.len());
+    assert_eq!(stats.insertions(), 1);
+    assert_eq!(stats.deletions(), 0);
   }
 
   // **File Deletion**:
