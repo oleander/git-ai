@@ -423,10 +423,7 @@ mod tests {
     setup();
     let (helpers, repo) = Git2Helpers::new();
     helpers.create_file("new_unstaged_file.txt"); // Create the file without staging
-    let (diff, _) = repo.diff(usize::MAX).expect("Could not generate diff");
-    assert!(
-      !diff.is_empty(),
-      "Diff should not be empty when a new file is added without staging"
-    );
+    let res = repo.diff(usize::MAX);
+    assert!(res.is_err());
   }
 }
