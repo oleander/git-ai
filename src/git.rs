@@ -2,7 +2,7 @@
 #![allow(unused_imports)]
 
 use git2::{
-  Commit, Delta, DiffFormat, DiffOptions, Index, IndexAddOption, ObjectType, Oid, Repository, RepositoryInitOptions, RepositoryOpenFlags as Flag, StatusOptions, StatusShow
+  Commit, Delta, DiffFormat, DiffOptions, Index, IndexAddOption, ObjectType, Oid, Repository, RepositoryInitOptions, RepositoryOpenFlags as Flag, StatusOptions, StatusShow, Diff
 };
 use anyhow::{anyhow, bail, Context, Result};
 use log::{debug, error, info, trace, warn};
@@ -54,18 +54,25 @@ impl Repo {
     opts
   }
 
-  pub fn diff(&self, max_token_count: usize) -> Result<(String, Index)> {
-    debug!("[diff] Generating diff with max token count: {}", max_token_count);
+  pub fn stats(&self) -> Result<git2::DiffStats> {
+    let mut opts = self.opts();
+    let repo = self.repo.lock().expect("Failed to lock repo");
+    let diff = repo.diff_tree_to_index(None, None, Some(&mut opts))?;
+    diff.stats().context("Failed to get diff stats")
+  }
+
+  pub fn diff(&self, max_token_count: usize) -> Result<String> {
+    let mut opts = self.opts();
+    let repo = self.repo.lock().expect("Failed to lock repo");
+
+    let diff = repo.diff_tree_to_index(
+      None,
+      None,
+      Some(&mut opts)
+    )?;
 
     let mut buf = Vec::new();
-    let mut opts = self.opts();
     let mut count = 0;
-    let repo = self.repo.lock().expect("Failed to lock repo");
-    let tree = repo.head().context("Failed to get head")?.peel_to_tree()?;
-    let index = repo.index().context("Failed to get index")?;
-    let diff = repo
-      .diff_index_to_workdir(Some(&index), Some(&mut opts))
-      .context("Failed to diff tree to index")?;
 
     // diff
     //   .foreach(
@@ -107,12 +114,10 @@ impl Repo {
       .context("Failed to print diff")?;
 
     if buf.is_empty() {
-      bail!("Nothing to commit");
+      bail!("The diff is empty");
     }
 
-    let str =
-      String::from_utf8(buf).context("Failed to convert diff to string")?;
-    Ok((str, index))
+    String::from_utf8(buf).context("Failed to convert diff to string")
   }
 
   pub async fn commit(&self, add_all: bool) -> Result<()> {
@@ -130,7 +135,7 @@ impl Repo {
       index.write().context("Failed to write index")?;
     }
 
-    let (diff, mut index) =
+    let diff =
       self.diff(1000).context("Failed to generate diff")?;
     let oid = index.write_tree().context("Failed to write tree")?;
     let tree = repo.find_tree(oid).context("Failed to find tree")?;
@@ -168,6 +173,7 @@ mod tests {
   use log::info;
   use anyhow::{anyhow, bail, Context, Result};
   use std::io::Write;
+  use parsepatch::{PatchReader};
   use std::path::Path;
   use tempfile::TempDir;
   use crate::git::Repo;
@@ -207,13 +213,16 @@ mod tests {
         .collect::<String>() + "\n"
     }
 
-    pub fn overrite_file(&self, file_name: &str, content: String) -> String {
+    pub fn replace_file(&self, file_name: &str) -> String {
+      let random_content = Self::random_content();
       let file_path = self.path().join(file_name);
-      let mut file = File::create(file_path.clone()).expect("Could not open file");
-      file.write_all(content.as_bytes()).expect("Could not write to file");
+      let mut file = File::create(file_path).expect("Could not open file");
+      file
+        .write_all(random_content.as_bytes())
+        .expect("Could not write to file");
       self.stage_file(file_name);
 
-      content
+      random_content
     }
 
     pub fn create_file(&self, file_name: &str) -> String {
@@ -309,13 +318,14 @@ mod tests {
   // 5. Test `git diff` to ensure it shows the unstaged changes since the last commit.
   #[test]
   fn file_replacement() {
+      use parsepatch::Patch;
     let (helpers, repo) = Git2Helpers::new();
     let content1 = helpers.create_file("test.txt");
     helpers.commit_changes("Initial commit");
     let content2 = helpers.replace_file("test.txt");
 
-    let (diff, _) = repo.diff(usize::MAX).expect("Could not generate diff");
-    
+    let stats = repo.stats().expect("Could not get diff stats");
+    assert_eq!(stats.files_changed(), 1);
   }
 
   // **File Deletion**:
