@@ -552,7 +552,6 @@ dependencies = [
  "http-cache-reqwest",
  "lazy_static",
  "log",
- "parsepatch",
  "rand",
  "reqwest",
  "reqwest-middleware",
@@ -1037,15 +1036,6 @@ dependencies = [
  "libc",
  "pkg-config",
  "vcpkg",
-]
-
-[[package]]
-name = "parsepatch"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46c056f107e40038b8a19e5ff78ae6308ff0704dd36aaf4d1b1e0ec568f39543"
-dependencies = [
- "log",
 ]
 
 [[package]]

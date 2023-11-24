@@ -109,7 +109,7 @@ impl Repo {
 
     diff_output.truncate(max_token_count);
 
-    trace!("Diff: {}", diff_output);
+    debug!("Diff: {}", diff_output);
 
     Ok((diff_output, files))
   }
