@@ -59,7 +59,8 @@ fn http_client() -> ClientWithMiddleware {
 fn extract_message_from_response(response: &str) -> Result<String> {
   trace!("[extract_message_from_response] Response: {}", response);
 
-  let response: Value = from_str(response).context("Failed to parse response")?;
+  let response: Value =
+    from_str(response).context("Failed to parse response")?;
   Ok(
     response["choices"]
       .as_array()
@@ -80,7 +81,8 @@ async fn fetch_completion(payload: Value) -> Result<String> {
     .json(&payload)
     .timeout(std::time::Duration::from_secs(10))
     .send()
-    .await.context("Failed to send request")?
+    .await
+    .context("Failed to send request")?
     .text()
     .await
     .map_err(|e| e.into())
@@ -96,6 +98,10 @@ pub async fn suggested_commit_message(diff: String) -> Result<String> {
     ChatMessage::new("user", diff),
   ];
   let payload = json_payload(messages);
-  let response = fetch_completion(payload).await.context("Failed to fetch completion")?;
-  Ok(extract_message_from_response(&response).context("Failed to extract message from response")?)
+  let response =
+    fetch_completion(payload).await.context("Failed to fetch completion")?;
+  Ok(
+    extract_message_from_response(&response)
+      .context("Failed to extract message from response")?
+  )
 }

@@ -59,34 +59,38 @@ impl Repo {
     let mut opts = self.opts();
     let mut count = 0;
     let tree = repo.head().context("Failed to get head")?.peel_to_tree()?;
-    let diff =
-      repo.diff_tree_to_index(Some(&tree), Some(&index), Some(&mut opts)).context("Failed to diff tree to index")?;
+    let diff = repo
+      .diff_tree_to_index(Some(&tree), Some(&index), Some(&mut opts))
+      .context("Failed to diff tree to index")?;
 
-    diff.foreach(
-      &mut |_file, _progress| true,
-      None,
-      None,
-      Some(&mut |_delta, _hunk, line| {
-        let content = line.content();
-        let tokens: Vec<&[u8]> =
-          content.split(|c| c.is_ascii_whitespace()).collect();
-        let new_count = count + tokens.len();
+    diff
+      .foreach(
+        &mut |_file, _progress| true,
+        None,
+        None,
+        Some(&mut |_delta, _hunk, line| {
+          let content = line.content();
+          let tokens: Vec<&[u8]> =
+            content.split(|c| c.is_ascii_whitespace()).collect();
+          let new_count = count + tokens.len();
 
-        if new_count > max_token_count {
-          return false;
-        }
+          if new_count > max_token_count {
+            return false;
+          }
 
-        buf.extend_from_slice(content);
-        count = new_count;
-        true
-      })
-    ).context("Failed to iterate over diff")?;
+          buf.extend_from_slice(content);
+          count = new_count;
+          true
+        })
+      )
+      .context("Failed to iterate over diff")?;
 
     if buf.is_empty() {
       bail!("Nothing to commit");
     }
 
-    let str = String::from_utf8(buf).context("Failed to convert diff to string")?;
+    let str =
+      String::from_utf8(buf).context("Failed to convert diff to string")?;
     Ok((str, index))
   }
 
@@ -99,31 +103,34 @@ impl Repo {
     if add_all {
       debug!("Adding all files to index(--all)");
 
-      index.add_all(["*"], IndexAddOption::DEFAULT, None).context("Failed to add all files to index")?;
+      index
+        .add_all(["*"], IndexAddOption::DEFAULT, None)
+        .context("Failed to add all files to index")?;
       index.write().context("Failed to write index")?;
     }
 
-    let (diff, mut index) = self.diff(1000, &repo, index).context("Failed to generate diff")?;
+    let (diff, mut index) =
+      self.diff(1000, &repo, index).context("Failed to generate diff")?;
     let oid = index.write_tree().context("Failed to write tree")?;
     let tree = repo.find_tree(oid).context("Failed to find tree")?;
     let signature = repo.signature().context("Failed to get signature")?;
     let parent = repo
-      .head().context("Failed to get head (2)")?
-      .resolve().context("Failed to resolve head")?
-      .peel(ObjectType::Commit).context("Failed to peel head")?
+      .head()
+      .context("Failed to get head (2)")?
+      .resolve()
+      .context("Failed to resolve head")?
+      .peel(ObjectType::Commit)
+      .context("Failed to peel head")?
       .into_commit()
       .map_err(|_| anyhow!("Failed to resolve parent commit"))?;
 
-    let message = chat::suggested_commit_message(diff).await.context("Failed to generate commit message")?;
+    let message = chat::suggested_commit_message(diff)
+      .await
+      .context("Failed to generate commit message")?;
 
-    repo.commit(
-      Some("HEAD"),
-      &signature,
-      &signature,
-      &message,
-      &tree,
-      &[&parent]
-    ).context("Failed to commit")?;
+    repo
+      .commit(Some("HEAD"), &signature, &signature, &message, &tree, &[&parent])
+      .context("Failed to commit")?;
 
     Ok(())
   }
