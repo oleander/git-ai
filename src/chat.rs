@@ -59,8 +59,9 @@ fn http_client() -> ClientWithMiddleware {
 fn extract_message_from_response(response: &str) -> Result<String> {
   trace!("[extract_message_from_response] Response: {}", response);
 
+  let response: Value = from_str(response).context("Failed to parse response")?;
   Ok(
-    from_str::<Value>(response)?["choices"]
+    response["choices"]
       .as_array()
       .and_then(|choices| choices.get(0))
       .and_then(|choice| choice["message"]["content"].as_str())
@@ -78,7 +79,7 @@ async fn fetch_completion(payload: Value) -> Result<String> {
     .bearer_auth(API_KEY.as_str())
     .json(&payload)
     .send()
-    .await?
+    .await.context("Failed to send request")?
     .text()
     .await
     .map_err(|e| e.into())
@@ -94,6 +95,6 @@ pub async fn suggested_commit_message(diff: String) -> Result<String> {
     ChatMessage::new("user", diff),
   ];
   let payload = json_payload(messages);
-  let response = fetch_completion(payload).await?;
-  Ok(extract_message_from_response(&response)?)
+  let response = fetch_completion(payload).await.context("Failed to fetch completion")?;
+  Ok(extract_message_from_response(&response).context("Failed to extract message from response")?)
 }
