@@ -40,17 +40,17 @@ impl Repo {
   pub fn opts() -> DiffOptions {
     let mut opts = DiffOptions::new();
     opts
-      //   .enable_fast_untracked_dirs(true)
-      //   .ignore_whitespace_change(true)
-      //   .recurse_untracked_dirs(false)
-      //   .recurse_ignored_dirs(false)
-      //   .ignore_whitespace_eol(true)
-      //   .recurse_untracked_dirs(false)
-      //   .ignore_blank_lines(true)
-      //   .ignore_submodules(true)
+        .enable_fast_untracked_dirs(true)
+        .ignore_whitespace_change(true)
+        .recurse_untracked_dirs(false)
+        .recurse_ignored_dirs(false)
+        .ignore_whitespace_eol(true)
+        .recurse_untracked_dirs(false)
+        .ignore_blank_lines(true)
+        .ignore_submodules(true)
       .include_untracked(false)
       .include_ignored(false)
-    //   .interhunk_lines(0)
+      .interhunk_lines(0)
       .context_lines(0)
       .minimal(true);
     opts
