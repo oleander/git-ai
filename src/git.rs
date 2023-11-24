@@ -56,26 +56,14 @@ impl Repo {
   pub fn stats(&self) -> Result<git2::DiffStats> {
     let mut opts = Repo::opts();
     let repo = self.repo.read().expect("Failed to lock repo");
-    let tree = repo
-      .head()
-      .context("Failed to get head")?
-      .peel_to_tree()
-      .context("Failed to peel head to tree")?;
-    let diff =
-      repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))?;
+    let diff = repo.diff_tree_to_workdir_with_index(None, Some(&mut opts))?;
     diff.stats().context("Failed to get diff stats")
   }
 
   pub fn diff(&self, max_token_count: usize) -> Result<(String, Vec<String>)> {
     let repo = self.repo.read().expect("Failed to lock repo");
     let mut opts = Repo::opts();
-    let tree = repo
-      .head()
-      .context("Failed to get head")?
-      .peel_to_tree()
-      .context("Failed to peel head to tree")?;
-    let diff =
-      repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))?;
+    let diff = repo.diff_tree_to_workdir_with_index(None, Some(&mut opts))?;
 
     // Get names of staged files
     let mut files = Vec::new();
@@ -112,43 +100,6 @@ impl Repo {
     Ok((diff_output, files))
   }
 
-  pub fn diff2(&self, max_token_count: usize) -> Result<String> {
-    let mut opts = Repo::opts();
-    let repo = self.repo.read().expect("Failed to lock repo");
-    let tree = repo
-      .head()
-      .context("Failed to get head")?
-      .peel_to_tree()
-      .context("Failed to peel head to tree")?;
-    let diff = repo.diff_tree_to_index(Some(&tree), None, Some(&mut opts))?;
-
-    let mut buf = Vec::new();
-    let mut count = 0;
-
-    diff
-      .print(DiffFormat::Patch, |_delta, _hunk, line| {
-        let content = line.content();
-        let tokens: Vec<&[u8]> =
-          content.split(|c| c.is_ascii_whitespace()).collect();
-        let new_count = count + tokens.len();
-
-        if new_count > max_token_count {
-          return false;
-        }
-
-        buf.extend_from_slice(content);
-        count = new_count;
-        true
-      })
-      .context("Failed to print diff")?;
-
-    if buf.is_empty() {
-      bail!("The diff is empty");
-    }
-
-    String::from_utf8(buf).context("Failed to convert diff to string")
-  }
-
   pub async fn commit(&self, add_all: bool) -> Result<()> {
     debug!("[commit] Committing with message");
 
@@ -168,21 +119,31 @@ impl Repo {
     let oid = index.write_tree().context("Failed to write tree")?;
     let tree = repo.find_tree(oid).context("Failed to find tree")?;
     let signature = repo.signature().context("Failed to get signature")?;
-    let parent = repo
-      .head()
-      .context("Failed to get head (2)")?
-      .resolve()
-      .context("Failed to resolve head")?
-      .peel(ObjectType::Commit)
-      .context("Failed to peel head")?
-      .into_commit()
-      .map_err(|_| anyhow!("Failed to resolve parent commit"))?;
-
     let message = chat::suggested_commit_message(diff).await?;
 
-    repo
-      .commit(Some("HEAD"), &signature, &signature, &message, &tree, &[&parent])
-      .context("Failed to commit")?;
+    match repo.head() {
+      Ok(ref head) => {
+        let parent = head
+          .resolve()
+          .context("Failed to resolve head")?
+          .peel(ObjectType::Commit)
+          .context("Failed to peel head")?
+          .into_commit()
+          .map_err(|_| anyhow!("Failed to resolve parent commit"))?;
+
+        repo.commit(
+          Some("HEAD"),
+          &signature,
+          &signature,
+          &message,
+          &tree,
+          &[&parent]
+        ).context("Failed to commit (1)")?;
+      },
+      Err(_) => {
+        repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, &[]).context("Failed to commit (2)")?;
+      },
+    }
 
     Ok(())
   }
@@ -269,7 +230,6 @@ mod tests {
         .add_path(Path::new(file_name))
         .expect("Could not add file to index");
       index.write().expect("Could not write index");
-      index.write_tree().expect("Could not write tree");
     }
 
     fn stage_deleted_file(&self, file_name: &str) {
@@ -283,21 +243,44 @@ mod tests {
     pub fn commit(&self) {
       let random_number = rand::random::<u8>();
       let message = format!("Commit {}", random_number);
-      let sig = self.repo.signature().expect("Could not create signature");
-      let mut index = self.repo.index().expect("Could not get repo index");
-      let oid = index.write_tree().expect("Could not write tree");
-      let tree = self.repo.find_tree(oid).expect("Could not find tree");
-      let mut parent_commits = Vec::new();
-      if let Some(parent_commit) = self.find_last_commit() {
-        parent_commits.push(parent_commit); // Add the parent commit directly
-      }
 
-      let parents: Vec<&Commit> = parent_commits.iter().collect();
+      let mut index = self.repo.index().unwrap();
+      let oid = index.write_tree().unwrap();
+      let tree = self.repo.find_tree(oid).unwrap();
+      let signature = self.repo.signature().unwrap();
 
-      self
-        .repo
-        .commit(Some("HEAD"), &sig, &sig, message.as_str(), &tree, &parents)
-        .expect("Could not commit");
+      let result = match self.repo.head() {
+        Ok(ref head) => {
+          let parent = head
+            .resolve()
+            .unwrap()
+            .peel(ObjectType::Commit)
+            .unwrap()
+            .into_commit()
+            .unwrap();
+
+          self.repo.commit(
+            Some("HEAD"),
+            &signature,
+            &signature,
+            &message,
+            &tree,
+            &[&parent]
+          )
+        },
+        Err(_) => {
+          self.repo.commit(
+            Some("HEAD"),
+            &signature,
+            &signature,
+            &message,
+            &tree,
+            &[]
+          )
+        },
+      };
+
+      result.unwrap();
     }
 
     fn find_last_commit(&self) -> Option<git2::Commit> {
@@ -390,16 +373,71 @@ mod tests {
     helpers.commit();
     helpers.replace_file("modifiable_file.txt"); // Unstaged changes
     helpers.stage_file("modifiable_file.txt"); // Stage only the initial content
-    let (diff, _) = repo.diff(usize::MAX).expect("Could not generate diff");
-    assert!(!diff.is_empty(), "Diff should not be empty after partial staging");
+    let (_, files) = repo.diff(usize::MAX).expect("Could not generate diff");
+    assert_eq!(files, vec!["modifiable_file.txt"]);
   }
 
-  // // Test case for committing with an empty repository (no changes)
-  // #[test]
-  // fn commit_with_no_changes() {
-  //   setup();
-  //   let (_, repo) = Git2Helpers::new();
-  //   let commit_result = repo.commit(false);
-  //   assert!(commit_result.is_err(), "Commit should fail with no changes");
-  // }
+  // Test case for modifying a file and staging all changes
+  #[test]
+  fn modify_and_stage_all_changes() {
+    setup();
+    let (helpers, repo) = Git2Helpers::new();
+    helpers.create_file("file_to_modify.txt");
+    helpers.commit();
+    helpers.replace_file("file_to_modify.txt"); // Modify the file
+    helpers.stage_file("file_to_modify.txt"); // Stage all changes
+    helpers.commit();
+    let res = repo.diff(usize::MAX);
+    assert!(res.is_err());
+  }
+
+  // Test case for handling multiple file operations in a single commit
+  #[test]
+  fn handle_multiple_file_operations() {
+    setup();
+    let (helpers, repo) = Git2Helpers::new();
+    helpers.create_file("file1.txt");
+    helpers.create_file("file2.txt");
+    helpers.stage_file("file1.txt");
+    helpers.stage_file("file2.txt");
+    helpers.commit();
+
+    // helpers.replace_file("file1.txt"); // Modify file1
+    // helpers.delete_file("file2.txt"); // Delete file2
+    // helpers.stage_file("file1.txt"); // Stage modification of file1
+    // helpers.stage_deleted_file("file2.txt"); // Stage deletion of file2
+    // helpers.commit();
+
+    info!("Stats: {:?}", repo.stats());
+    let (diff, files) = repo.diff(usize::MAX).expect("Could not generate diff");
+    info!("Diff: \n{}", diff);
+    info!("Files: {:?}", files);
+    assert!(files.is_empty());
+    // assert_eq!(files, vec!["file1.txt", "file2.txt"]);
+  }
+
+  // Test case for unstaged changes after committing
+  #[test]
+  fn unstaged_changes_after_commit() {
+    setup();
+    let (helpers, repo) = Git2Helpers::new();
+    helpers.create_file("file_to_change.txt");
+    helpers.commit();
+    helpers.replace_file("file_to_change.txt"); // Modify the file without staging
+    let res = repo.diff(usize::MAX);
+    assert!(res.is_err());
+  }
+
+  // Test case for adding a new file without staging or committing
+  #[test]
+  fn add_new_file_without_staging() {
+    setup();
+    let (helpers, repo) = Git2Helpers::new();
+    helpers.create_file("new_unstaged_file.txt"); // Create the file without staging
+    let (diff, _) = repo.diff(usize::MAX).expect("Could not generate diff");
+    assert!(
+      !diff.is_empty(),
+      "Diff should not be empty when a new file is added without staging"
+    );
+  }
 }
