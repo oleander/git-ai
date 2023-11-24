@@ -23,7 +23,11 @@ pub struct Repo {
 
 impl Repo {
   pub fn new() -> Result<Self> {
-    let repo = Repository::open_ext(".", Flag::empty(), Vec::<&Path>::new())
+    Self::new_with_path(".".to_string())
+  }
+
+  pub fn new_with_path(path: String) -> Result<Self> {
+    let repo = Repository::open_ext(path, Flag::empty(), Vec::<&Path>::new())
       .with_context(|| format!("Failed to open the git repository at"))?;
 
     Ok(Repo {
@@ -50,15 +54,15 @@ impl Repo {
     opts
   }
 
-  pub fn diff(
-    &self, max_token_count: usize, repo: &Repository, index: Index
-  ) -> Result<(String, Index)> {
+  pub fn diff(&self, max_token_count: usize) -> Result<(String, Index)> {
     debug!("[diff] Generating diff with max token count: {}", max_token_count);
 
     let mut buf = Vec::new();
     let mut opts = self.opts();
     let mut count = 0;
+    let repo = self.repo.lock().expect("Failed to lock repo");
     let tree = repo.head().context("Failed to get head")?.peel_to_tree()?;
+    let index = repo.index().context("Failed to get index")?;
     let diff = repo
       .diff_tree_to_index(Some(&tree), Some(&index), Some(&mut opts))
       .context("Failed to diff tree to index")?;
@@ -110,7 +114,7 @@ impl Repo {
     }
 
     let (diff, mut index) =
-      self.diff(1000, &repo, index).context("Failed to generate diff")?;
+      self.diff(1000).context("Failed to generate diff")?;
     let oid = index.write_tree().context("Failed to write tree")?;
     let tree = repo.find_tree(oid).context("Failed to find tree")?;
     let signature = repo.signature().context("Failed to get signature")?;
@@ -144,6 +148,7 @@ pub fn repo() -> &'static Repo {
 mod tests {
   use git2::{Commit, IndexAddOption, ObjectType, Repository};
   use std::fs::File;
+  use log::info;
   use anyhow::{anyhow, bail, Context, Result};
   use std::io::Write;
   use std::path::Path;
@@ -151,36 +156,37 @@ mod tests {
 
   pub struct Git2Helpers {
     pub repo: Repository,
-    pub dir:  TempDir
+    pub dir: TempDir
   }
 
   impl Git2Helpers {
     pub fn new() -> Self {
       let dir = TempDir::new().expect("Could not create temp dir");
-      let repo =
-        Repository::init(dir.path()).expect("Could not initialize repo");
-      Self {
-        repo,
-        dir
-      }
+      let repo = Repository::init(dir.path()).expect("Could not initialize repo");
+      Self { repo, dir }
+    }
+
+    pub fn path(&self) -> &Path {
+      self.repo.path().parent().unwrap()
     }
 
     pub fn create_file(&self, file_name: &str, content: &str) {
-      let file_path = self.dir.path().join(file_name);
+      let file_path = self.path().join(file_name);
       let mut file = File::create(file_path).expect("Could not create file");
       writeln!(file, "{}", content).expect("Could not write to file");
       self.stage_file(file_name);
     }
 
     pub fn modify_file(&self, file_name: &str, content: &str) {
-      let file_path = self.dir.path().join(file_name);
-      let mut file = File::open(file_path).expect("Could not open file");
-      writeln!(file, "{}", content).expect("Could not write to file");
+      let file_path = self.path().join(file_name);
+      let mut file = File::create(file_path).expect("Could not open file");
+      file.write_all(content.as_bytes()).expect("Could not write to file");
+      // writeln!(file, "{}", content).expect("Could not write to file");
       self.stage_file(file_name);
     }
 
     pub fn delete_file(&self, file_name: &str) {
-      let file_path = self.dir.path().join(file_name);
+      let file_path = self.path().join(file_name);
       std::fs::remove_file(file_path).expect("Could not delete file");
       self.stage_file(file_name);
     }
@@ -220,14 +226,27 @@ mod tests {
         .and_then(|head| head.peel_to_commit().ok())
     }
   }
+
+  // **New File Addition**:
+  // 1. Create a new file in the repository.
+  // 2. Stage the new file with `git add`.
+  // 3. Commit the new file to the repository.
+  // 4. Add more content to the file without staging it.
+  // 5. Test `git diff` to ensure it shows the unstaged changes.
+  #[test]
+  fn new_file_addition() {
+    let helpers = Git2Helpers::new();
+    // info!("======");
+    // panic!("Path: {}", helpers.path().to_str().unwrap());
+    let repo = crate::git::Repo::new_with_path(helpers.path().to_str().unwrap().to_string()).expect("Could not create repo");
+    helpers.create_file("test.txt", "Hello, world!");
+    helpers.commit_changes("Initial commit");
+    helpers.modify_file("test.txt", "Hello, world!\nHello, world!");
+    let diff = repo.diff(usize::MAX).expect("Could not generate diff");
+    // assert_eq!(diff.lines().count(), 1);
+  }
 }
 
-// **New File Addition**:
-// 1. Create a new file in the repository.
-// 2. Stage the new file with `git add`.
-// 3. Commit the new file to the repository.
-// 4. Add more content to the file without staging it.
-// 5. Test `git diff` to ensure it shows the unstaged changes.
 
 // **File Modification**:
 // 1. Modify an existing file in the repository.
