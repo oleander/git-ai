@@ -396,6 +396,9 @@ mod tests {
     assert_eq!(stats.insertions(), 0);
     assert_eq!(stats.deletions(), 0);
 
+    /* Reset */
+    helpers.commit();
+
     /* A new file is created and committed */
     helpers.create_file("other.txt");
     helpers.stage_file("other.txt");
