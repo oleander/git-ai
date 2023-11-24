@@ -52,7 +52,9 @@ impl Repo {
       .include_ignored(false)
       .interhunk_lines(0)
       .context_lines(0)
-      .minimal(true);
+      .minimal(true)
+      .patience(true)
+      .indent_heuristic(false);
     opts
   }
 
@@ -64,9 +66,6 @@ impl Repo {
       .context("Failed to get head")?
       .peel_to_tree()
       .context("Failed to peel head to tree")?;
-    let index = repo.index().context("Failed to get index")?;
-
-    // Pass the index explicitly to ensure that we are diffing against the staged changes only
     let diff =
       repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))?;
     diff.stats().context("Failed to get diff stats")
@@ -75,27 +74,7 @@ impl Repo {
   pub fn diff(&self, max_token_count: usize) -> Result<String> {
     let mut opts = Repo::opts();
     let repo = self.repo.read().expect("Failed to lock repo");
-    let mut pathspec = HashSet::new();
-    let exclude_files: Option<Vec<String>> = None;
-
-    // Include patterns to exclude files
-    if let Some(ex_files) = exclude_files {
-      for file in ex_files {
-        opts.pathspec(format!(":(exclude){}", file));
-        pathspec.insert(file.to_string());
-      }
-    }
-
-    // Commonly excluded files
-    let common_excludes = vec!["package-lock.json", "pnpm-lock.yaml", "*.lock"];
-    for file in common_excludes {
-      opts.pathspec(format!(":(exclude){}", file));
-      pathspec.insert(file.to_string());
-    }
-
     let mut opts = Repo::opts();
-    let head = repo.head()?.peel_to_tree()?;
-    let index = repo.index()?;
     let tree = repo
       .head()
       .context("Failed to get head")?
@@ -105,14 +84,14 @@ impl Repo {
       repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))?;
 
     // Get names of staged files
-    let mut files = Vec::new();
+    // let mut files = Vec::new();
     diff.foreach(
       &mut |delta, _| {
         if let Some(file) = delta.new_file().path() {
           let file_path = file.to_string_lossy().into_owned();
-          if !pathspec.contains(&file_path) {
-            files.push(file_path);
-          }
+          // if !pathspec.contains(&file_path) {
+          //   files.push(file_path);
+          // }
         }
         true
       },
@@ -131,7 +110,7 @@ impl Repo {
     let diff_output =
       String::from_utf8(diff_str).expect("Diff output is not valid UTF-8");
 
-    debug!("Diff: {}", diff_output);
+    trace!("Diff: {}", diff_output);
 
     Ok(diff_output)
   }
