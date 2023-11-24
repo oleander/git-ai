@@ -131,18 +131,22 @@ impl Repo {
           .into_commit()
           .map_err(|_| anyhow!("Failed to resolve parent commit"))?;
 
-        repo.commit(
-          Some("HEAD"),
-          &signature,
-          &signature,
-          &message,
-          &tree,
-          &[&parent]
-        ).context("Failed to commit (1)")?;
+        repo
+          .commit(
+            Some("HEAD"),
+            &signature,
+            &signature,
+            &message,
+            &tree,
+            &[&parent]
+          )
+          .context("Failed to commit (1)")?;
       },
       Err(_) => {
-        repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, &[]).context("Failed to commit (2)")?;
-      },
+        repo
+          .commit(Some("HEAD"), &signature, &signature, &message, &tree, &[])
+          .context("Failed to commit (2)")?;
+      }
     }
 
     Ok(())
