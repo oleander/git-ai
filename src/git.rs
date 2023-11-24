@@ -51,7 +51,8 @@ impl Repo {
       .include_untracked(false)
       .include_ignored(false)
     //   .interhunk_lines(0)
-      .context_lines(0);
+      .context_lines(0)
+      .minimal(true);
     opts
   }
 
