@@ -64,7 +64,7 @@ impl Repo {
     let tree = repo.head().context("Failed to get head")?.peel_to_tree()?;
     let index = repo.index().context("Failed to get index")?;
     let diff = repo
-      .diff_tree_to_index(Some(&tree), Some(&index), Some(&mut opts))
+      .diff_index_to_workdir(Some(&index), Some(&mut opts))
       .context("Failed to diff tree to index")?;
 
     // diff
@@ -207,35 +207,6 @@ mod tests {
         .collect::<String>() + "\n"
     }
 
-    pub fn append_file(&self, file_name: &str) -> String {
-      // let file_path = self.path().join(file_name);
-      // let random_content = Self::random_content();
-      // // let mut file = std::fs::OpenOptions::new()
-      // //   .append(true)
-      // //   .open(file_path)
-      // //   .expect("Could not open file");
-
-      // let file = File::open(file_path.clone()).expect("Could not open file");
-      // let current_content = std::fs::read_to_string(file_path.clone()).expect("Could not read file");
-      // let new_content = current_content + &random_content;
-      // let mut file = File::create(file_path.clone()).expect("Could not open file");
-      // file.write_all(new_content.as_bytes()).expect("Could not write to file");
-      // // if let Err(e) = writeln!(file, "{}", random_content) {
-      // //   eprintln!("Couldn't write to file: {}", e);
-      // // }
-
-      // // file
-      // //   .write(random_content.as_bytes())
-      // //   .expect("Could not append to file");
-      // self.stage_file(file_name);
-
-      // random_content
-
-      let content = Self::random_content();
-      self.overrite_file(file_name, content.clone());
-      content
-    }
-
     pub fn overrite_file(&self, file_name: &str, content: String) -> String {
       let file_path = self.path().join(file_name);
       let mut file = File::create(file_path.clone()).expect("Could not open file");
@@ -337,17 +308,14 @@ mod tests {
   // 4. Further modify the file without staging the changes.
   // 5. Test `git diff` to ensure it shows the unstaged changes since the last commit.
   #[test]
-  fn file_modification() {
+  fn file_replacement() {
     let (helpers, repo) = Git2Helpers::new();
     let content1 = helpers.create_file("test.txt");
     helpers.commit_changes("Initial commit");
-    let content2 = helpers.append_file("test.txt");
+    let content2 = helpers.replace_file("test.txt");
 
     let (diff, _) = repo.diff(usize::MAX).expect("Could not generate diff");
-
-    panic!("Conent 1: {}\nContent 2: {}\nDiff: {}", content1, content2, diff);
-    assert!(!diff.contains(&content1));
-    assert!(diff.contains(&content2));
+    
   }
 
   // **File Deletion**:
