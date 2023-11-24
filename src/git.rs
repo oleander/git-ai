@@ -38,19 +38,19 @@ impl Repo {
 
   pub fn opts(&self) -> DiffOptions {
     let mut opts = DiffOptions::new();
-    opts
-      .enable_fast_untracked_dirs(true)
-      .ignore_whitespace_change(true)
-      .recurse_untracked_dirs(false)
-      .recurse_ignored_dirs(false)
-      .ignore_whitespace_eol(true)
-      .recurse_untracked_dirs(false)
-      .ignore_blank_lines(true)
-      .ignore_submodules(true)
-      .include_untracked(false)
-      .include_ignored(false)
-      .interhunk_lines(0)
-      .context_lines(0);
+    // opts
+    //   .enable_fast_untracked_dirs(true)
+    //   .ignore_whitespace_change(true)
+    //   .recurse_untracked_dirs(false)
+    //   .recurse_ignored_dirs(false)
+    //   .ignore_whitespace_eol(true)
+    //   .recurse_untracked_dirs(false)
+    //   .ignore_blank_lines(true)
+    //   .ignore_submodules(true)
+    //   .include_untracked(false)
+    //   .include_ignored(false)
+    //   .interhunk_lines(0)
+    //   .context_lines(0);
     opts
   }
 
@@ -208,18 +208,41 @@ mod tests {
     }
 
     pub fn append_file(&self, file_name: &str) -> String {
+      // let file_path = self.path().join(file_name);
+      // let random_content = Self::random_content();
+      // // let mut file = std::fs::OpenOptions::new()
+      // //   .append(true)
+      // //   .open(file_path)
+      // //   .expect("Could not open file");
+
+      // let file = File::open(file_path.clone()).expect("Could not open file");
+      // let current_content = std::fs::read_to_string(file_path.clone()).expect("Could not read file");
+      // let new_content = current_content + &random_content;
+      // let mut file = File::create(file_path.clone()).expect("Could not open file");
+      // file.write_all(new_content.as_bytes()).expect("Could not write to file");
+      // // if let Err(e) = writeln!(file, "{}", random_content) {
+      // //   eprintln!("Couldn't write to file: {}", e);
+      // // }
+
+      // // file
+      // //   .write(random_content.as_bytes())
+      // //   .expect("Could not append to file");
+      // self.stage_file(file_name);
+
+      // random_content
+
+      let content = Self::random_content();
+      self.overrite_file(file_name, content.clone());
+      content
+    }
+
+    pub fn overrite_file(&self, file_name: &str, content: String) -> String {
       let file_path = self.path().join(file_name);
-      let random_content = Self::random_content();
-      let mut file = std::fs::OpenOptions::new()
-        .append(true)
-        .open(file_path)
-        .expect("Could not open file");
-      file
-        .write_all(random_content.as_bytes())
-        .expect("Could not append to file");
+      let mut file = File::create(file_path.clone()).expect("Could not open file");
+      file.write_all(content.as_bytes()).expect("Could not write to file");
       self.stage_file(file_name);
 
-      random_content
+      content
     }
 
     pub fn create_file(&self, file_name: &str) -> String {
@@ -319,17 +342,12 @@ mod tests {
     let content1 = helpers.create_file("test.txt");
     helpers.commit_changes("Initial commit");
     let content2 = helpers.append_file("test.txt");
-    helpers.commit_changes("Second commit");
-    let content3 = helpers.append_file("test.txt");
+
     let (diff, _) = repo.diff(usize::MAX).expect("Could not generate diff");
 
-    panic!(
-      "Diff: {}, Content1: {}, Content2: {}, Content3: {}",
-      diff, content1, content2, content3
-    );
-    assert!(diff.contains(&content3));
-    assert!(!diff.contains(&content2));
+    panic!("Conent 1: {}\nContent 2: {}\nDiff: {}", content1, content2, diff);
     assert!(!diff.contains(&content1));
+    assert!(diff.contains(&content2));
   }
 
   // **File Deletion**:
