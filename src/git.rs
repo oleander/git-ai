@@ -47,7 +47,7 @@ impl Repo {
     //   .recurse_untracked_dirs(false)
     //   .ignore_blank_lines(true)
     //   .ignore_submodules(true)
-    //   .include_untracked(false)
+      // .include_untracked(false);
     //   .include_ignored(false)
     //   .interhunk_lines(0)
     //   .context_lines(0);
@@ -62,9 +62,70 @@ impl Repo {
       .context("Failed to get head")?
       .peel_to_tree()
       .context("Failed to peel head to tree")?;
-    let diff = repo.diff_tree_to_index(Some(&tree), None, Some(&mut opts))?;
+    let index = repo.index().context("Failed to get index")?;
+
+    // Pass the index explicitly to ensure that we are diffing against the staged changes only
+    let diff =
+      repo.diff_tree_to_index(Some(&tree), Some(&index), Some(&mut opts))?;
     diff.stats().context("Failed to get diff stats")
+    
   }
+
+  fn staged_diff(
+    repo: &Repository, exclude_files: Option<Vec<&str>>
+  ) -> Result<(Vec<String>, String), Error> {
+    let mut pathspec = HashSet::new();
+
+    // Include patterns to exclude files
+    if let Some(ex_files) = exclude_files {
+      for file in ex_files {
+        opts.pathspec(format!(":(exclude){}", file));
+        pathspec.insert(file.to_string());
+      }
+    }
+
+    // Commonly excluded files
+    let common_excludes = vec!["package-lock.json", "pnpm-lock.yaml", "*.lock"];
+    for file in common_excludes {
+      opts.pathspec(format!(":(exclude){}", file));
+      pathspec.insert(file.to_string());
+    }
+
+    let mut opts = self.opts();
+    let head = repo.head()?.peel_to_tree()?;
+    let index = repo.index()?;
+    let diff =
+      repo.diff_tree_to_index(Some(&head), Some(&index), Some(&opts))?;
+
+    // Get names of staged files
+    let mut files = Vec::new();
+    diff.foreach(
+      &mut |delta, _| {
+        if let Some(file) = delta.new_file().path() {
+          let file_path = file.to_string_lossy().into_owned();
+          if !pathspec.contains(&file_path) {
+            files.push(file_path);
+          }
+        }
+        true
+      },
+      None,
+      None,
+      None
+    )?;
+
+    // Get the full diff
+    let mut diff_str = Vec::new();
+    diff.print(git2::DiffFormat::Patch, |_, _, line| {
+      diff_str.extend_from_slice(line.content());
+      true
+    })?;
+
+    let diff_output =
+      String::from_utf8(diff_str).expect("Diff output is not valid UTF-8");
+
+    Ok((files, diff_output))
+}
 
   pub fn diff(&self, max_token_count: usize) -> Result<String> {
     let mut opts = self.opts();
@@ -247,6 +308,7 @@ mod tests {
         .add_path(Path::new(file_name))
         .expect("Could not add file to index");
       index.write().expect("Could not write index");
+      index.write_tree().expect("Could not write tree");
     }
 
     fn stage_deleted_file(&self, file_name: &str) {
@@ -342,7 +404,7 @@ mod tests {
     assert_eq!(stats.deletions(), 1);
 
     /* The file is modified again without staging */
-    helpers.replace_file("test.txt");
+    helpers.create_file("new.txt");
     let stats = repo.stats().expect("Could not get diff stats");
     assert_eq!(stats.files_changed(), 0);
     assert_eq!(stats.insertions(), 0);
