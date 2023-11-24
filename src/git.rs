@@ -63,7 +63,8 @@ impl Repo {
   pub fn diff(&self, max_token_count: usize) -> Result<(String, Vec<String>)> {
     let repo = self.repo.read().expect("Failed to lock repo");
     let mut opts = Repo::opts();
-    let diff = repo.diff_tree_to_workdir_with_index(None, Some(&mut opts))?;
+    let tree = repo.head()?.peel(ObjectType::Tree)?.into_tree().unwrap();
+    let diff = repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))?;
 
     // Get names of staged files
     let mut files = Vec::new();
@@ -182,8 +183,8 @@ mod tests {
 
       helper.git(&["init"]);
 
-      let repo = Repo::new_with_path(helper.path().to_str().unwrap().to_string())
-.expect("Could not open repo");
+      let repo = Repo::new_with_path(helper.str_path().to_string())
+        .expect("Could not open repo");
 
       (helper, repo)
     }
@@ -207,7 +208,6 @@ mod tests {
       file
         .write_all(random_content.as_bytes())
         .expect("Could not write to file");
-      self.stage_file(file_name);
     }
 
     pub fn create_file(&self, file_name: &str) {
@@ -217,33 +217,38 @@ mod tests {
       file
         .write_all(random_content.as_bytes())
         .expect("Could not write to file");
-      self.stage_file(file_name);
     }
 
     pub fn delete_file(&self, file_name: &str) {
       let file_path = self.path().join(file_name);
       std::fs::remove_file(&file_path).expect("Could not delete file");
-      self.stage_deleted_file(file_name);
     }
 
     pub fn str_path(&self) -> &str {
       self.path().to_str().unwrap()
     }
 
+    pub fn status(&self) -> String {
+      self.git(&["status", "--porcelain"])
+    }
+
     pub fn stage_file(&self, file_name: &str) {
       self.git(&["add", file_name]);
     }
 
-    fn git(&self, args: &[&str]) {
+    fn git(&self, args: &[&str]) -> String {
       Command::new("git")
         .args(args)
+        .env("OVERCOMMIT_DISABLE", "1")
         .current_dir(self.path())
-        .status()
-        .expect("Could not execute git command");
+        .output()
+        .context("Could not run git command")
+        .unwrap()
+        .stdout.into_iter().map(|b| b as char).collect::<String>()
     }
 
     pub fn stage_deleted_file(&self, file_name: &str) {
-      self.git(&["add", "-u", file_name]);
+      self.git(&["add", file_name]);
     }
 
     pub fn commit(&self) {
@@ -304,8 +309,11 @@ mod tests {
     helpers.create_file("new_file.txt");
     helpers.stage_file("new_file.txt");
     helpers.commit();
-    let res = repo.diff(usize::MAX);
-    assert!(res.is_err());
+    let (diff, files) = repo.diff(usize::MAX).unwrap();
+    info!("Status: {}", helpers.status());
+    info!("Diff: \n{}", diff);
+    info!("Files: {:?}", files);
+    assert!(files.is_empty());
   }
 
   // Test case for deleting a file and committing the deletion
