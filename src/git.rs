@@ -242,8 +242,8 @@ mod tests {
     helpers.create_file("test.txt", "Hello, world!");
     helpers.commit_changes("Initial commit");
     helpers.modify_file("test.txt", "Hello, world!\nHello, world!");
-    let diff = repo.diff(usize::MAX).expect("Could not generate diff");
-    // assert_eq!(diff.lines().count(), 1);
+    let (diff, _) = repo.diff(usize::MAX).expect("Could not generate diff");
+    assert_eq!(diff.lines().count(), 1);
   }
 }
 
