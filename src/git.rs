@@ -27,8 +27,9 @@ impl Repo {
   }
 
   pub fn new_with_path(path: String) -> Result<Self> {
-    let repo = Repository::open_ext(path, Flag::empty(), Vec::<&Path>::new())
-      .with_context(|| format!("Failed to open the git repository at"))?;
+    let repo =
+      Repository::open_ext(path, Flag::empty(), Vec::<&Path>::new())
+        .with_context(|| format!("Failed to open the git repository at"))?;
 
     Ok(Repo {
       repo: Mutex::new(repo)
@@ -157,15 +158,18 @@ mod tests {
 
   pub struct Git2Helpers {
     pub repo: Repository,
-    pub dir: TempDir
+    pub dir:  TempDir
   }
-
 
   impl Git2Helpers {
     pub fn new() -> (Self, Repo) {
       let dir = TempDir::new().expect("Could not create temp dir");
-      let repo = Repository::init(dir.path()).expect("Could not initialize repo");
-      let helper = Self { repo, dir };
+      let repo =
+        Repository::init(dir.path()).expect("Could not initialize repo");
+      let helper = Self {
+        repo,
+        dir
+      };
       let repo2 = helper.into_repo();
       (helper, repo2)
     }
@@ -175,7 +179,8 @@ mod tests {
     }
 
     pub fn into_repo(&self) -> Repo {
-      Repo::new_with_path(self.path().to_str().unwrap().to_string()).expect("Could not create repo")
+      Repo::new_with_path(self.path().to_str().unwrap().to_string())
+        .expect("Could not create repo")
     }
 
     pub fn create_file(&self, file_name: &str, content: &str) {
@@ -196,7 +201,7 @@ mod tests {
     pub fn delete_file(&self, file_name: &str) {
       let file_path = self.path().join(file_name);
       std::fs::remove_file(file_path).expect("Could not delete file");
-      self.stage_file(file_name);
+      self.stage_deleted_file(file_name);
     }
 
     fn stage_file(&self, file_name: &str) {
@@ -204,6 +209,14 @@ mod tests {
       index
         .add_path(Path::new(file_name))
         .expect("Could not add file to index");
+      index.write().expect("Could not write index");
+    }
+
+    fn stage_deleted_file(&self, file_name: &str) {
+      let mut index = self.repo.index().expect("Could not get repo index");
+      index
+        .remove_path(Path::new(file_name))
+        .expect("Could not remove file from index");
       index.write().expect("Could not write index");
     }
 
@@ -268,15 +281,23 @@ mod tests {
     let (diff, _) = repo.diff(usize::MAX).expect("Could not generate diff");
     assert_eq!(diff, "C\n");
   }
+
+  // **File Deletion**:
+  // 1. Delete a file from the repository.
+  // 2. Stage the deletion with `git rm`.
+  // 3. Commit the deletion.
+  // 4. Test `git diff` with a previous commit to ensure it shows the file as deleted.
+  #[test]
+  fn file_deletion() {
+    let (helpers, repo) = Git2Helpers::new();
+    helpers.create_file("test.txt", "A\n");
+    helpers.commit_changes("Initial commit");
+    helpers.delete_file("test.txt");
+    helpers.commit_changes("Second commit");
+    let (diff, _) = repo.diff(usize::MAX).expect("Could not generate diff");
+    assert_eq!(diff, "-A\n");
+  }
 }
-
-
-
-// **File Deletion**:
-// 1. Delete a file from the repository.
-// 2. Stage the deletion with `git rm`.
-// 3. Commit the deletion.
-// 4. Test `git diff` with a previous commit to ensure it shows the file as deleted.
 
 // **File Renaming**:
 // 1. Rename an existing file in the repository.
