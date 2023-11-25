@@ -3,28 +3,39 @@
 
 use std::sync::{Arc, LazyLock, Mutex, PoisonError, RwLock, RwLockReadGuard};
 use log::{debug, error, info, trace, warn};
-use git2::RepositoryOpenFlags as Flag;
+use git2::{RepositoryOpenFlags as Flag, *};
 use std::collections::HashSet;
+use std::backtrace::Backtrace;
 use lazy_static::lazy_static;
 use crate::chat::ChatError;
 use std::process::Command;
 use thiserror::Error;
 use std::path::Path;
-use anyhow::bail;
+use anyhow::{bail, Context};
 use crate::chat;
-use git2::*;
 
 #[derive(Error, Debug)]
 pub enum GitError {
   #[error("Git error: {0}")]
   Git(#[from] git2::Error),
+
   #[error("IO error: {0}")]
   Io(#[from] std::io::Error),
+
   #[error("No files to commit")]
   NoFilesToCommit,
+
   #[error("Empty diff output")]
-  EmptyDiffOutput
+  EmptyDiffOutput,
+
+  #[error("Anyhow error: {0}")]
+  Anyhow(#[from] anyhow::Error),
+
+  #[error("Chat error: {0}")]
+  ChatError(#[from] ChatError)
 }
+
+pub type Result<T, E = GitError> = std::result::Result<T, E>;
 
 impl From<PoisonError<RwLockReadGuard<'_, git2::Repository>>> for GitError {
   fn from(_: PoisonError<RwLockReadGuard<'_, git2::Repository>>) -> Self {
@@ -34,17 +45,9 @@ impl From<PoisonError<RwLockReadGuard<'_, git2::Repository>>> for GitError {
 
 impl From<git2::Object<'_>> for GitError {
   fn from(_: git2::Object<'_>) -> Self {
-    GitError::Git(git2::Error::from_str("Failed to get object"))
+    GitError::Git(git2::Error::from_str("Failed to get git2 object"))
   }
 }
-
-impl From<ChatError> for GitError {
-  fn from(_: ChatError) -> Self {
-    GitError::Git(git2::Error::from_str("Failed to get object"))
-  }
-}
-
-pub type Result<T, E = GitError> = std::result::Result<T, E>;
 
 pub struct Repo {
   repo: Arc<RwLock<Repository>>
@@ -80,7 +83,23 @@ impl Repo {
     let mut opts = Repo::diff_options();
     let mut length = 0;
 
-    let tree = repo.head()?.resolve()?.peel(ObjectType::Commit)?.into_commit()?.tree().map(Some)?;
+    let tree =
+      match repo.head() {
+        Ok(ref head) => {
+          head
+            .resolve()
+            .context("Could not resolve head")?
+            .peel(ObjectType::Commit)
+            .context("Could not peel head")?
+            .into_commit()
+            .map_err(GitError::from)?
+            .tree()
+            .context("Could not get tree")
+            .map(Some)?
+        },
+        Err(_) => None
+      };
+
     let diff = repo.diff_tree_to_workdir_with_index(tree.as_ref(), Some(&mut opts))?;
 
     diff.foreach(
