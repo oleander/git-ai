@@ -4,14 +4,49 @@
 use git2::{
   Commit, Delta, Diff, DiffFormat, DiffOptions, Index, IndexAddOption, ObjectType, Oid, Repository, RepositoryInitOptions, RepositoryOpenFlags as Flag, StatusOptions, StatusShow
 };
-use std::sync::{Arc, LazyLock, Mutex, RwLock};
-use anyhow::{anyhow, bail, Context, Result};
+use std::sync::{Arc, LazyLock, Mutex, PoisonError, RwLock, RwLockReadGuard};
+// use anyhow::{anyhow, bail, Context, Result};
 use log::{debug, error, info, trace, warn};
 use std::collections::HashSet;
 use lazy_static::lazy_static;
 use std::process::Command;
 use std::path::Path;
+use crate::chat::ChatError;
+use thiserror::Error;
+use anyhow::bail;
 use crate::chat;
+
+#[derive(Error, Debug)]
+pub enum GitError {
+  #[error("Git error: {0}")]
+  Git(#[from] git2::Error),
+  #[error("IO error: {0}")]
+  Io(#[from] std::io::Error),
+  #[error("No files to commit")]
+  NoFilesToCommit,
+  #[error("Empty diff output")]
+  EmptyDiffOutput // Add other error types as needed here
+}
+
+impl From<PoisonError<RwLockReadGuard<'_, git2::Repository>>> for GitError {
+  fn from(_: PoisonError<RwLockReadGuard<'_, git2::Repository>>) -> Self {
+    GitError::Git(git2::Error::from_str("Failed to lock repo"))
+  }
+}
+
+impl From<git2::Object<'_>> for GitError {
+  fn from(_: git2::Object<'_>) -> Self {
+    GitError::Git(git2::Error::from_str("Failed to get object"))
+  }
+}
+
+impl From<ChatError> for GitError {
+  fn from(_: ChatError) -> Self {
+    GitError::Git(git2::Error::from_str("Failed to get object"))
+  }
+}
+
+pub type Result<T, E = GitError> = std::result::Result<T, E>;
 
 pub struct Repo {
   repo: Arc<RwLock<Repository>>
@@ -33,8 +68,7 @@ impl Repo {
   }
 
   pub fn new_with_path(path: String) -> Result<Self> {
-    let repo = Repository::open_ext(path, Flag::empty(), Vec::<&Path>::new())
-      .with_context(|| format!("Failed to open the git repository at"))?;
+    let repo = Repository::open_ext(path, Flag::empty(), Vec::<&Path>::new())?;
 
     Ok(Repo {
       repo: Arc::new(RwLock::new(repo))
@@ -50,15 +84,7 @@ impl Repo {
 
     let diff = match repo.head() {
       Ok(ref head) => {
-        let tree = head
-          .resolve()
-          .context("Failed to resolve head")?
-          .peel(ObjectType::Commit)
-          .context("Failed to peel head")?
-          .into_commit()
-          .map_err(|_| anyhow!("Failed to resolve commit"))?
-          .tree()
-          .context("Failed to get tree")?;
+        let tree = head.resolve()?.peel(ObjectType::Commit)?.into_commit()?.tree().map_err(GitError::from)?;
         repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))?
       },
       Err(_) => repo.diff_tree_to_workdir_with_index(None, Some(&mut opts))?
@@ -78,7 +104,7 @@ impl Repo {
     )?;
 
     if files.is_empty() {
-      bail!("No files to commit");
+      return Err(GitError::NoFilesToCommit);
     }
 
     /* Will abort if the diff is too long */
@@ -94,7 +120,7 @@ impl Repo {
 
     let mut diff_output = diff_str.to_utf8();
     if diff_output.is_empty() {
-      bail!("Empty diff output");
+      return Err(GitError::EmptyDiffOutput);
     }
 
     /* If the diff output is too long, truncate it */
@@ -116,34 +142,30 @@ impl Repo {
     if add_all {
       debug!("Adding all files to index(--all)");
 
-      index.add_all(["*"], IndexAddOption::DEFAULT, None).context("Failed to add all files to index")?;
-      index.write().context("Failed to write index")?;
+      index.add_all(["*"], IndexAddOption::DEFAULT, None)?;
+      index.write()?
     }
 
     let (diff, _) = self.diff(1000)?;
-    let oid = index.write_tree().context("Failed to write tree")?;
-    let tree = repo.find_tree(oid).context("Failed to find tree")?;
-    let signature = repo.signature().context("Failed to get signature")?;
+    let oid = index.write_tree()?;
+    let tree = repo.find_tree(oid)?;
+    let signature = repo.signature()?;
     let message = chat::suggested_commit_message(diff).await?;
 
-    match repo.head() {
-      Ok(ref head) => {
-        let parent = head
-          .resolve()
-          .context("Failed to resolve head")?
-          .peel(ObjectType::Commit)
-          .context("Failed to peel head")?
-          .into_commit()
-          .map_err(|_| anyhow!("Failed to resolve parent commit"))?;
 
-        repo
-          .commit(Some("HEAD"), &signature, &signature, &message, &tree, &[&parent])
-          .context("Failed to commit (1)")?;
+    let parent = match repo.head() {
+      Ok(head) => head.resolve()?.peel(ObjectType::Commit)?.into_commit().map(Some)?,
+      Err(_) => None
+    };
+
+    match parent {
+      Some(parent) => {
+        repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, &[&parent])?
       },
-      Err(_) => {
-        repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, &[]).context("Failed to commit (2)")?;
+      None => {
+        repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, &[])?
       }
-    }
+    };
 
     Ok(())
   }
