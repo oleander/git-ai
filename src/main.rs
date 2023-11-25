@@ -8,7 +8,6 @@ use anyhow::Result;
 use colored::*;
 use clap::Parser;
 use lazy_static::lazy_static;
-use thiserror::Error;
 use dotenv_codegen::dotenv;
 use chat::generate_commit_message;
 use git::Repo;

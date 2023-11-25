@@ -5,8 +5,6 @@ use log::{debug, error};
 use thiserror::Error;
 use std::path::Path;
 use anyhow::Context;
-use std::fmt;
-
 
 #[derive(Error, Debug)]
 pub enum GitError {
