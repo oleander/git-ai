@@ -18,7 +18,13 @@ reorder_modules = false
 reorder_imports = false
 newline_style = "Auto"
 group_imports = "One"
-fn_call_width = 80
 hard_tabs = false
 max_width = 150
+chain_width = 120
 tab_spaces = 2
+
+
+chains_overflow_last = true
+fn_call_width = 100
+chain_one_line_max = 80
+fn_call_style = "Block"

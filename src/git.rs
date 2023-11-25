@@ -1,18 +1,10 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-
-use std::sync::{Arc, LazyLock, Mutex, PoisonError, RwLock, RwLockReadGuard};
-use log::{debug, error, info, trace, warn};
+use std::sync::{PoisonError, RwLockReadGuard};
 use git2::{RepositoryOpenFlags as Flag, *};
-use std::collections::HashSet;
-use std::backtrace::Backtrace;
-use lazy_static::lazy_static;
 use crate::chat::ChatError;
-use std::process::Command;
+use log::{debug, error};
 use thiserror::Error;
 use std::path::Path;
-use anyhow::{bail, Context};
-use crate::chat;
+use anyhow::Context;
 
 #[derive(Error, Debug)]
 pub enum GitError {
@@ -50,7 +42,7 @@ impl From<git2::Object<'_>> for GitError {
 }
 
 pub struct Repo {
-  repo: Arc<RwLock<Repository>>
+  repo: Repository
 }
 
 trait Utf8String {
@@ -72,19 +64,18 @@ impl Repo {
     let repo = Repository::open_ext(path, Flag::empty(), Vec::<&Path>::new())?;
 
     Ok(Repo {
-      repo: Arc::new(RwLock::new(repo))
+      repo: repo
     })
   }
 
   pub fn diff(&self, max_token_count: usize) -> Result<(String, Vec<String>)> {
-    let repo = self.repo.read()?;
     let mut files = Vec::new();
     let mut diff_str = Vec::new();
     let mut opts = Repo::diff_options();
     let mut length = 0;
 
-    let tree = repo.head().ok().and_then(|head| head.peel_to_tree().ok());
-    let diff = repo.diff_tree_to_workdir_with_index(tree.as_ref(), Some(&mut opts))?;
+    let tree = self.repo.head().ok().and_then(|head| head.peel_to_tree().ok());
+    let diff = self.repo.diff_tree_to_workdir_with_index(tree.as_ref(), Some(&mut opts))?;
 
     diff.foreach(
       &mut |delta, _| {
@@ -104,15 +95,13 @@ impl Repo {
     }
 
     /* Will abort if the diff is too long */
-    diff
-      .print(DiffFormat::Patch, |_, _, line| {
-        let content = line.content();
-        diff_str.extend_from_slice(content);
-        let str = content.to_utf8();
-        length += str.len();
-        length <= max_token_count
-      })
-      .ok();
+    diff.print(DiffFormat::Patch, |_, _, line| {
+      let content = line.content();
+      diff_str.extend_from_slice(content);
+      let str = content.to_utf8();
+      length += str.len();
+      length <= max_token_count
+    }).ok();
 
     let mut diff_output = diff_str.to_utf8();
     if diff_output.is_empty() {
@@ -132,8 +121,7 @@ impl Repo {
   pub fn commit(&self, message: &str, add_all: bool) -> Result<Oid> {
     debug!("[commit] Committing with message");
 
-    let repo = self.repo.read().expect("Failed to lock repo");
-    let mut index = repo.index().expect("Failed to get index");
+    let mut index = self.repo.index().expect("Failed to get index");
 
     if add_all {
       debug!("Adding all files to index(--all)");
@@ -143,12 +131,12 @@ impl Repo {
     }
 
     let oid = index.write_tree().context("Could not write tree")?;
-    let tree = repo.find_tree(oid).context("Could not find tree")?;
-    let signature = repo.signature().context("Could not get signature")?;
-    let parent = repo.head().ok().and_then(|head| head.peel_to_commit().ok());
+    let tree = self.repo.find_tree(oid).context("Could not find tree")?;
+    let signature = self.repo.signature().context("Could not get signature")?;
+    let parent = self.repo.head().ok().and_then(|head| head.peel_to_commit().ok());
     let parents = parent.iter().map(|commit| commit).collect::<Vec<&Commit>>();
 
-    repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, parents.as_slice()).context("Could not commit").map_err(GitError::from)
+    self.repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, parents.as_slice()).context("Could not commit").map_err(GitError::from)
   }
 
   fn diff_options() -> DiffOptions {
