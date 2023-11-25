@@ -241,3 +241,16 @@ fn add_new_file_without_staging() {
   let res = repo.diff(usize::MAX);
   assert!(res.is_err());
 }
+
+// Empty repo with a single file, no commits
+#[test]
+fn empty_repo_with_single_file() {
+  setup();
+  let (helpers, repo) = Git2Helpers::new();
+  helpers.create_file("file.txt");
+  helpers.stage_file("file.txt");
+  let (_, files) = repo.diff(usize::MAX).expect("Could not generate diff");
+  assert_eq!(files, vec!["file.txt"]);
+
+
+}

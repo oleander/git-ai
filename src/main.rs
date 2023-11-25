@@ -28,13 +28,17 @@ lazy_static! {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-  env_logger::init();
   dotenv().ok();
 
   let cli = Cli::parse();
 
   if cli.verbose {
-    std::env::set_var("RUST_LOG", "debug");
+    panic!("Verbose logging is not yet implemented");
+    env_logger::builder()
+      .filter_level(log::LevelFilter::Debug)
+      .format_target(false)
+      .format_timestamp(None)
+      .init();
   }
 
   let repo = Repo::new()?;

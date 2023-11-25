@@ -19,8 +19,8 @@ reorder_imports = false
 newline_style = "Auto"
 group_imports = "One"
 hard_tabs = false
-max_width = 150
-chain_width = 120
+max_width = 130
+chain_width = 90
 tab_spaces = 2
 
 
