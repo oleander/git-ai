@@ -1,7 +1,7 @@
 use std::sync::{PoisonError, RwLockReadGuard};
 use git2::{RepositoryOpenFlags as Flag, *};
 use crate::chat::ChatError;
-use log::{debug, error};
+use log::{debug, error, warn};
 use thiserror::Error;
 use std::path::Path;
 use anyhow::Context;
@@ -75,11 +75,17 @@ impl Repo {
     let tree = self.repo.head().ok().and_then(|head| head.peel_to_tree().ok());
     let diff = self.repo.diff_tree_to_workdir_with_index(tree.as_ref(), Some(&mut opts))?;
 
+    debug!("Tree: {:?}", tree);
+    debug!("Stats: {:?}", diff.stats());
+
     diff.foreach(
       &mut |delta, _| {
         if let Some(file) = delta.new_file().path() {
           let file_path = file.to_string_lossy().into_owned();
+          debug!("[diff] File: {}", file_path);
           files.push(file_path);
+        } else {
+          warn!("[diff] Could not get file path");
         }
         true
       },
@@ -118,18 +124,19 @@ impl Repo {
     Ok((diff_output, files))
   }
 
-  pub fn commit(&self, message: &str, add_all: bool) -> Result<Oid> {
+  pub fn add_all(&self) -> Result<()> {
+    debug!("[add_all] Adding all files to index(--all)");
+
+    let mut index = self.repo.index().expect("Failed to get index");
+    index.add_all(["*"], IndexAddOption::DEFAULT, None)?;
+    index.write().context("Could not write index")?;
+    Ok(())
+  }
+
+  pub fn commit(&self, message: &str) -> Result<Oid> {
     debug!("[commit] Committing with message");
 
     let mut index = self.repo.index().expect("Failed to get index");
-
-    if add_all {
-      debug!("Adding all files to index(--all)");
-
-      index.add_all(["*"], IndexAddOption::DEFAULT, None)?;
-      index.write().context("Could not write index")?;
-    }
-
     let oid = index.write_tree().context("Could not write tree")?;
     let tree = self.repo.find_tree(oid).context("Could not find tree")?;
     let signature = self.repo.signature().context("Could not get signature")?;

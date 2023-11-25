@@ -5,7 +5,7 @@ pub mod chat;
 
 use dotenv::dotenv;
 use anyhow::Result;
-use log::LevelFilter;
+use log::{debug, LevelFilter};
 use colored::*;
 use clap::Parser;
 use lazy_static::lazy_static;
@@ -39,12 +39,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       .format_target(false)
       .format_timestamp(None)
       .init();
+    debug!("Verbose logging enabled");
   }
 
   let repo = Repo::new()?;
+
+  if cli.all {
+    repo.add_all()?;
+  }
+
   let (diff, files) = repo.diff(*MAX_CHARS)?;
   let message = generate_commit_message(diff).await?;
-  let oid = repo.commit(&message, cli.all)?;
+  let oid = repo.commit(&message)?;
 
   println!("{} [{:.7}] {}: ", "🤖", oid.to_string().yellow(), message.green().italic());
   for file in files {
