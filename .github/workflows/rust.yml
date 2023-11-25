@@ -8,17 +8,15 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  MAX_LENGTH: 100
+  MAX_CHARS: 5000
+  LANGUAGE: "en"
+  TIMEOUT: 30
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env: 
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEYa }}
-      MAX_LENGTH: 100
-      MAX_CHARS: 5000
-      LANGUAGE: "en"
-      TIMEOUT: 30
-
     steps:
       - uses: actions/checkout@v3
       - name: Build
