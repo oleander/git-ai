@@ -61,10 +61,8 @@ impl Repo {
   }
 
   pub fn new_with_path(path: String) -> Result<Self> {
-    let repo = Repository::open_ext(path, Flag::empty(), Vec::<&Path>::new())?;
-
     Ok(Repo {
-      repo: repo
+      repo: Repository::open_ext(path, Flag::empty(), Vec::<&Path>::new())?
     })
   }
 
@@ -95,13 +93,15 @@ impl Repo {
     }
 
     /* Will abort if the diff is too long */
-    diff.print(DiffFormat::Patch, |_, _, line| {
-      let content = line.content();
-      diff_str.extend_from_slice(content);
-      let str = content.to_utf8();
-      length += str.len();
-      length <= max_token_count
-    }).ok();
+    diff
+      .print(DiffFormat::Patch, |_, _, line| {
+        let content = line.content();
+        diff_str.extend_from_slice(content);
+        let str = content.to_utf8();
+        length += str.len();
+        length <= max_token_count
+      })
+      .ok();
 
     let mut diff_output = diff_str.to_utf8();
     if diff_output.is_empty() {
@@ -136,7 +136,11 @@ impl Repo {
     let parent = self.repo.head().ok().and_then(|head| head.peel_to_commit().ok());
     let parents = parent.iter().map(|commit| commit).collect::<Vec<&Commit>>();
 
-    self.repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, parents.as_slice()).context("Could not commit").map_err(GitError::from)
+    self
+      .repo
+      .commit(Some("HEAD"), &signature, &signature, &message, &tree, parents.as_slice())
+      .context("Could not commit")
+      .map_err(GitError::from)
   }
 
   fn diff_options() -> DiffOptions {
