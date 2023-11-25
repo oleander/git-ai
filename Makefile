@@ -1,0 +1,2 @@
+install:
+	cargo build --release
