@@ -41,13 +41,6 @@ impl Repo {
     })
   }
 
-  pub fn stats(&self) -> Result<git2::DiffStats> {
-    let mut opts = Repo::diff_options();
-    let repo = self.repo.read().expect("Failed to lock repo");
-    let diff = repo.diff_tree_to_workdir_with_index(None, Some(&mut opts))?;
-    diff.stats().context("Failed to get diff stats")
-  }
-
   pub fn diff(&self, max_token_count: usize) -> Result<(String, Vec<String>)> {
     let repo = self.repo.read().expect("Failed to lock repo");
     let mut files = Vec::new();
