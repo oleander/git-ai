@@ -90,22 +90,24 @@ impl Repo {
       bail!("No files to commit");
     }
 
+    /* Will abort if the diff is too long */
     diff.print(git2::DiffFormat::Patch, |_, _, line| {
       let content = line.content();
       diff_str.extend_from_slice(content);
       let str = content.to_utf8();
       length += str.len();
-
-      if length <= max_token_count {
-        let overflow = length - max_token_count;
-        diff_str.truncate(diff_str.len() - overflow);
-        return false
-      }
-
-      true
+      length <= max_token_count
     }).ok();
 
-    let diff_output = diff_str.to_utf8();
+    let mut diff_output = diff_str.to_utf8();
+    if diff_output.is_empty() {
+      bail!("Empty diff output");
+    }
+
+    /* If the diff output is too long, truncate it */
+    if diff_output.len() > max_token_count {
+      diff_output.truncate(max_token_count);
+    }
 
     debug!("[diff] Diff: {}", diff_output);
 
@@ -127,7 +129,7 @@ impl Repo {
       index.write().context("Failed to write index")?;
     }
 
-    let (diff, _) = self.diff(10)?;
+    let (diff, _) = self.diff(2)?;
     let oid = index.write_tree().context("Failed to write tree")?;
     let tree = repo.find_tree(oid).context("Failed to find tree")?;
     let signature = repo.signature().context("Failed to get signature")?;
