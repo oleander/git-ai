@@ -42,25 +42,6 @@ impl Repo {
     })
   }
 
-  pub fn diff_options() -> DiffOptions {
-    let mut opts = DiffOptions::new();
-    opts
-      .enable_fast_untracked_dirs(true)
-      .ignore_whitespace_change(true)
-      .recurse_untracked_dirs(false)
-      .recurse_ignored_dirs(false)
-      .ignore_whitespace_eol(true)
-      .ignore_blank_lines(true)
-      .ignore_submodules(true)
-      .include_untracked(false)
-      .include_ignored(false)
-      .interhunk_lines(0)
-      .context_lines(0)
-      .minimal(true)
-      .patience(true)
-      .indent_heuristic(false);
-    opts
-  }
 
   pub fn stats(&self) -> Result<git2::DiffStats> {
     let mut opts = Repo::diff_options();
@@ -176,6 +157,26 @@ impl Repo {
     }
 
     Ok(())
+  }
+
+  fn diff_options() -> DiffOptions {
+    let mut opts = DiffOptions::new();
+    opts
+      .enable_fast_untracked_dirs(true)
+      .ignore_whitespace_change(true)
+      .recurse_untracked_dirs(false)
+      .recurse_ignored_dirs(false)
+      .ignore_whitespace_eol(true)
+      .ignore_blank_lines(true)
+      .ignore_submodules(true)
+      .include_untracked(false)
+      .include_ignored(false)
+      .interhunk_lines(0)
+      .context_lines(0)
+      .minimal(true)
+      .patience(true)
+      .indent_heuristic(false);
+    opts
   }
 }
 
