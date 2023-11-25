@@ -158,16 +158,15 @@ impl Repo {
       index.write()?
     }
 
-    let oid = index.write_tree()?;
-    let tree = repo.find_tree(oid)?;
-    let signature = repo.signature()?;
-    let parent = repo.head()?.resolve()?.peel(ObjectType::Commit)?.into_commit().map(Some)?;
-
-    match parent {
-      Some(parent) => repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, &[&parent]),
-      None => repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, &[])
-    }
-    .map_err(GitError::from)
+    let oid = index.write_tree().context("Could not write tree")?;
+    let tree = repo.find_tree(oid).context("Could not find tree")?;
+    let signature = repo.signature().context("Could not get signature")?;
+    let head = repo.head().context("Could not get head")?;
+    let parent = head.peel_to_commit().ok();
+    let parents = parent.iter().map(|commit| commit).collect::<Vec<&Commit>>();
+    repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, parents.as_slice())
+      .context("Could not commit")
+      .map_err(GitError::from)
   }
 
   fn diff_options() -> DiffOptions {
