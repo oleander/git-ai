@@ -32,7 +32,7 @@ impl Repo {
     })
   }
 
-  pub fn opts() -> DiffOptions {
+  pub fn diff_options() -> DiffOptions {
     let mut opts = DiffOptions::new();
     opts
       .enable_fast_untracked_dirs(true)
@@ -40,7 +40,6 @@ impl Repo {
       .recurse_untracked_dirs(false)
       .recurse_ignored_dirs(false)
       .ignore_whitespace_eol(true)
-      .recurse_untracked_dirs(false)
       .ignore_blank_lines(true)
       .ignore_submodules(true)
       .include_untracked(false)
@@ -54,15 +53,17 @@ impl Repo {
   }
 
   pub fn stats(&self) -> Result<git2::DiffStats> {
-    let mut opts = Repo::opts();
+    let mut opts = Repo::diff_options();
     let repo = self.repo.read().expect("Failed to lock repo");
     let diff = repo.diff_tree_to_workdir_with_index(None, Some(&mut opts))?;
     diff.stats().context("Failed to get diff stats")
   }
-
   pub fn diff(&self, max_token_count: usize) -> Result<(String, Vec<String>)> {
     let repo = self.repo.read().expect("Failed to lock repo");
-    let mut opts = Repo::opts();
+    let mut files = Vec::new();
+    let mut diff_str = Vec::new();
+    let mut opts = Repo::diff_options();
+
     let diff = match repo.head() {
       Ok(ref head) => {
         let tree = head
@@ -79,8 +80,6 @@ impl Repo {
       Err(_) => repo.diff_tree_to_workdir_with_index(None, Some(&mut opts))?
     };
 
-    // Get names of staged files
-    let mut files = Vec::new();
     diff.foreach(
       &mut |delta, _| {
         if let Some(file) = delta.new_file().path() {
@@ -98,11 +97,14 @@ impl Repo {
       bail!("No files to commit");
     }
 
-    let mut diff_str = Vec::new();
+    let mut length = 0;
     diff.print(git2::DiffFormat::Patch, |_, _, line| {
-      diff_str.extend_from_slice(line.content());
-      true
-    })?;
+      let content = line.content();
+      diff_str.extend_from_slice(content);
+      let str = String::from_utf8(content.into()).unwrap_or_default();
+      length += str.len();
+      length < max_token_count
+    }).ok();
 
     let mut diff_output =
       String::from_utf8(diff_str).expect("Diff output is not valid UTF-8");
@@ -174,15 +176,14 @@ pub fn repo() -> Repo {
 #[cfg(test)]
 mod tests {
   use git2::{Commit, IndexAddOption, ObjectType, Repository};
-  use std::fs::File;
-  use log::info;
   use anyhow::{anyhow, bail, Context, Result};
-  use std::io::Write;
-  use parsepatch::PatchReader;
   use std::path::{Path, PathBuf};
+  use std::process::Command;
   use tempfile::TempDir;
   use crate::git::Repo;
-  use std::process::Command;
+  use std::io::Write;
+  use std::fs::File;
+  use log::info;
 
   pub struct Git2Helpers {
     dir: TempDir
