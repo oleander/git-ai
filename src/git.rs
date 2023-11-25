@@ -1,20 +1,18 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
-use git2::{
-  Commit, Delta, Diff, DiffFormat, DiffOptions, Index, IndexAddOption, ObjectType, Oid, Repository, RepositoryInitOptions, RepositoryOpenFlags as Flag, StatusOptions, StatusShow
-};
 use std::sync::{Arc, LazyLock, Mutex, PoisonError, RwLock, RwLockReadGuard};
-// use anyhow::{anyhow, bail, Context, Result};
 use log::{debug, error, info, trace, warn};
+use git2::RepositoryOpenFlags as Flag;
 use std::collections::HashSet;
 use lazy_static::lazy_static;
-use std::process::Command;
-use std::path::Path;
 use crate::chat::ChatError;
+use std::process::Command;
 use thiserror::Error;
+use std::path::Path;
 use anyhow::bail;
 use crate::chat;
+use git2::*;
 
 #[derive(Error, Debug)]
 pub enum GitError {
