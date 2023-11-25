@@ -13,11 +13,11 @@ use dotenv_codegen::dotenv;
 #[derive(Parser, Debug)]
 #[clap(author, version, about)]
 struct Cli {
-  #[clap(long, help = "Enables debug logging", default_value = "false")]
-  debug: bool,
-
   #[clap(long, default_value = "false", help = "git add .")]
-  all: bool
+  all: bool,
+
+  #[clap(short, long, help = "Enables verbose logging", default_value = "false")]
+  verbose: bool
 }
 
 lazy_static! {
@@ -32,8 +32,8 @@ async fn main() -> Result<()> {
 
   let cli = Cli::parse();
 
-  if cli.debug {
-    std::env::set_var("RUST_LOG", "info");
+  if cli.verbose {
+    std::env::set_var("RUST_LOG", "debug");
   }
 
   let repo = git::Repo::new()?;
