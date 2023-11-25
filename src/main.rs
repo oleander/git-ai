@@ -13,6 +13,9 @@ use dotenv_codegen::dotenv;
 use chat::generate_commit_message;
 use git::Repo;
 
+#[macro_use]
+extern crate dotenv_codegen;
+
 #[derive(Parser, Debug)]
 #[clap(author, version, about)]
 struct Cli {
