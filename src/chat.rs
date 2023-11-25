@@ -1,5 +1,3 @@
-use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache, HttpCacheOptions};
-use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, json, Value};
 use anyhow::{Context, Result};
@@ -44,8 +42,10 @@ fn json_payload(messages: Vec<ChatMessage>) -> Value {
   json!({ "model": MODEL, "messages": messages })
 }
 
-fn http_client() -> ClientWithMiddleware {
-  ClientBuilder::new(Client::new()).build()
+fn http_client() -> Client {
+  reqwest::Client::builder()
+    .build()
+    .expect("Failed to build HTTP client")  
 }
 
 fn extract_message_from_response(response: &str) -> Result<String> {
