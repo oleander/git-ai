@@ -83,7 +83,7 @@ impl Repo {
 
     /* Will abort if the diff is too long */
     diff
-      .print(git2::DiffFormat::Patch, |_, _, line| {
+      .print(DiffFormat::Patch, |_, _, line| {
         let content = line.content();
         diff_str.extend_from_slice(content);
         let str = content.to_utf8();

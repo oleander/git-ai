@@ -45,13 +45,7 @@ fn json_payload(messages: Vec<ChatMessage>) -> Value {
 }
 
 fn http_client() -> ClientWithMiddleware {
-  ClientBuilder::new(Client::new())
-    .with(Cache(HttpCache {
-      options: HttpCacheOptions::default(),
-      manager: CACacheManager::default(),
-      mode:    CacheMode::Default
-    }))
-    .build()
+  ClientBuilder::new(Client::new()).build()
 }
 
 fn extract_message_from_response(response: &str) -> Result<String> {
@@ -79,7 +73,7 @@ async fn fetch_completion(payload: Value) -> Result<String> {
     .timeout(std::time::Duration::from_secs(10))
     .send()
     .await
-    .context("Failed to send request")?
+    .context("HTTP POST to OpenAI API failed")?
     .text()
     .await
     .map_err(|e| e.into())
