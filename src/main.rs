@@ -5,6 +5,7 @@ pub mod chat;
 
 use dotenv::dotenv;
 use anyhow::Result;
+use log::LevelFilter;
 use colored::*;
 use clap::Parser;
 use lazy_static::lazy_static;
@@ -34,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   if cli.verbose {
     env_logger::builder()
-      .filter_level(log::LevelFilter::Debug)
+      .filter_level(LevelFilter::Debug)
       .format_target(false)
       .format_timestamp(None)
       .init();
