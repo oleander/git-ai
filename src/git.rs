@@ -133,7 +133,7 @@ impl Repo {
     Ok((diff_output, files))
   }
 
-  pub async fn commit(&self, add_all: bool) -> Result<()> {
+  pub async fn commit(&self, add_all: bool) -> Result<Oid> {
     debug!("[commit] Committing with message");
 
     let repo = self.repo.read().expect("Failed to lock repo");
@@ -160,14 +160,12 @@ impl Repo {
 
     match parent {
       Some(parent) => {
-        repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, &[&parent])?
+        repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, &[&parent])
       },
       None => {
-        repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, &[])?
+        repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, &[])
       }
-    };
-
-    Ok(())
+    }
   }
 
   fn diff_options() -> DiffOptions {
