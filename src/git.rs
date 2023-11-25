@@ -164,11 +164,10 @@ impl Repo {
     let parent = repo.head()?.resolve()?.peel(ObjectType::Commit)?.into_commit().map(Some)?;
 
     match parent {
-      Some(parent) => {
-        repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, &[&parent]).map_err(GitError::from)
-      },
-      None => repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, &[]).map_err(GitError::from)
+      Some(parent) => repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, &[&parent]),
+      None => repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, &[])
     }
+    .map_err(GitError::from)
   }
 
   fn diff_options() -> DiffOptions {
