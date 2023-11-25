@@ -39,7 +39,10 @@ async fn main() -> Result<()> {
 
   info!("Commit {} created", oid);
 
-  Command::new("git").args(&["--no-pager", "log", "-1", "--name-only"]).exec();
+  println!("{}: ({})", message, oid);
+  for file in files {
+    println!("   {}", file);
+  }
 
   Ok(())
 }
