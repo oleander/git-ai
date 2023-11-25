@@ -17,6 +17,16 @@ pub struct Repo {
   repo: Arc<RwLock<Repository>>
 }
 
+trait Utf8String {
+  fn to_utf8(&self) -> String;
+}
+
+impl Utf8String for [u8] {
+  fn to_utf8(&self) -> String {
+    String::from_utf8(self.to_vec()).unwrap_or_default()
+  }
+}
+
 impl Repo {
   pub fn new() -> Result<Self> {
     Self::new_with_path(".".to_string())
@@ -58,11 +68,13 @@ impl Repo {
     let diff = repo.diff_tree_to_workdir_with_index(None, Some(&mut opts))?;
     diff.stats().context("Failed to get diff stats")
   }
+
   pub fn diff(&self, max_token_count: usize) -> Result<(String, Vec<String>)> {
     let repo = self.repo.read().expect("Failed to lock repo");
     let mut files = Vec::new();
     let mut diff_str = Vec::new();
     let mut opts = Repo::diff_options();
+    let mut length = 0;
 
     let diff = match repo.head() {
       Ok(ref head) => {
@@ -97,19 +109,17 @@ impl Repo {
       bail!("No files to commit");
     }
 
-    let mut length = 0;
-    diff.print(git2::DiffFormat::Patch, |_, _, line| {
-      let content = line.content();
-      diff_str.extend_from_slice(content);
-      let str = String::from_utf8(content.into()).unwrap_or_default();
-      length += str.len();
-      length < max_token_count
-    }).ok();
+    diff
+      .print(git2::DiffFormat::Patch, |_, _, line| {
+        let content = line.content();
+        diff_str.extend_from_slice(content);
+        let str = content.to_utf8();
+        length += str.len();
+        length < max_token_count
+      })
+      .ok();
 
-    let mut diff_output =
-      String::from_utf8(diff_str).expect("Diff output is not valid UTF-8");
-
-    diff_output.truncate(max_token_count);
+    let diff_output = diff_str.to_utf8();
 
     debug!("Diff: {}", diff_output);
 
