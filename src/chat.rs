@@ -1,24 +1,25 @@
 use serde_json::{from_str, json, Value};
 use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
+use dotenv_codegen::dotenv;
+use std::time::Duration;
 use thiserror::Error;
 use reqwest::Client;
 use anyhow::Context;
-use dotenv_codegen::dotenv;
-use std::time::Duration;
 use std::io;
 
 const API_URL: &str = "https://api.openai.com/v1/chat/completions";
 const MODEL: &str = "gpt-4-1106-preview";
 
 lazy_static! {
+   #[derive(Debug)]
+  static ref MAX_LENGTH: u8 = dotenv!("MAX_LENGTH").parse::<u8>().unwrap();
+   #[derive(Debug)]
   static ref TIMEOUT: u64 = dotenv!("TIMEOUT").parse::<u64>().unwrap();
    #[derive(Debug)]
   static ref API_KEY: String = dotenv!("OPENAI_API_KEY").to_string();
    #[derive(Debug)]
   static ref LANGUAGE: String = dotenv!("LANGUAGE").to_string();
-   #[derive(Debug)]
-  static ref MAX_LENGTH: u8 = dotenv!("MAX_LENGTH").parse::<u8>().unwrap();
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -47,7 +48,6 @@ pub enum ChatError {
   JsonParseError(#[from] serde_json::Error),
   #[error("Failed to extract message from response")]
   ResponseExtractionError,
-
   #[error("Anyhow error: {0}")]
   Anyhow(#[from] anyhow::Error)
 }
