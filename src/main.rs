@@ -39,7 +39,7 @@ async fn main() -> Result<()> {
 
   info!("Commit {} created", oid);
 
-  println!("{}: ({})", message, oid);
+  println!("{}: ({})", message, oid.to_string()[0..7].to_string());
   for file in files {
     println!("   {}", file);
   }
