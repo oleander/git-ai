@@ -96,7 +96,7 @@ impl Repo {
         diff_str.extend_from_slice(content);
         let str = content.to_utf8();
         length += str.len();
-        length < max_token_count
+        length <= max_token_count
       })
       .ok();
 
