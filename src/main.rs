@@ -7,6 +7,7 @@ use std::os::unix::process::CommandExt;
 use std::process::{exit, Command};
 use dotenv::dotenv;
 use anyhow::Result;
+use log::info;
 use clap::Parser;
 use log::error;
 
@@ -32,11 +33,11 @@ async fn main() -> Result<()> {
   }
 
   let repo = git::Repo::new()?;
+  let (diff, files) = repo.diff(1000)?;
+  let message = chat::suggested_commit_message(diff).await?;
+  let oid = repo.commit(&message, cli.all)?;
 
-  if let Err(e) = repo.commit(cli.all).await {
-    error!("Failed to commit: {}", e);
-    exit(1);
-  }
+  info!("Commit {} created", oid);
 
   Command::new("git").args(&["--no-pager", "log", "-1", "--name-only"]).exec();
 

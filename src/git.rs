@@ -133,7 +133,7 @@ impl Repo {
     Ok((diff_output, files))
   }
 
-  pub async fn commit(&self, add_all: bool) -> Result<Oid> {
+  pub fn commit(&self, message: &str, add_all: bool) -> Result<Oid> {
     debug!("[commit] Committing with message");
 
     let repo = self.repo.read().expect("Failed to lock repo");
@@ -146,12 +146,9 @@ impl Repo {
       index.write()?
     }
 
-    let (diff, _) = self.diff(1000)?;
     let oid = index.write_tree()?;
     let tree = repo.find_tree(oid)?;
     let signature = repo.signature()?;
-    let message = chat::suggested_commit_message(diff).await?;
-
     let parent = repo.head()?.resolve()?.peel(ObjectType::Commit)?.into_commit().map(Some)?;
 
     match parent {
