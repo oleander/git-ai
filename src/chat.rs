@@ -1,6 +1,4 @@
-use http_cache_reqwest::{
-  CACacheManager, Cache, CacheMode, HttpCache, HttpCacheOptions
-};
+use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache, HttpCacheOptions};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, json, Value};
@@ -59,8 +57,7 @@ fn http_client() -> ClientWithMiddleware {
 fn extract_message_from_response(response: &str) -> Result<String> {
   trace!("[extract_message_from_response] Response: {}", response);
 
-  let response: Value =
-    from_str(response).context("Failed to parse response")?;
+  let response: Value = from_str(response).context("Failed to parse response")?;
   Ok(
     response["choices"]
       .as_array()
@@ -93,15 +90,8 @@ pub async fn suggested_commit_message(diff: String) -> Result<String> {
   trace!("[suggested_commit_message] Generating commit message");
 
   let chat_prompt = build_commit_message_prompt("en", 72);
-  let messages = vec![
-    ChatMessage::new("system", chat_prompt),
-    ChatMessage::new("user", diff),
-  ];
+  let messages = vec![ChatMessage::new("system", chat_prompt), ChatMessage::new("user", diff)];
   let payload = json_payload(messages);
-  let response =
-    fetch_completion(payload).await.context("Failed to fetch completion")?;
-  Ok(
-    extract_message_from_response(&response)
-      .context("Failed to extract message from response")?
-  )
+  let response = fetch_completion(payload).await.context("Failed to fetch completion")?;
+  Ok(extract_message_from_response(&response).context("Failed to extract message from response")?)
 }

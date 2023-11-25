@@ -38,9 +38,8 @@ impl Repo {
   }
 
   pub fn new_with_path(path: String) -> Result<Self> {
-    let repo =
-      Repository::open_ext(path, Flag::empty(), Vec::<&Path>::new())
-        .with_context(|| format!("Failed to open the git repository at"))?;
+    let repo = Repository::open_ext(path, Flag::empty(), Vec::<&Path>::new())
+      .with_context(|| format!("Failed to open the git repository at"))?;
 
     Ok(Repo {
       repo: Arc::new(RwLock::new(repo))
@@ -117,7 +116,7 @@ impl Repo {
 
     debug!("[diff] Diff: {}", diff_output);
 
-    Ok((diff_output, files))  
+    Ok((diff_output, files))
   }
 
   pub async fn commit(&self, add_all: bool) -> Result<()> {
@@ -129,9 +128,7 @@ impl Repo {
     if add_all {
       debug!("Adding all files to index(--all)");
 
-      index
-        .add_all(["*"], IndexAddOption::DEFAULT, None)
-        .context("Failed to add all files to index")?;
+      index.add_all(["*"], IndexAddOption::DEFAULT, None).context("Failed to add all files to index")?;
       index.write().context("Failed to write index")?;
     }
 
@@ -152,20 +149,11 @@ impl Repo {
           .map_err(|_| anyhow!("Failed to resolve parent commit"))?;
 
         repo
-          .commit(
-            Some("HEAD"),
-            &signature,
-            &signature,
-            &message,
-            &tree,
-            &[&parent]
-          )
+          .commit(Some("HEAD"), &signature, &signature, &message, &tree, &[&parent])
           .context("Failed to commit (1)")?;
       },
       Err(_) => {
-        repo
-          .commit(Some("HEAD"), &signature, &signature, &message, &tree, &[])
-          .context("Failed to commit (2)")?;
+        repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, &[]).context("Failed to commit (2)")?;
       }
     }
 

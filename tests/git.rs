@@ -20,8 +20,7 @@ impl Git2Helpers {
 
     helper.git(&["init"]);
 
-    let repo = Repo::new_with_path(helper.str_path().to_string())
-      .expect("Could not open repo");
+    let repo = Repo::new_with_path(helper.str_path().to_string()).expect("Could not open repo");
 
     (helper, repo)
   }
