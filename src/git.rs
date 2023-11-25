@@ -83,23 +83,7 @@ impl Repo {
     let mut opts = Repo::diff_options();
     let mut length = 0;
 
-    let tree =
-      match repo.head() {
-        Ok(ref head) => {
-          head
-            .resolve()
-            .context("Could not resolve head")?
-            .peel(ObjectType::Commit)
-            .context("Could not peel head")?
-            .into_commit()
-            .map_err(GitError::from)?
-            .tree()
-            .context("Could not get tree")
-            .map(Some)?
-        },
-        Err(_) => None
-      };
-
+    let tree = repo.head().ok().and_then(|head| head.peel_to_tree().ok());
     let diff = repo.diff_tree_to_workdir_with_index(tree.as_ref(), Some(&mut opts))?;
 
     diff.foreach(
@@ -161,9 +145,9 @@ impl Repo {
     let oid = index.write_tree().context("Could not write tree")?;
     let tree = repo.find_tree(oid).context("Could not find tree")?;
     let signature = repo.signature().context("Could not get signature")?;
-    let head = repo.head().context("Could not get head")?;
-    let parent = head.peel_to_commit().ok();
+    let parent = repo.head().ok().and_then(|head| head.peel_to_commit().ok());
     let parents = parent.iter().map(|commit| commit).collect::<Vec<&Commit>>();
+
     repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, parents.as_slice())
       .context("Could not commit")
       .map_err(GitError::from)
