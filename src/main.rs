@@ -8,6 +8,7 @@ use anyhow::Result;
 use colored::*;
 use clap::Parser;
 use lazy_static::lazy_static;
+use thiserror::Error;
 use dotenv_codegen::dotenv;
 use chat::generate_commit_message;
 use git::Repo;
@@ -26,9 +27,8 @@ lazy_static! {
   static ref MAX_CHARS: usize = dotenv!("MAX_CHARS").parse::<usize>().unwrap();
 }
 
-
 #[tokio::main(flavor = "multi_thread")]
-async fn main() -> Result<()> {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
   env_logger::init();
   dotenv().ok();
 
