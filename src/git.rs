@@ -152,19 +152,13 @@ impl Repo {
     let signature = repo.signature()?;
     let message = chat::suggested_commit_message(diff).await?;
 
-
-    let parent = match repo.head() {
-      Ok(head) => head.resolve()?.peel(ObjectType::Commit)?.into_commit().map(Some)?,
-      Err(_) => None
-    };
+    let parent = repo.head()?.resolve()?.peel(ObjectType::Commit)?.into_commit().map(Some)?;
 
     match parent {
       Some(parent) => {
         repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, &[&parent]).map_err(GitError::from)
       },
-      None => {
-        repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, &[]).map_err(GitError::from)
-      }
+      None => repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, &[]).map_err(GitError::from)
     }
   }
 
