@@ -36,6 +36,24 @@ async fn main() -> Result<()> {
     std::env::set_var("RUST_LOG", "debug");
   }
 
+  "this is blue".blue();
+  "this is red".red();
+  "this is red on blue".red().on_blue();
+  "this is also red on blue".on_blue().red();
+  "you can use truecolor values too!".truecolor(0, 255, 136);
+  "background truecolor also works :)".on_truecolor(135, 28, 167);
+  "bright colors are welcome as well".on_bright_blue().bright_red();
+  "you can also make bold comments".bold();
+  println!("{} {} {}", "or use".cyan(), "any".italic().yellow(), "string type".cyan());
+  "or change advice. This is red".yellow().blue().red();
+  "or clear things up. This is default color and style".red().bold().clear();
+  "purple and magenta are the same".purple().magenta();
+  "and so are normal and clear".normal().clear();
+  "you can specify color by string".color("blue").on_color("red");
+  String::from("this also works!").green().bold();
+  format!("{:30}", "format works as expected. This will be padded".blue());
+    format!("{:.3}", "and this will be green but truncated to 3 chars".green());
+    
   let repo = git::Repo::new()?;
   let (diff, files) = repo.diff(*MAX_CHARS)?;
   let message = chat::suggested_commit_message(diff).await?;
