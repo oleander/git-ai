@@ -3,13 +3,9 @@
 pub mod git;
 pub mod chat;
 
-use std::os::unix::process::CommandExt;
-use std::process::{exit, Command};
 use dotenv::dotenv;
 use anyhow::Result;
-use log::info;
 use clap::Parser;
-use log::error;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about)]
