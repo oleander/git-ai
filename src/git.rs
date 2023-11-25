@@ -4,19 +4,14 @@
 use git2::{
   Commit, Delta, Diff, DiffFormat, DiffOptions, Index, IndexAddOption, ObjectType, Oid, Repository, RepositoryInitOptions, RepositoryOpenFlags as Flag, StatusOptions, StatusShow
 };
+use std::sync::{Arc, LazyLock, Mutex, RwLock};
 use anyhow::{anyhow, bail, Context, Result};
 use log::{debug, error, info, trace, warn};
-use std::sync::{Arc, LazyLock, Mutex, RwLock};
+use std::collections::HashSet;
 use lazy_static::lazy_static;
 use std::process::Command;
 use std::path::Path;
-use std::collections::HashSet;
 use crate::chat;
-
-pub struct DiffResult {
-  pub diff_output: String,
-  pub files:       Vec<String>
-}
 
 pub struct Repo {
   repo: Arc<RwLock<Repository>>
@@ -179,8 +174,4 @@ impl Repo {
       .indent_heuristic(false);
     opts
   }
-}
-
-pub fn repo() -> Repo {
-  Repo::new().expect("Failed to initialize git repository")
 }

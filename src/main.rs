@@ -31,7 +31,9 @@ async fn main() -> Result<()> {
     std::env::set_var("RUST_LOG", "info");
   }
 
-  if let Err(e) = git::repo().commit(cli.all).await {
+  let repo = git::Repo::new()?;
+
+  if let Err(e) = repo.commit(cli.all).await {
     error!("Failed to commit: {}", e);
     exit(1);
   }
