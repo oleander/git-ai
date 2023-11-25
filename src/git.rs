@@ -148,7 +148,8 @@ impl Repo {
     let parent = repo.head().ok().and_then(|head| head.peel_to_commit().ok());
     let parents = parent.iter().map(|commit| commit).collect::<Vec<&Commit>>();
 
-    repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, parents.as_slice())
+    repo
+      .commit(Some("HEAD"), &signature, &signature, &message, &tree, parents.as_slice())
       .context("Could not commit")
       .map_err(GitError::from)
   }
