@@ -33,7 +33,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let cli = Cli::parse();
 
   if cli.verbose {
-    panic!("Verbose logging is not yet implemented");
     env_logger::builder()
       .filter_level(log::LevelFilter::Debug)
       .format_target(false)
