@@ -9,6 +9,8 @@ use colored::*;
 use clap::Parser;
 use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
+use chat::generate_commit_message;
+use git::Repo;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about)]
@@ -36,9 +38,9 @@ async fn main() -> Result<()> {
     std::env::set_var("RUST_LOG", "debug");
   }
 
-  let repo = git::Repo::new()?;
+  let repo = Repo::new()?;
   let (diff, files) = repo.diff(*MAX_CHARS)?;
-  let message = chat::suggested_commit_message(diff).await?;
+  let message = generate_commit_message(diff).await?;
   let oid = repo.commit(&message, cli.all)?;
 
   println!("{} [{:.7}] {}: ", "🤖", oid.to_string().yellow(), message.green().italic());
