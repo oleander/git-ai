@@ -5,6 +5,7 @@ pub mod chat;
 
 use dotenv::dotenv;
 use anyhow::Result;
+use colored::*;
 use clap::Parser;
 
 #[derive(Parser, Debug)]
@@ -33,9 +34,9 @@ async fn main() -> Result<()> {
   let message = chat::suggested_commit_message(diff).await?;
   let oid = repo.commit(&message, cli.all)?;
 
-  println!("{}: ({})", message, oid.to_string()[0..7].to_string());
+  println!("{} {}: ({:.7})", "🤖".bright_blue(), message.bright_green().bold(), oid.to_string().bright_yellow());
   for file in files {
-    println!("   {}", file);
+    println!("   {}", file.white());
   }
 
   Ok(())
