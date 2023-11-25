@@ -5,12 +5,15 @@ use thiserror::Error;
 use reqwest::Client;
 use anyhow::Context;
 use dotenv_codegen::dotenv;
+use std::time::Duration;
 use std::io;
 
 const API_URL: &str = "https://api.openai.com/v1/chat/completions";
 const MODEL: &str = "gpt-4-1106-preview";
 
 lazy_static! {
+  static ref TIMEOUT: u64 = dotenv!("TIMEOUT").parse::<u64>().unwrap();
+   #[derive(Debug)]
   static ref API_KEY: String = dotenv!("OPENAI_API_KEY").to_string();
    #[derive(Debug)]
   static ref LANGUAGE: String = dotenv!("LANGUAGE").to_string();
@@ -69,7 +72,7 @@ pub async fn suggested_commit_message(diff: String) -> Result<String, ChatError>
     .post(API_URL)
     .bearer_auth(API_KEY.as_str())
     .json(&payload)
-    .timeout(std::time::Duration::from_secs(10))
+    .timeout(Duration::from_secs(*TIMEOUT))
     .send()
     .await
     .context("Failed to send request")?
