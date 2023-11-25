@@ -90,19 +90,24 @@ impl Repo {
       bail!("No files to commit");
     }
 
-    diff
-      .print(git2::DiffFormat::Patch, |_, _, line| {
-        let content = line.content();
-        diff_str.extend_from_slice(content);
-        let str = content.to_utf8();
-        length += str.len();
-        length <= max_token_count
-      })
-      .ok();
+    diff.print(git2::DiffFormat::Patch, |_, _, line| {
+      let content = line.content();
+      diff_str.extend_from_slice(content);
+      let str = content.to_utf8();
+      length += str.len();
+
+      if length <= max_token_count {
+        let overflow = length - max_token_count;
+        diff_str.truncate(diff_str.len() - overflow);
+        return false
+      }
+
+      true
+    }).ok();
 
     let diff_output = diff_str.to_utf8();
 
-    debug!("Diff: {}", diff_output);
+    debug!("[diff] Diff: {}", diff_output);
 
     Ok((diff_output, files))
   }
