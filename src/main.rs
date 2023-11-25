@@ -37,8 +37,6 @@ async fn main() -> Result<()> {
   let message = chat::suggested_commit_message(diff).await?;
   let oid = repo.commit(&message, cli.all)?;
 
-  info!("Commit {} created", oid);
-
   println!("{}: ({})", message, oid.to_string()[0..7].to_string());
   for file in files {
     println!("   {}", file);

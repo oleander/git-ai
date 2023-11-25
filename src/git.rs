@@ -25,7 +25,7 @@ pub enum GitError {
   #[error("No files to commit")]
   NoFilesToCommit,
   #[error("Empty diff output")]
-  EmptyDiffOutput // Add other error types as needed here
+  EmptyDiffOutput
 }
 
 impl From<PoisonError<RwLockReadGuard<'_, git2::Repository>>> for GitError {
@@ -76,19 +76,14 @@ impl Repo {
   }
 
   pub fn diff(&self, max_token_count: usize) -> Result<(String, Vec<String>)> {
-    let repo = self.repo.read().expect("Failed to lock repo");
+    let repo = self.repo.read()?;
     let mut files = Vec::new();
     let mut diff_str = Vec::new();
     let mut opts = Repo::diff_options();
     let mut length = 0;
 
-    let diff = match repo.head() {
-      Ok(ref head) => {
-        let tree = head.resolve()?.peel(ObjectType::Commit)?.into_commit()?.tree().map_err(GitError::from)?;
-        repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))?
-      },
-      Err(_) => repo.diff_tree_to_workdir_with_index(None, Some(&mut opts))?
-    };
+    let tree = repo.head()?.resolve()?.peel(ObjectType::Commit)?.into_commit()?.tree().map(Some)?;
+    let diff = repo.diff_tree_to_workdir_with_index(tree.as_ref(), Some(&mut opts))?;
 
     diff.foreach(
       &mut |delta, _| {
