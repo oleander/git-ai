@@ -43,7 +43,7 @@ fn json_payload(messages: Vec<ChatMessage>) -> Value {
 }
 
 fn http_client() -> Client {
-  reqwest::Client::builder()
+  Client::builder()
     .build()
     .expect("Failed to build HTTP client")  
 }
