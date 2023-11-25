@@ -1,10 +1,10 @@
-use crate::chat::ChatError;
-use anyhow::Context;
+use std::sync::{PoisonError, RwLockReadGuard};
 use git2::{RepositoryOpenFlags as Flag, *};
 use log::{debug, error, warn};
-use std::path::Path;
-use std::sync::{PoisonError, RwLockReadGuard};
+use crate::chat::ChatError;
 use thiserror::Error;
+use anyhow::Context;
+use std::path::Path;
 
 #[derive(Error, Debug)]
 pub enum GitError {
@@ -141,7 +141,7 @@ impl Repo {
     let tree = self.repo.find_tree(oid).context("Could not find tree")?;
     let signature = self.repo.signature().context("Could not get signature")?;
     let parent = self.repo.head().ok().and_then(|head| head.peel_to_commit().ok());
-    let parents = parent.iter().map(|commit| commit).collect::<Vec<&Commit>>();
+    let parents = parent.iter().collect::<Vec<&Commit>>();
 
     self
       .repo
