@@ -80,12 +80,8 @@ impl Git2Helpers {
   }
 
   fn git(&self, args: &[&str]) -> Result<String> {
-    let output = Command::new("git")
-      .args(args)
-      .env("OVERCOMMIT_DISABLE", "1")
-      .current_dir(self.path())
-      .output()
-      .context("Could not run git command")?;
+    let output =
+      Command::new("git").args(args).env("OVERCOMMIT_DISABLE", "1").current_dir(self.path()).output().context("Could not run git command")?;
 
     if !output.status.success() {
       let stderr = String::from_utf8_lossy(&output.stderr);

@@ -139,7 +139,7 @@ impl Repo {
       debug!("Adding all files to index(--all)");
 
       index.add_all(["*"], IndexAddOption::DEFAULT, None)?;
-      index.write()?
+      index.write().context("Could not write index")?;
     }
 
     let oid = index.write_tree().context("Could not write tree")?;
@@ -148,10 +148,7 @@ impl Repo {
     let parent = repo.head().ok().and_then(|head| head.peel_to_commit().ok());
     let parents = parent.iter().map(|commit| commit).collect::<Vec<&Commit>>();
 
-    repo
-      .commit(Some("HEAD"), &signature, &signature, &message, &tree, parents.as_slice())
-      .context("Could not commit")
-      .map_err(GitError::from)
+    repo.commit(Some("HEAD"), &signature, &signature, &message, &tree, parents.as_slice()).context("Could not commit").map_err(GitError::from)
   }
 
   fn diff_options() -> DiffOptions {
