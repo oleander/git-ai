@@ -43,9 +43,7 @@ fn json_payload(messages: Vec<ChatMessage>) -> Value {
 }
 
 fn http_client() -> Client {
-  Client::builder()
-    .build()
-    .expect("Failed to build HTTP client")  
+  Client::builder().build().expect("Failed to build HTTP client")
 }
 
 fn extract_message_from_response(response: &str) -> Result<String> {
