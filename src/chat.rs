@@ -55,7 +55,7 @@ pub enum ChatError {
 // Generates a commit message from the OpenAI API
 pub async fn generate_commit_message(diff: String) -> Result<String, ChatError> {
   let prompt = format!(
-    "Generate a concise git commit message written in present tense for the following code diff with the given specifications below:\nMessage language: {}\nCommit message must be a maximum of {} characters.\nExclude anything unnecessary such as translation. Your entire response will be passed directly into git commit.",
+    "Generate a concise git commit message written in present tense for the following code diff with the given specifications below:\nMessage language: {:?}\nCommit message must be a maximum of {:?} characters.\nExclude anything unnecessary such as translation. Your entire response will be passed directly into git commit.",
     LANGUAGE, MAX_LENGTH
   );
 
