@@ -73,7 +73,7 @@ impl Repo {
     let mut length = 0;
 
     let tree = self.repo.head().ok().and_then(|head| head.peel_to_tree().ok());
-    let diff = self.repo.diff_tree_to_workdir_with_index(tree.as_ref(), Some(&mut opts))?;
+    let diff = self.repo.diff_tree_to_index(tree.as_ref(), None, Some(&mut opts))?;
 
     debug!("Stats: {:?}", diff.stats());
     debug!("Tree: {:?}", tree);
