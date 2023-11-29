@@ -75,8 +75,8 @@ impl Repo {
     let tree = self.repo.head().ok().and_then(|head| head.peel_to_tree().ok());
     let diff = self.repo.diff_tree_to_workdir_with_index(tree.as_ref(), Some(&mut opts))?;
 
-    debug!("Tree: {:?}", tree);
     debug!("Stats: {:?}", diff.stats());
+    debug!("Tree: {:?}", tree);
 
     diff.foreach(
       &mut |delta, _| {
