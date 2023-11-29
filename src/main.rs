@@ -3,15 +3,15 @@
 pub mod chat;
 pub mod git;
 
-use anyhow::Result;
 use chat::generate_commit_message;
+use log::{debug, LevelFilter};
+use lazy_static::lazy_static;
+use dotenv_codegen::dotenv;
+use anyhow::Result;
+use dotenv::dotenv;
 use clap::Parser;
 use colored::*;
-use dotenv::dotenv;
-use dotenv_codegen::dotenv;
 use git::Repo;
-use lazy_static::lazy_static;
-use log::{debug, LevelFilter};
 
 extern crate dotenv_codegen;
 
