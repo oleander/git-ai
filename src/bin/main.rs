@@ -1,9 +1,9 @@
 #![feature(lazy_cell)]
 
-pub mod chat;
-pub mod git;
+// pub mod chat;
+// pub mod git;
 
-use chat::generate_commit_message;
+use ai::chat::generate_commit_message;
 use log::{debug, LevelFilter};
 use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
@@ -11,7 +11,7 @@ use anyhow::Result;
 use dotenv::dotenv;
 use clap::Parser;
 use colored::*;
-use git::Repo;
+use ai::git::Repo;
 
 extern crate dotenv_codegen;
 
