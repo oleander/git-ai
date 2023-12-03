@@ -1,32 +1,21 @@
 // Hook: prepare-commit-msg
 
-use std::io::Write;
 use ai::chat::generate_commit_message;
-use anyhow::Result;
+use std::process::Termination;
+use lazy_static::lazy_static;
+use std::process::ExitCode;
+use dotenv_codegen::dotenv;
+use std::path::PathBuf;
+use git2::DiffOptions;
 use git2::Repository;
 use git2::DiffFormat;
-use git2::DiffOptions;
-use git2::Oid;
-use lazy_static::lazy_static;
-use std::process::Termination;
-use std::process::ExitCode;
-use git2::Tree;
-use dotenv_codegen::dotenv;
-
-use clap::Parser;
-use std::path::PathBuf;
-// use thiserror::Error;
-
-// #[derive(Error, Debug)]
-// pub enum HookError {
-//   #[error("Anyhow error: {0}")]
-//   Anyhow(#[from] anyhow::Error)
-
-//   Msg(String)
+use std::io::Write;
+use anyhow::Result;
 use std::fs::File;
-// }
+use clap::Parser;
+use git2::Tree;
+use git2::Oid;
 
-/// Git prepare-commit-msg hook
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
@@ -94,7 +83,7 @@ async fn main() -> Result<Msg, Box<dyn std::error::Error>> {
   let repo = Repository::open_from_env()?;
 
   let mut opts = DiffOptions::new();
-    opts
+  opts
     .enable_fast_untracked_dirs(true)
     .ignore_whitespace_change(true)
     .recurse_untracked_dirs(false)
