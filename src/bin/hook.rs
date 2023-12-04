@@ -165,13 +165,12 @@ async fn run(args: Args) -> Result<Msg> {
   pb.set_style(
     ProgressStyle::default_spinner()
       .tick_strings(&["-", "\\", "|", "/"])
-      .template("{spinner:.blue} Processing {msg}")?
+      .template("{spinner:.blue} {msg}")?
   );
 
   tokio::spawn(async move {
     spin_progress_bar(pb_clone, is_done_clone).await;
   });
-
 
   if args.commit_type.is_some() {
     return Ok(Msg("Commit message is not empty".to_string()));
@@ -199,9 +198,6 @@ async fn run(args: Args) -> Result<Msg> {
     .commit_msg_file
     .write(new_commit_message.trim().to_string())
     .context("Failed to write commit message")?;
-
-  eprintln!("[1] Commit message: {}", new_commit_message);
-  println!("[2] Commit message: {}", new_commit_message);
 
   pb.finish_with_message(new_commit_message.clone());
   Ok(Msg(new_commit_message))

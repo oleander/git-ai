@@ -45,9 +45,7 @@ pub fn run() -> Result<()> {
 
   let relative_path = hook_file.strip_prefix(&current_dir).context("Failed to strip prefix")?;
 
-  info!("Hook symlinked successfully to {:?}", relative_path);
-  eprintln!("[1] Hook symlinked successfully to {:?}", relative_path);
-  println!("[2] Hook symlinked successfully to {:?}", relative_path);
+  println!("Hook symlinked successfully to {}", relative_path.display());
 
   Ok(())
 }
