@@ -3,7 +3,6 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use anyhow::{Result, Context};
 use git2::Repository;
-use log::info;
 use std::env;
 use std::fs;
 use log::debug;
