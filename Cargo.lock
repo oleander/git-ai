@@ -412,6 +412,7 @@ dependencies = [
  "env_logger",
  "filepath",
  "git2",
+ "hook",
  "lazy_static",
  "log",
  "rand",
@@ -474,6 +475,29 @@ name = "hermit-abi"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d77f7ec81a6d05a3abb01ab6eb7590f6083d08449fe5a1c8b1e620283546ccb7"
+
+[[package]]
+name = "hook"
+version = "0.1.0"
+dependencies = [
+ "ansi_term",
+ "anyhow",
+ "clap",
+ "colored",
+ "dotenv",
+ "dotenv_codegen",
+ "env_logger",
+ "filepath",
+ "git2",
+ "lazy_static",
+ "log",
+ "rand",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+]
 
 [[package]]
 name = "http"
