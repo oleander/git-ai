@@ -1,21 +1,16 @@
 use git2::RepositoryOpenFlags as Flags;
-use anyhow::{Result, Context, bail};
-use std::os::unix::fs as unix_fs;
+use anyhow::{Result, Context};
 use std::path::{Path, PathBuf};
 use std::os::unix::fs::PermissionsExt; // This trait provides the set_mode method
 use git2::Repository;
 use std::env;
-use filepath::FilePath;
 use std::fs;
 
 pub fn run() -> Result<()> {
-  let profile = env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
   let current_dir = env::current_dir().with_context(|| "Failed to get current directory".to_string())?;
   let repo = Repository::open_ext(&current_dir, Flags::empty(), Vec::<&Path>::new())
     .with_context(|| "Failed to open repository".to_string())?;
-
   let script = include_bytes!("../target/release/git-ai-hook");
-
   let hook_dir = PathBuf::from(repo.path()).join("hooks");
   let hook_file = hook_dir.join("prepare-commit-msg");
 

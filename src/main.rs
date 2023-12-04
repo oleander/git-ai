@@ -11,15 +11,8 @@ fn cli() -> Command {
     .subcommand_required(true)
     .arg_required_else_help(true)
     .allow_external_subcommands(true)
-    .subcommand(
-      Command::new("install")
-        .about("Installs the git-ai hook")
-    )
-    .subcommand(
-      Command::new("uninstall")
-        .about("Uninstalls the git-ai hook")
-        .arg_required_else_help(true)
-    )
+    .subcommand(Command::new("install").about("Installs the git-ai hook"))
+    .subcommand(Command::new("uninstall").about("Uninstalls the git-ai hook").arg_required_else_help(true))
 }
 
 #[tokio::main]
