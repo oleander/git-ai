@@ -31,7 +31,8 @@ log = "0.4.20"
 
 [dev-dependencies]
 tempfile = "3.8.1"
+rand = "0.8.4"
 
 [profile.release]
-opt-level = 3
+opt-level = "s"
 lto = true

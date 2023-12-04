@@ -1,4 +1,3 @@
-use ai::git::Repo;
 use anyhow::{anyhow, bail, Context, Result};
 use git2::{Commit, IndexAddOption, ObjectType, Repository};
 use log::info;
