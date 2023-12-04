@@ -3,8 +3,10 @@
 #[cfg(not(mock))]
 // Hook: prepare-commit-msg
 use ai::chat::generate_commit_message;
+use indicatif::ProgressBar;
 
 use std::process::Termination;
+use indicatif::ProgressStyle;
 use lazy_static::lazy_static;
 use std::process::ExitCode;
 use dotenv_codegen::dotenv;
@@ -145,6 +147,11 @@ async fn main() -> Result<Msg, Box<dyn std::error::Error>> {
 }
 
 async fn run(args: Args) -> Result<Msg> {
+  let pb = ProgressBar::new_spinner();
+  pb.set_style(ProgressStyle::default_spinner()
+        .tick_strings(&["-", "\\", "|", "/"])
+        .template("{spinner:.blue} Processing {msg}")?);
+
   if args.commit_type.is_some() {
     return Ok(Msg("Commit message is not empty".to_string()));
   }
@@ -171,6 +178,7 @@ async fn run(args: Args) -> Result<Msg> {
     .write(new_commit_message.trim().to_string())
     .context("Failed to write commit message")?;
 
+  pb.finish_with_message(new_commit_message.clone());
   Ok(Msg(new_commit_message))
 }
 

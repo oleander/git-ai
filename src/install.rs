@@ -44,7 +44,10 @@ pub fn run() -> Result<()> {
   fs::set_permissions(&hook_file, permissions).context("Failed to set permissions")?;
 
   let relative_path = hook_file.strip_prefix(&current_dir).context("Failed to strip prefix")?;
+
   info!("Hook symlinked successfully to {:?}", relative_path);
+  eprintln!("[1] Hook symlinked successfully to {:?}", relative_path);
+  println!("[2] Hook symlinked successfully to {:?}", relative_path);
 
   Ok(())
 }

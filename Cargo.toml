@@ -29,6 +29,7 @@ anyhow = "1.0.75"
 dotenv = "0.15.0"
 git2 = "0.18.1"
 log = "0.4.20"
+indicatif = "0.17.7"
 
 [dev-dependencies]
 tempfile = "3.8.1"
