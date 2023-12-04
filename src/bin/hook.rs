@@ -152,7 +152,7 @@ async fn main() -> Result<Msg, Box<dyn std::error::Error>> {
 async fn spin_progress_bar(pb: ProgressBar, is_done: Arc<AtomicBool>) {
   while !is_done.load(Ordering::SeqCst) {
     pb.tick();
-    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
   }
 }
 
@@ -164,8 +164,8 @@ async fn run(args: Args) -> Result<Msg> {
 
   pb.set_style(
     ProgressStyle::default_spinner()
-      .tick_strings(&[".", "..", "...", ""])
-      .template("Calculating commit {spinner}")?
+      .tick_strings(&["-", "\\", "|", "/"])
+      .template("{spinner:.blue} Calculating commit message... {msg}")?
   );
 
   tokio::spawn(async move {
