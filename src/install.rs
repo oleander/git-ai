@@ -16,7 +16,7 @@ pub fn run() -> Result<()> {
 
   let binary_path = current_dir.join(format!("target/{}/git-ai-hook", profile));
     // read binary file into a string
-  let script = include_bytes!("../target/release/git-ai-hook");
+  let script = include_bytes!("target/release/git-ai-hook");
 
   if !binary_path.exists() {
     bail!("Binary does not exist: {:?}", binary_path);
