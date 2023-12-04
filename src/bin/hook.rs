@@ -71,8 +71,6 @@ impl FilePath for PathBuf {
   }
 }
 
-
-
 trait Utf8String {
   fn to_utf8(&self) -> String;
 }
@@ -86,12 +84,11 @@ impl Utf8String for [u8] {
 #[tokio::main]
 async fn main() -> Result<Msg, Box<dyn std::error::Error>> {
   let args = Args::parse();
-  run(args).await?;
-  Ok(Msg("Commit message generated".to_string()))
+  run(args).await
 }
 
 async fn run(args: Args) -> Result<Msg, Box<dyn std::error::Error>> {
-  if !args.commit_msg_file.is_empty()? {
+  if args.commit_type.is_some() {
     return Ok(Msg("Commit message is not empty".to_string()));
   }
 
