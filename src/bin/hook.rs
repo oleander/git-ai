@@ -2,8 +2,10 @@
 
 // Hook: prepare-commit-msg
 
-use log::info;
+#[cfg(not(mock))]
 use ai::chat::generate_commit_message;
+
+use log::info;
 use std::process::Termination;
 use lazy_static::lazy_static;
 use std::process::ExitCode;
@@ -12,6 +14,7 @@ use std::path::PathBuf;
 use git2::DiffOptions;
 use git2::Repository;
 use git2::DiffFormat;
+use anyhow::bail;
 use std::io::Write;
 use std::io::Read;
 use anyhow::Result;
@@ -19,6 +22,7 @@ use std::fs::File;
 use clap::Parser;
 use git2::Tree;
 use git2::Oid;
+use log::error;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -89,11 +93,13 @@ impl Utf8String for [u8] {
 
 #[tokio::main]
 async fn main() -> Result<Msg, Box<dyn std::error::Error>> {
+  env_logger::init();
   let args = Args::parse();
-  run(args).await
+  Ok(run(args).await?)
 }
 
-async fn run(args: Args) -> Result<Msg, Box<dyn std::error::Error>> {
+async fn run(args: Args) -> Result<Msg> {
+  info!("Args: {:?}", args);
   if args.commit_type.is_some() {
     return Ok(Msg("Commit message is not empty".to_string()));
   }
@@ -138,11 +144,24 @@ async fn run(args: Args) -> Result<Msg, Box<dyn std::error::Error>> {
     length <= max_token_count
   }).ok();
 
-  let new_commit_message = generate_commit_message(acc.to_utf8()).await?;
+  let message = acc.to_utf8();
+  let message = message.trim();
+
+  if message.is_empty() {
+    bail!("Empty diff output");
+  }
+
+  let new_commit_message = generate_commit_message(message.to_string()).await?;
 
   args.commit_msg_file.write(new_commit_message.clone())?;
 
   Ok(Msg(new_commit_message))
+}
+
+
+#[cfg(mock)]
+async fn generate_commit_message(diff: String) -> Result<String> {
+  Ok(diff.to_string())
 }
 
 #[cfg(test)]
