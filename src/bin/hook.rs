@@ -75,6 +75,12 @@ trait Utf8String {
   fn to_utf8(&self) -> String;
 }
 
+impl Utf8String for Vec<u8> {
+  fn to_utf8(&self) -> String {
+    String::from_utf8(self.to_vec()).unwrap_or_default()
+  }
+}
+
 impl Utf8String for [u8] {
   fn to_utf8(&self) -> String {
     String::from_utf8(self.to_vec()).unwrap_or_default()
@@ -120,21 +126,19 @@ async fn run(args: Args) -> Result<Msg, Box<dyn std::error::Error>> {
   };
 
   let diff = repo.diff_tree_to_index(tree.as_ref(), None, Some(&mut opts))?;
-  let mut diff_str = Vec::new();
+  let mut acc = Vec::new();
   let max_token_count = *MAX_CHARS;
 
   #[rustfmt::skip]
   diff.print(DiffFormat::Patch, |_, _, line| {
     let content = line.content();
-    diff_str.extend_from_slice(content);
+    acc.extend_from_slice(content);
     let str = content.to_utf8();
     length += str.len();
     length <= max_token_count
   }).ok();
 
-  info!("diff_str: {:?}", diff_str.to_utf8());
-  let diff = diff_str.to_utf8();
-  let new_commit_message = generate_commit_message(diff).await?;
+  let new_commit_message = generate_commit_message(acc.to_utf8()).await?;
 
   args.commit_msg_file.write(new_commit_message.clone())?;
 
