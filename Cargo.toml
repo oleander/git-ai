@@ -28,11 +28,10 @@ anyhow = "1.0.75"
 dotenv = "0.15.0"
 git2 = "0.18.1"
 log = "0.4.20"
-config = "0.13.4"
 
 [dev-dependencies]
 tempfile = "3.8.1"
 
 [profile.release]
-opt-level = "s"
+opt-level = 3
 lto = true

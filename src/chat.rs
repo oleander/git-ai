@@ -56,7 +56,7 @@ pub enum ChatError {
 pub async fn generate_commit_message(diff: String) -> Result<String, ChatError> {
   let api_key = config::get_str("api_key").unwrap_or(API_KEY.as_str().to_owned());
   let lang = config::get_str("language").unwrap_or(LANGUAGE.as_str().to_owned());
-  let timeout = config::get_i32("timeout").unwrap_or(TIMEOUT.clone() as i32);
+  let timeout = config::get_i32("timeout").unwrap_or((*TIMEOUT) as i32);
   let length = config::get_i32("max_length").unwrap_or(*MAX_LENGTH as i32);
   let model = config::get_str("model").unwrap_or(MODEL.to_owned());
 
