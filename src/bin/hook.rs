@@ -165,8 +165,8 @@ async fn run(args: Args) -> Result<Msg> {
   pb.set_style(
     ProgressStyle::default_spinner()
       .tick_strings(&["-", "\\", "|", "/"])
-      .template("{spinner:.blue} {msg}")?
-  );
+          .template("{spinner:.green} {msg} 🚀")?
+        );
 
   tokio::spawn(async move {
     spin_progress_bar(pb_clone, is_done_clone).await;
