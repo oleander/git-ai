@@ -35,7 +35,7 @@ struct Args {
 }
 
 lazy_static! {
-  static ref MAX_CHARS: usize = dotenv!("MAX_CHARS").parse::<usize>().unwrap();
+  static ref MAX_DIFF_TOKENS: usize = dotenv!("MAX_DIFF_TOKENS").parse::<usize>().unwrap();
 }
 
 #[derive(Debug)]
@@ -157,7 +157,8 @@ async fn run(args: Args) -> Result<Msg> {
     repo.head().ok().and_then(|head| head.peel_to_tree().ok())
   };
 
-  let patch = repo.to_patch(tree, *MAX_CHARS).context("Failed to get patch")?;
+  let max_tokens = ai::config::get("max-diff-tokens").unwrap_or(*MAX_DIFF_TOKENS as i32);
+  let patch = repo.to_patch(tree, max_tokens.try_into().unwrap()).context("Failed to get patch")?;
 
   if patch.is_empty() {
     bail!("Empty diff output");
