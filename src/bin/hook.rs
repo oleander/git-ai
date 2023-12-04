@@ -3,7 +3,7 @@
 // Hook: prepare-commit-msg
 
 use log::info;
-// use ai::chat::generate_commit_message;
+use ai::chat::generate_commit_message;
 use std::process::Termination;
 use lazy_static::lazy_static;
 use std::process::ExitCode;
@@ -139,14 +139,14 @@ async fn run(args: Args) -> Result<Msg, Box<dyn std::error::Error>> {
   let diff = diff_str.to_utf8();
   let new_commit_message = generate_commit_message(diff).await?;
 
-  args.commit_msg_file.write(new_commit_message)?;
+  args.commit_msg_file.write(new_commit_message.clone())?;
 
-  Ok(Msg("Commit message generated".to_string()))
+  Ok(Msg(new_commit_message))
 }
 
-async fn generate_commit_message(_: String) -> Result<String> {
-  Ok("Commit message generated".to_string())
-}
+// async fn generate_commit_message(diff: String) -> Result<String> {
+//   Ok(diff)
+// }
 
 #[cfg(test)]
 mod tests {
@@ -168,17 +168,18 @@ mod tests {
     }
   }
 
+  lazy_static! {
+    static ref FILE: NamedTempFile = NamedTempFile::new().unwrap();
+  }
+
   #[tokio::test]
   async fn test_generate_commit_message() {
-    let temp_file = NamedTempFile::new().unwrap();
-
     let args = Args {
-      commit_msg_file: temp_file.path().into(), commit_type: None, sha1: None
+      commit_msg_file: FILE.path().into(), commit_type: None, sha1: None
     };
 
-    assert!(temp_file.is_empty().unwrap());
     let result = run(args).await;
-    assert!(!temp_file.is_empty().unwrap());
+    assert!(!FILE.is_empty().unwrap());
     assert!(result.is_ok());
   }
 }
