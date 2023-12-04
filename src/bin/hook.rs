@@ -5,7 +5,6 @@
 #[cfg(not(mock))]
 use ai::chat::generate_commit_message;
 
-use log::info;
 use std::process::Termination;
 use lazy_static::lazy_static;
 use std::process::ExitCode;
@@ -14,27 +13,27 @@ use std::path::PathBuf;
 use git2::DiffOptions;
 use git2::Repository;
 use git2::DiffFormat;
-use anyhow::bail;
+use anyhow::Context;
 use std::io::Write;
-use std::io::Read;
 use anyhow::Result;
+use std::io::Read;
 use std::fs::File;
+use anyhow::bail;
 use clap::Parser;
 use git2::Tree;
+use log::info;
 use git2::Oid;
-use log::error;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-  // #[clap(parse(from_os_str))]
   commit_msg_file: PathBuf,
 
   #[clap(required = false)]
   commit_type: Option<String>,
 
   #[clap(required = false)]
-  sha1: Option<String>
+  sha1: Option<Oid>
 }
 
 lazy_static! {
@@ -91,15 +90,14 @@ impl Utf8String for [u8] {
   }
 }
 
-trait Patch {
+trait PatchDiff {
   fn to_patch(&self, max_token_count: usize) -> Result<String>;
 }
 
-impl Patch for git2::Diff<'_> {
+impl PatchDiff for git2::Diff<'_> {
   fn to_patch(&self, max_token_count: usize) -> Result<String> {
     let mut acc = Vec::new();
     let mut length = 0;
-
 
     #[rustfmt::skip]
     self.print(DiffFormat::Patch, |_, _, line| {
@@ -114,29 +112,14 @@ impl Patch for git2::Diff<'_> {
   }
 }
 
-#[tokio::main]
-async fn main() -> Result<Msg, Box<dyn std::error::Error>> {
-  env_logger::init();
-  let args = Args::parse();
-  Ok(run(args).await?)
+trait PatchRepository {
+  fn to_patch(&self, tree: Option<Tree<'_>>, max_token_count: usize) -> Result<String>;
 }
 
-async fn run(args: Args) -> Result<Msg> {
-  info!("Args: {:?}", args);
-  if args.commit_type.is_some() {
-    return Ok(Msg("Commit message is not empty".to_string()));
-  }
-
-  let repo = Repository::open_from_env()?;
-
-  let tree: Option<Tree<'_>> = if let Some(sha1) = args.sha1 {
-    repo.find_commit(Oid::from_str(&sha1)?)?.tree()?.into()
-  } else {
-    repo.head().ok().and_then(|head| head.peel_to_tree().ok())
-  };
-
-  let mut opts = DiffOptions::new();
-  opts
+impl PatchRepository for Repository {
+  fn to_patch(&self, tree: Option<Tree<'_>>, max_token_count: usize) -> Result<String> {
+    let mut opts = DiffOptions::new();
+    opts
       .enable_fast_untracked_dirs(true)
       .ignore_whitespace_change(true)
       .recurse_untracked_dirs(false)
@@ -152,9 +135,31 @@ async fn run(args: Args) -> Result<Msg> {
       .patience(true)
       .minimal(true);
 
-  let diff = repo.diff_tree_to_index(tree.as_ref(), None, Some(&mut opts))?;
-  let max_token_count = *MAX_CHARS;
-  let patch = diff.to_patch(max_token_count)?;
+    self.diff_tree_to_index(tree.as_ref(), None, Some(&mut opts))?.to_patch(max_token_count)
+  }
+}
+
+#[tokio::main]
+async fn main() -> Result<Msg, Box<dyn std::error::Error>> {
+  env_logger::init();
+  let args = Args::parse();
+  Ok(run(args).await?)
+}
+
+async fn run(args: Args) -> Result<Msg> {
+  if args.commit_type.is_some() {
+    return Ok(Msg("Commit message is not empty".to_string()));
+  }
+
+  let repo = Repository::open_from_env().context("Failed to open repository")?;
+
+  let tree = if let Some(sha1) = args.sha1 {
+    repo.find_commit(sha1.try_into()?)?.tree().ok()
+  } else {
+    repo.head().ok().and_then(|head| head.peel_to_tree().ok())
+  };
+
+  let patch = repo.to_patch(tree, *MAX_CHARS).context("Failed to get patch")?;
 
   if patch.is_empty() {
     bail!("Empty diff output");
@@ -162,7 +167,10 @@ async fn run(args: Args) -> Result<Msg> {
 
   let new_commit_message = generate_commit_message(patch.to_string()).await?;
 
-  args.commit_msg_file.write(new_commit_message.trim().to_string())?;
+  args
+    .commit_msg_file
+    .write(new_commit_message.trim().to_string())
+    .context("Failed to write commit message")?;
 
   Ok(Msg(new_commit_message))
 }
