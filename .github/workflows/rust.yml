@@ -19,10 +19,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Build
-        run: cargo build --verbose
-      - run: |
-            git config --global user.name "John Doe"
-            git config --global user.email "hello@example.com"
-      - name: Run tests
-        run: make install
+      - run: make install
