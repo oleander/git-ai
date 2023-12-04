@@ -1,7 +1,7 @@
 install:
-	cargo build --release --bin git-ai-hook
-	cargo build --release --bin git-ai
-	cargo install --path . --bin git-ai
+	cargo build --release --bin git-ai-hook --no-default-features
+	cargo build --release --bin git-ai --no-default-features
+	cargo install --path . --bin git-ai --no-default-features
 	git-ai install
 build_hook:
 	cargo build --bin hook --release
