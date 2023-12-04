@@ -1,4 +1,5 @@
 mod install;
+mod uninstall;
 
 use anyhow::Result;
 use dotenv::dotenv;
@@ -15,6 +16,11 @@ fn cli() -> Command {
         .about("Installs the git-ai hook")
         .arg_required_else_help(true)
     )
+    .subcommand(
+      Command::new("uninstall")
+        .about("Uninstalls the git-ai hook")
+        .arg_required_else_help(true)
+    )
 }
 
 #[tokio::main]
@@ -26,6 +32,9 @@ async fn main() -> Result<()> {
   match args.subcommand() {
     Some(("install", _)) => {
       install::run()?;
+    },
+    Some(("uninstall", _)) => {
+      uninstall::run()?;
     },
     _ => {
       log::info!("Running git-ai...");
