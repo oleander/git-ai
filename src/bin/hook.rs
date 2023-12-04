@@ -165,8 +165,10 @@ async fn run(args: Args) -> Result<Msg> {
   pb.set_style(
     ProgressStyle::default_spinner()
       .tick_strings(&["-", "\\", "|", "/"])
-      .template("{spinner:.blue} Calculating commit message... {msg}")?
+      .template("{spinner:.blue} {msg.blue}")?
   );
+
+  pb.set_message("Generating commit message...");
 
   tokio::spawn(async move {
     spin_progress_bar(pb_clone, is_done_clone).await;
