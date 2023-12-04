@@ -14,7 +14,6 @@ fn cli() -> Command {
     .subcommand(
       Command::new("install")
         .about("Installs the git-ai hook")
-        .arg_required_else_help(true)
     )
     .subcommand(
       Command::new("uninstall")
