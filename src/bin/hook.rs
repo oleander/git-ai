@@ -145,10 +145,6 @@ async fn run(args: Args) -> Result<Msg, Box<dyn std::error::Error>> {
   Ok(Msg(new_commit_message))
 }
 
-// async fn generate_commit_message(diff: String) -> Result<String> {
-//   Ok(diff)
-// }
-
 #[cfg(test)]
 mod tests {
   use tempfile::NamedTempFile;
