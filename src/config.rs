@@ -19,7 +19,6 @@ lazy_static! {
 
     config_file
   };
-
   static ref CONFIG: RwLock<Ini> = RwLock::new(Ini::load_from_file(CONFIG_PATH.as_str()).expect("Failed to load config file"));
 }
 
