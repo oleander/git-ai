@@ -2,7 +2,7 @@
 
 #[cfg(not(mock))]
 // Hook: prepare-commit-msg
-use ai::chat::generate_commit_message;
+use ai::chat::commit;
 use indicatif::ProgressBar;
 
 use std::process::Termination;
@@ -193,7 +193,7 @@ async fn run(args: Args) -> Result<Msg> {
     bail!("Empty diff output");
   }
 
-  let new_commit_message = generate_commit_message(patch.to_string()).await?;
+  let new_commit_message = commit(patch.to_string()).await?;
   is_done.store(true, Ordering::SeqCst);
 
   args

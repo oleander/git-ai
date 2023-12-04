@@ -49,31 +49,37 @@ pub enum ChatError {
   Anyhow(#[from] anyhow::Error)
 }
 
-pub async fn generate_commit_message(diff: String) -> Result<String, ChatError> {
-  let api_key = config::get("api_key").unwrap_or(API_KEY.as_str().to_owned());
-  let lang = config::get("language").unwrap_or(LANGUAGE.as_str().to_owned());
-  let timeout = config::get("timeout").unwrap_or((*TIMEOUT) as i32);
-  let length = config::get("max-length").unwrap_or(*MAX_LENGTH as i32);
+fn payload(diff: String) -> Value {
   let model = config::get("model").unwrap_or(MODEL.to_owned());
 
-  let prompt = format!(
-    "Generate a concise git commit message written in present tense for the following code diff with the given specifications below:\nMessage language: {:?}\nCommit message must be a maximum of {:?} characters.\nExclude anything unnecessary such as translation. Your entire response will be passed directly into git commit.",
-    lang, length
-  );
-
-  let payload = json!({
+  json!({
      "model": model,
      "messages": vec![
-       ChatMessage::new("system", prompt),
+       ChatMessage::new("system", prompt()),
        ChatMessage::new("user", diff)
      ]
-  });
+  })
+}
 
-  let response = Client::builder()
+fn prompt() -> String {
+  let lang = config::get("language").unwrap_or(LANGUAGE.as_str().to_owned());
+  let length = config::get("max-length").unwrap_or(*MAX_LENGTH as i32);
+
+  format!(
+    "Generate a concise git commit message written in present tense for the following code diff with the given specifications below:\nMessage language: {:?}\nCommit message must be a maximum of {:?} characters.\nExclude anything unnecessary such as translation. Your entire response will be passed directly into git commit.",
+    lang, length
+  )
+}
+
+async fn response(diff: String) -> Result<Value, ChatError> {
+  let api_key = config::get("api_key").unwrap_or(API_KEY.as_str().to_owned());
+  let timeout = config::get("timeout").unwrap_or((*TIMEOUT) as i32);
+
+  Client::builder()
     .build()?
     .post(API_URL)
     .bearer_auth(api_key)
-    .json(&payload)
+    .json(&payload(diff))
     .timeout(Duration::from_secs(timeout as u64))
     .send()
     .await
@@ -81,14 +87,15 @@ pub async fn generate_commit_message(diff: String) -> Result<String, ChatError> 
     .text()
     .await
     .context("Failed to get response body")
-    .and_then(|body| from_str::<Value>(&body).context("Failed to parse JSON"))?;
+    .and_then(|body| from_str::<Value>(&body).context("Failed to parse JSON"))
+    .map_err(|e| e.into())
+}
 
-  let message = response["choices"]
+pub async fn commit(diff: String) -> Result<String, ChatError> {
+  response(diff).await?["choices"]
     .as_array()
     .and_then(|choices| choices.first())
     .and_then(|choice| choice["message"]["content"].as_str())
     .map(|s| s.to_string())
-    .ok_or(ChatError::ResponseExtractionError)?;
-
-  Ok(message)
+    .ok_or(ChatError::ResponseExtractionError)
 }
