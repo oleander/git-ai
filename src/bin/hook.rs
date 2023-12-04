@@ -21,7 +21,6 @@ use std::fs::File;
 use anyhow::bail;
 use clap::Parser;
 use git2::Tree;
-use log::info;
 use git2::Oid;
 
 #[derive(Parser, Debug)]
@@ -154,7 +153,7 @@ async fn run(args: Args) -> Result<Msg> {
   let repo = Repository::open_from_env().context("Failed to open repository")?;
 
   let tree = if let Some(sha1) = args.sha1 {
-    repo.find_commit(sha1.try_into()?)?.tree().ok()
+    repo.find_commit(sha1)?.tree().ok()
   } else {
     repo.head().ok().and_then(|head| head.peel_to_tree().ok())
   };
