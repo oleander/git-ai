@@ -6,6 +6,14 @@ edition = "2021"
 [lib]
 name = "ai"
 
+[[bin]]
+name = "git-ai-hook"
+path = "src/bin/hook.rs"
+
+[[bin]]
+name = "git-ai-install"
+path = "src/bin/install.rs"
+
 [dependencies]
 tokio = { version = "1.34.0", features = ["macros", "rt-multi-thread"] }
 clap = { version = "4.4.8", features = ["derive", "wrap_help"]  }
