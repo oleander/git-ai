@@ -83,7 +83,7 @@ pub async fn generate_commit_message(diff: String) -> Result<String, ChatError> 
 
   let message = response["choices"]
     .as_array()
-    .and_then(|choices| choices.get(0))
+    .and_then(|choices| choices.first())
     .and_then(|choice| choice["message"]["content"].as_str())
     .map(|s| s.to_string())
     .ok_or(ChatError::ResponseExtractionError)?;

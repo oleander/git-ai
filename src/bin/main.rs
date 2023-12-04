@@ -54,7 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let message = generate_commit_message(diff).await?;
   let oid = repo.commit(&message)?;
 
-  println!("{} [{:.7}] {}: ", "🤖", oid.to_string().yellow(), message.green().italic());
+  println!("[{:.7}] {}: ", oid.to_string().yellow(), message.green().italic());
   for file in files {
     println!("   {}", file.white());
   }

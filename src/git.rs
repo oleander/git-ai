@@ -145,7 +145,7 @@ impl Repo {
 
     self
       .repo
-      .commit(Some("HEAD"), &signature, &signature, &message, &tree, parents.as_slice())
+      .commit(Some("HEAD"), &signature, &signature, message, &tree, parents.as_slice())
       .context("Could not commit")
       .map_err(GitError::from)
   }

@@ -4,8 +4,6 @@
 
 use log::info;
 // use ai::chat::generate_commit_message;
-use tempfile::NamedTempFile;
-use tempfile::TempPath;
 use std::process::Termination;
 use lazy_static::lazy_static;
 use std::process::ExitCode;
@@ -73,20 +71,7 @@ impl FilePath for PathBuf {
   }
 }
 
-impl FilePath for NamedTempFile {
-  fn write(&self, msg: String) -> Result<()> {
-    let mut file = File::create(self.path())?;
-    file.write_all(msg.as_bytes())?;
-    Ok(())
-  }
 
-  fn read(&self) -> Result<String> {
-    let mut file = File::open(self.path())?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
-    Ok(contents)
-  }
-}
 
 trait Utf8String {
   fn to_utf8(&self) -> String;
@@ -134,7 +119,7 @@ async fn run(args: Args) -> Result<Msg, Box<dyn std::error::Error>> {
   let tree: Option<Tree<'_>> = if let Some(sha1) = args.sha1 {
     repo.find_commit(Oid::from_str(&sha1)?)?.tree()?.into()
   } else {
-    repo.head().ok().and_then(|head| head.peel_to_tree().ok()).into()
+    repo.head().ok().and_then(|head| head.peel_to_tree().ok())
   };
 
   let diff = repo.diff_tree_to_index(tree.as_ref(), None, Some(&mut opts))?;
@@ -165,10 +150,23 @@ async fn generate_commit_message(_: String) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
   use tempfile::NamedTempFile;
-  use std::{io::Read, assert_matches};
-  use assert_matches::assert_matches;
+  use super::*;
+
+  impl FilePath for NamedTempFile {
+    fn write(&self, msg: String) -> Result<()> {
+      let mut file = File::create(self.path())?;
+      file.write_all(msg.as_bytes())?;
+      Ok(())
+    }
+
+    fn read(&self) -> Result<String> {
+      let mut file = File::open(self.path())?;
+      let mut contents = String::new();
+      file.read_to_string(&mut contents)?;
+      Ok(contents)
+    }
+  }
 
   #[tokio::test]
   async fn test_generate_commit_message() {
@@ -181,5 +179,6 @@ mod tests {
     assert!(temp_file.is_empty().unwrap());
     let result = run(args).await;
     assert!(!temp_file.is_empty().unwrap());
+    assert!(result.is_ok());
   }
 }
