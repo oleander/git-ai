@@ -1,12 +1,12 @@
-use anyhow::Context;
-use dotenv_codegen::dotenv;
-use lazy_static::lazy_static;
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
 use serde_json::{from_str, json, Value};
-use std::io;
+use serde::{Deserialize, Serialize};
+use lazy_static::lazy_static;
+use dotenv_codegen::dotenv;
 use std::time::Duration;
 use thiserror::Error;
+use anyhow::Context;
+use reqwest::Client;
+use std::io;
 
 const API_URL: &str = "https://api.openai.com/v1/chat/completions";
 const MODEL: &str = "gpt-4-1106-preview";
