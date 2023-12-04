@@ -153,7 +153,7 @@ async fn run(args: Args) -> Result<Msg> {
   let repo = Repository::open_from_env().context("Failed to open repository")?;
 
   let tree = if let Some(sha1) = args.sha1 {
-    repo.find_commit(sha1)?.tree().ok()
+    repo.find_commit(sha1).ok().and_then(|commit| commit.tree().ok())
   } else {
     repo.head().ok().and_then(|head| head.peel_to_tree().ok())
   };
