@@ -181,7 +181,8 @@ async fn generate_commit_message(diff: String) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-  use tempfile::NamedTempFile;
+  use tempfile::{NamedTempFile, TempDir};
+  use std::process::Command as Cmd;
   use super::*;
 
   impl FilePath for NamedTempFile {
@@ -201,16 +202,68 @@ mod tests {
 
   lazy_static! {
     static ref FILE: NamedTempFile = NamedTempFile::new().unwrap();
+    static ref REPO_PATH: TempDir = TempDir::new().unwrap();
+  }
+
+  fn setup_repo() -> Result<()> {
+    let output = Cmd::new("git")
+      .arg("init")
+      .current_dir(REPO_PATH.path())
+      .output()
+      .expect("Failed to execute git init");
+
+    assert!(output.status.success());
+
+    // create file
+    let file_path = REPO_PATH.path().join("file");
+    let mut file = File::create(file_path.clone())?;
+    file.write_all(b"Hello, world!")?;
+
+    let output = Cmd::new("git")
+      .current_dir(REPO_PATH.path())
+      .arg("add")
+      .arg(file_path)
+      .output()
+      .expect("Failed to execute git add");
+
+    assert!(output.status.success());
+
+    let output = Cmd::new("git")
+      .arg("commit")
+      .arg("-m")
+      .arg("Initial commit")
+      .current_dir(REPO_PATH.path())
+      .output()
+      .expect("Failed to execute git commit");
+
+    assert!(output.status.success());
+
+    Ok(())
   }
 
   #[tokio::test]
-  async fn test_generate_commit_message() {
+  async fn test_empty_commit_type() {
+    setup_repo().unwrap();
+
     let args = Args {
       commit_msg_file: FILE.path().into(), commit_type: None, sha1: None
     };
 
     let result = run(args).await;
+    assert!(result.is_ok());
     assert!(!FILE.is_empty().unwrap());
+  }
+
+  #[tokio::test]
+  async fn test_non_empty_commit_type() {
+    setup_repo().unwrap();
+
+    let args = Args {
+      commit_msg_file: FILE.path().into(), commit_type: Some("test".to_string()), sha1: None
+    };
+
+    let result = run(args).await;
+    assert_eq!(FILE.read().unwrap(), "");
     assert!(result.is_ok());
   }
 }
