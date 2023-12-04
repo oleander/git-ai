@@ -1,6 +1,11 @@
+#![feature(assert_matches)]
+
 // Hook: prepare-commit-msg
 
-use ai::chat::generate_commit_message;
+use log::info;
+// use ai::chat::generate_commit_message;
+use tempfile::NamedTempFile;
+use tempfile::TempPath;
 use std::process::Termination;
 use lazy_static::lazy_static;
 use std::process::ExitCode;
@@ -10,6 +15,7 @@ use git2::DiffOptions;
 use git2::Repository;
 use git2::DiffFormat;
 use std::io::Write;
+use std::io::Read;
 use anyhow::Result;
 use std::fs::File;
 use clap::Parser;
@@ -19,15 +25,12 @@ use git2::Oid;
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-  /// File containing the commit message
   // #[clap(parse(from_os_str))]
   commit_msg_file: PathBuf,
 
-  /// Source of the commit message, if any
   #[clap(required = false)]
   commit_type: Option<String>,
 
-  /// SHA-1 hash in case of an amend or squash
   #[clap(required = false)]
   sha1: Option<String>
 }
@@ -36,6 +39,7 @@ lazy_static! {
   static ref MAX_CHARS: usize = dotenv!("MAX_CHARS").parse::<usize>().unwrap();
 }
 
+#[derive(Debug)]
 struct Msg(String);
 
 impl Termination for Msg {
@@ -46,19 +50,41 @@ impl Termination for Msg {
 }
 
 trait FilePath {
-  fn is_empty(&self) -> bool;
+  fn is_empty(&self) -> Result<bool> {
+    self.read().map(|s| s.is_empty())
+  }
+
   fn write(&self, msg: String) -> Result<()>;
+  fn read(&self) -> Result<String>;
 }
 
 impl FilePath for PathBuf {
-  fn is_empty(&self) -> bool {
-    self.to_str().unwrap().is_empty()
-  }
-
   fn write(&self, msg: String) -> Result<()> {
     let mut file = File::create(self)?;
     file.write_all(msg.as_bytes())?;
     Ok(())
+  }
+
+  fn read(&self) -> Result<String> {
+    let mut file = File::open(self)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+    Ok(contents)
+  }
+}
+
+impl FilePath for NamedTempFile {
+  fn write(&self, msg: String) -> Result<()> {
+    let mut file = File::create(self.path())?;
+    file.write_all(msg.as_bytes())?;
+    Ok(())
+  }
+
+  fn read(&self) -> Result<String> {
+    let mut file = File::open(self.path())?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+    Ok(contents)
   }
 }
 
@@ -75,9 +101,13 @@ impl Utf8String for [u8] {
 #[tokio::main]
 async fn main() -> Result<Msg, Box<dyn std::error::Error>> {
   let args = Args::parse();
+  run(args).await?;
+  Ok(Msg("Commit message generated".to_string()))
+}
 
-  if !args.commit_msg_file.is_empty() {
-    return Ok(Msg("Commit message is empty".to_string()));
+async fn run(args: Args) -> Result<Msg, Box<dyn std::error::Error>> {
+  if !args.commit_msg_file.is_empty()? {
+    return Ok(Msg("Commit message is not empty".to_string()));
   }
 
   let repo = Repository::open_from_env()?;
@@ -120,10 +150,36 @@ async fn main() -> Result<Msg, Box<dyn std::error::Error>> {
     length <= max_token_count
   }).ok();
 
+  info!("diff_str: {:?}", diff_str.to_utf8());
   let diff = diff_str.to_utf8();
   let new_commit_message = generate_commit_message(diff).await?;
 
   args.commit_msg_file.write(new_commit_message)?;
 
   Ok(Msg("Commit message generated".to_string()))
+}
+
+async fn generate_commit_message(_: String) -> Result<String> {
+  Ok("Commit message generated".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use tempfile::NamedTempFile;
+  use std::{io::Read, assert_matches};
+  use assert_matches::assert_matches;
+
+  #[tokio::test]
+  async fn test_generate_commit_message() {
+    let temp_file = NamedTempFile::new().unwrap();
+
+    let args = Args {
+      commit_msg_file: temp_file.path().into(), commit_type: None, sha1: None
+    };
+
+    assert!(temp_file.is_empty().unwrap());
+    let result = run(args).await;
+    assert!(!temp_file.is_empty().unwrap());
+  }
 }
