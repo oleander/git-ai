@@ -165,7 +165,7 @@ async fn run(args: Args) -> Result<Msg> {
   pb.set_style(
     ProgressStyle::default_spinner()
       .tick_strings(&["-", "\\", "|", "/"])
-      .template("{spinner:.blue} {msg.blue}")?
+      .template("{spinner:.blue} {msg:.blue}")?
   );
 
   pb.set_message("Generating commit message...");
