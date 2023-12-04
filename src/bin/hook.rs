@@ -91,6 +91,29 @@ impl Utf8String for [u8] {
   }
 }
 
+trait Patch {
+  fn to_patch(&self, max_token_count: usize) -> Result<String>;
+}
+
+impl Patch for git2::Diff<'_> {
+  fn to_patch(&self, max_token_count: usize) -> Result<String> {
+    let mut acc = Vec::new();
+    let mut length = 0;
+
+
+    #[rustfmt::skip]
+    self.print(DiffFormat::Patch, |_, _, line| {
+      let content = line.content();
+      acc.extend_from_slice(content);
+      let str = content.to_utf8();
+      length += str.len();
+      length <= max_token_count
+    }).ok();
+
+    Ok(acc.to_utf8())
+  }
+}
+
 #[tokio::main]
 async fn main() -> Result<Msg, Box<dyn std::error::Error>> {
   env_logger::init();
@@ -106,58 +129,43 @@ async fn run(args: Args) -> Result<Msg> {
 
   let repo = Repository::open_from_env()?;
 
-  let mut opts = DiffOptions::new();
-  opts
-    .enable_fast_untracked_dirs(true)
-    .ignore_whitespace_change(true)
-    .recurse_untracked_dirs(false)
-    .recurse_ignored_dirs(false)
-    .ignore_whitespace_eol(true)
-    .ignore_blank_lines(true)
-    .include_untracked(false)
-    .indent_heuristic(false)
-    .ignore_submodules(true)
-    .include_ignored(false)
-    .interhunk_lines(0)
-    .context_lines(0)
-    .patience(true)
-    .minimal(true);
-
-  let mut length = 0;
-
   let tree: Option<Tree<'_>> = if let Some(sha1) = args.sha1 {
     repo.find_commit(Oid::from_str(&sha1)?)?.tree()?.into()
   } else {
     repo.head().ok().and_then(|head| head.peel_to_tree().ok())
   };
 
+  let mut opts = DiffOptions::new();
+  opts
+      .enable_fast_untracked_dirs(true)
+      .ignore_whitespace_change(true)
+      .recurse_untracked_dirs(false)
+      .recurse_ignored_dirs(false)
+      .ignore_whitespace_eol(true)
+      .ignore_blank_lines(true)
+      .include_untracked(false)
+      .indent_heuristic(false)
+      .ignore_submodules(true)
+      .include_ignored(false)
+      .interhunk_lines(0)
+      .context_lines(0)
+      .patience(true)
+      .minimal(true);
+
   let diff = repo.diff_tree_to_index(tree.as_ref(), None, Some(&mut opts))?;
-  let mut acc = Vec::new();
   let max_token_count = *MAX_CHARS;
+  let patch = diff.to_patch(max_token_count)?;
 
-  #[rustfmt::skip]
-  diff.print(DiffFormat::Patch, |_, _, line| {
-    let content = line.content();
-    acc.extend_from_slice(content);
-    let str = content.to_utf8();
-    length += str.len();
-    length <= max_token_count
-  }).ok();
-
-  let message = acc.to_utf8();
-  let message = message.trim();
-
-  if message.is_empty() {
+  if patch.is_empty() {
     bail!("Empty diff output");
   }
 
-  let new_commit_message = generate_commit_message(message.to_string()).await?;
+  let new_commit_message = generate_commit_message(patch.to_string()).await?;
 
-  args.commit_msg_file.write(new_commit_message.clone())?;
+  args.commit_msg_file.write(new_commit_message.trim().to_string())?;
 
   Ok(Msg(new_commit_message))
 }
-
 
 #[cfg(mock)]
 async fn generate_commit_message(diff: String) -> Result<String> {
