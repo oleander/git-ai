@@ -6,6 +6,9 @@ use ai::chat::generate_commit_message;
 use indicatif::ProgressBar;
 
 use std::process::Termination;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use indicatif::ProgressStyle;
 use lazy_static::lazy_static;
 use std::process::ExitCode;
@@ -146,11 +149,29 @@ async fn main() -> Result<Msg, Box<dyn std::error::Error>> {
   Ok(run(args).await?)
 }
 
+async fn spin_progress_bar(pb: ProgressBar, is_done: Arc<AtomicBool>) {
+  while !is_done.load(Ordering::SeqCst) {
+    pb.tick();
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+  }
+}
+
 async fn run(args: Args) -> Result<Msg> {
+  let is_done = Arc::new(AtomicBool::new(false));
   let pb = ProgressBar::new_spinner();
-  pb.set_style(ProgressStyle::default_spinner()
-        .tick_strings(&["-", "\\", "|", "/"])
-        .template("{spinner:.blue} Processing {msg}")?);
+  let pb_clone = pb.clone();
+  let is_done_clone = is_done.clone();
+
+  pb.set_style(
+    ProgressStyle::default_spinner()
+      .tick_strings(&["-", "\\", "|", "/"])
+      .template("{spinner:.blue} Processing {msg}")?
+  );
+
+  tokio::spawn(async move {
+    spin_progress_bar(pb_clone, is_done_clone).await;
+  });
+
 
   if args.commit_type.is_some() {
     return Ok(Msg("Commit message is not empty".to_string()));
@@ -172,6 +193,7 @@ async fn run(args: Args) -> Result<Msg> {
   }
 
   let new_commit_message = generate_commit_message(patch.to_string()).await?;
+  is_done.store(true, Ordering::SeqCst);
 
   args
     .commit_msg_file
