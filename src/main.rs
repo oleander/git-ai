@@ -1,10 +1,11 @@
 mod install;
 mod uninstall;
+mod config;
 
 use anyhow::Result;
 use clap::Arg;
 use dotenv::dotenv;
-use clap::{Command, arg};
+use clap::Command;
 
 fn cli() -> Command {
   Command::new("git-ai")
@@ -20,13 +21,13 @@ fn cli() -> Command {
         .subcommand(
           Command::new("set")
             .about("Sets a configuration value")
-            .arg(arg!(<KEY> "The configuration key"))
-            .arg(arg!(<VALUE> "The configuration value"))
+            .arg(Arg::new("KEY").required(true).index(1))
+            .arg(Arg::new("VALUE").required(true).index(2))
         )
         .subcommand(
           Command::new("get")
             .about("Gets a configuration value")
-            .arg(Arg::new("key").help("The configuration key").required(true).index(1))
+            .arg(Arg::new("KEY").required(true).index(1))
         )
     )
 }
@@ -49,7 +50,11 @@ async fn main() -> Result<()> {
         let key = matches.get_one::<String>("KEY").expect("required");
         let value = matches.get_one::<String>("VALUE").expect("required");
         log::info!("Setting config key {} to {}", key, value);
-        // config::set(key, value)?;
+        config::set(key, value.as_str())?;
+      } else if let Some(matches) = args.subcommand_matches("get") {
+        let key = matches.get_one::<String>("KEY").expect("required");
+        let value: String = config::get(key)?;
+        log::info!("Config key {} is set to {}", key, value);
       }
     },
     _ => {
