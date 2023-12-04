@@ -178,6 +178,9 @@ async fn run(args: Args) -> Result<Msg> {
     .write(new_commit_message.trim().to_string())
     .context("Failed to write commit message")?;
 
+  eprintln!("[1] Commit message: {}", new_commit_message);
+  println!("[2] Commit message: {}", new_commit_message);
+
   pb.finish_with_message(new_commit_message.clone());
   Ok(Msg(new_commit_message))
 }
