@@ -1,8 +1,7 @@
 #![feature(assert_matches)]
 
-// Hook: prepare-commit-msg
-
 #[cfg(not(mock))]
+// Hook: prepare-commit-msg
 use ai::chat::generate_commit_message;
 
 use std::process::Termination;
