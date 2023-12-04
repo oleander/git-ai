@@ -3,9 +3,9 @@ mod uninstall;
 mod config;
 
 use anyhow::Result;
-use clap::Arg;
 use dotenv::dotenv;
 use clap::Command;
+use clap::Arg;
 
 fn cli() -> Command {
   Command::new("git-ai")
