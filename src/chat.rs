@@ -6,6 +6,7 @@ use std::time::Duration;
 use thiserror::Error;
 use anyhow::Context;
 use reqwest::Client;
+use crate::config;
 use std::io;
 
 const API_URL: &str = "https://api.openai.com/v1/chat/completions";
@@ -52,15 +53,20 @@ pub enum ChatError {
   Anyhow(#[from] anyhow::Error)
 }
 
-// Generates a commit message from the OpenAI API
 pub async fn generate_commit_message(diff: String) -> Result<String, ChatError> {
+  let api_key = config::get_str("api_key").unwrap_or(API_KEY.as_str().to_owned());
+  let lang = config::get_str("language").unwrap_or(LANGUAGE.as_str().to_owned());
+  let timeout = config::get_i32("timeout").unwrap_or(TIMEOUT.clone() as i32);
+  let length = config::get_i32("max_length").unwrap_or(*MAX_LENGTH as i32);
+  let model = config::get_str("model").unwrap_or(MODEL.to_owned());
+
   let prompt = format!(
     "Generate a concise git commit message written in present tense for the following code diff with the given specifications below:\nMessage language: {:?}\nCommit message must be a maximum of {:?} characters.\nExclude anything unnecessary such as translation. Your entire response will be passed directly into git commit.",
-    LANGUAGE, MAX_LENGTH
+    lang, length
   );
 
   let payload = json!({
-     "model": MODEL,
+     "model": model,
      "messages": vec![
        ChatMessage::new("system", prompt),
        ChatMessage::new("user", diff)
@@ -70,9 +76,9 @@ pub async fn generate_commit_message(diff: String) -> Result<String, ChatError> 
   let response = Client::builder()
     .build()?
     .post(API_URL)
-    .bearer_auth(API_KEY.as_str())
+    .bearer_auth(api_key)
     .json(&payload)
-    .timeout(Duration::from_secs(*TIMEOUT))
+    .timeout(Duration::from_secs(timeout as u64))
     .send()
     .await
     .context("Failed to send request")?
