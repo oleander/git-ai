@@ -16,7 +16,6 @@ use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
 use ai::chat::generate_commit;
 use clap::Parser;
-use tokio::time::sleep;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -237,22 +236,13 @@ async fn run(args: Args) -> Result<()> {
 
   // Loading bar to indicate that the program is running
   let pb = ProgressBar::new_spinner();
-  pb.set_style(
-    ProgressStyle::default_spinner()
-      .tick_strings(&["-", "\\", "|", "/"])
-      .template("{spinner:.blue} {msg}")?
-  );
-
+  // pb.set_style(
+  //   ProgressStyle::default_spinner()
+  //     .tick_strings(&["-", "\\", "|", "/"])
+  //     .template("{spinner:.blue} {msg}")?
+  // );
   pb.set_message("Generating commit message...");
   pb.enable_steady_tick(Duration::from_millis(150));
-
-  // let pb_clone = pb.clone();
-  // tokio::spawn(async move {
-  //   loop {
-  //     pb_clone.tick();
-  //     sleep(Duration::from_millis(150)).await;
-  //   }
-  // });
 
   let repo = Repository::open_from_env().context("Failed to open repository")?;
 
