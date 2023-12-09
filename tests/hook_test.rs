@@ -1,18 +1,11 @@
 use std::fs::File;
-use std::process::Command as Cmd;
 use std::io::{Read, Write};
-use std::time::Duration;
-use std::path::PathBuf;
+use std::process::Command as Cmd;
 
 use ai::hook::{run, Args};
 use lazy_static::lazy_static;
 use tempfile::{NamedTempFile, TempDir};
-use git2::{DiffFormat, DiffOptions, Oid, Repository, Tree};
-use indicatif::{ProgressBar, ProgressStyle};
-use anyhow::{bail, Context, Result};
-use ai::chat::generate_commit;
-use dotenv_codegen::dotenv;
-use clap::Parser;
+use anyhow::Result;
 
 impl FilePath for NamedTempFile {
   fn write(&self, msg: String) -> Result<()> {
