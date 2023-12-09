@@ -1,8 +1,13 @@
+#![feature(assert_matches)]
+
+use std::assert_matches::assert_matches;
+
+use std::assert_matches;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::process::Command as Cmd;
 
-use ai::hook::{run, Args};
+use ai::hook::*;
 use lazy_static::lazy_static;
 use tempfile::{NamedTempFile, TempDir};
 use anyhow::Result;
@@ -81,7 +86,7 @@ async fn test_empty_commit_type() {
   };
 
   let result = run(args).await;
-  assert!(result.is_ok());
+  assert_matches!(result, Ok(()));
   assert!(!FILE.is_empty().unwrap());
 }
 
