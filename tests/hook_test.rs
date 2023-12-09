@@ -80,7 +80,9 @@ impl Default for TestRepo {
 
     std::env::set_var("GIT_DIR", repo_path.path().join(".git"));
 
-    Self { repo_path }
+    Self {
+      repo_path
+    }
   }
 }
 
@@ -93,13 +95,16 @@ impl TestRepo {
 }
 
 struct GitFile {
-  path: PathBuf,
+  path:      PathBuf,
   repo_path: PathBuf
 }
 
 impl GitFile {
   fn new(path: PathBuf, repo_path: PathBuf) -> Result<Self> {
-    Ok(Self { path, repo_path })
+    Ok(Self {
+      path,
+      repo_path
+    })
   }
 
   pub fn stage(&self) -> Result<()> {
@@ -134,60 +139,6 @@ impl GitFile {
     Ok(())
   }
 }
-
-// fn setup_repo() -> Result<TempDir> {
-//   let repo_path = TempDir::new().unwrap();
-
-//   let output = Cmd::new("git")
-//     .arg("init")
-//     .current_dir(repo_path.path())
-//     .output()
-//     .expect("Failed to execute git init");
-
-//   assert!(output.status.success());
-
-//   std::env::set_var("GIT_DIR", repo_path.path().join(".git"));
-
-//   // // create file
-//   // let file_path = repo_path.path().join("file");
-//   // let mut file = File::create(file_path.clone())?;
-//   // file.write_all(b"Hello, world!")?;
-
-//   // let output = Cmd::new("git")
-//   //   .current_dir(repo_path.path())
-//   //   .arg("add")
-//   //   .arg(file_path)
-//   //   .output()
-//   //   .expect("Failed to execute git add");
-
-//   // assert!(output.status.success());
-
-//   let output = Cmd::new("git")
-//     .arg("commit")
-//     .arg("-m")
-//     .arg("Initial commit")
-//     .current_dir(repo_path.path())
-//     .output()
-//     .expect("Failed to execute git commit");
-
-//   assert!(output.status.success());
-
-//   Ok(repo_path)
-// }
-
-// #[tokio::test]
-// async fn test_nothing_to_commit() {
-//   let _repo_dir = setup_repo().unwrap();
-//   let commit_msg_file = NamedTempFile::new().unwrap();
-
-//   let args = Args {
-//     commit_msg_file: commit_msg_file.path().to_path_buf(), commit_type: None, sha1: None
-//   };
-
-//   let result = run(&args).await;
-//   assert_matches!(result, Err(HookError::EmptyDiffOutput));
-//   assert!(commit_msg_file.is_empty().unwrap());
-// }
 
 #[tokio::test]
 async fn test_something_to_commit() {
@@ -229,26 +180,9 @@ async fn test_something_to_commit() {
   let result = run(&args).await;
   assert_matches!(result, Err(HookError::EmptyDiffOutput));
 
-
   // Add deleted file
   file.stage().unwrap(); // git add file3
 
   let result = run(&args).await;
   assert_matches!(result, Ok(()));
 }
-
-// #[tokio::test]
-// async fn test_non_empty_commit_type() {
-//   let _repo_dir = setup_repo().unwrap();
-//   let commit_msg_file = NamedTempFile::new().unwrap();
-
-//   let args = Args {
-//     commit_msg_file: commit_msg_file.path().to_path_buf(),
-//     commit_type:     Some("test".to_string()),
-//     sha1:            None
-//   };
-
-//   let result = run(&args).await;
-//   assert_eq!(commit_msg_file.read().unwrap(), "");
-//   assert!(result.is_ok());
-// }

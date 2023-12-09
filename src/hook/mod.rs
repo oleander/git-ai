@@ -12,8 +12,7 @@ use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
 use clap::Parser;
 
-use crate::chat::generate_commit;
-use crate::chat::ChatError;
+use crate::chat::{generate_commit, ChatError};
 use crate::config;
 
 #[derive(Parser, Debug)]
@@ -152,10 +151,6 @@ async fn generate_commit_message(diff: String) -> Result<String> {
 }
 
 pub async fn run(args: &Args) -> Result<(), HookError> {
-
-
-
-
   let repo = Repository::open_from_env().context("Failed to open repository")?;
 
   // Get the tree from the commit if the sha1 is provided
