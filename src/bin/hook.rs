@@ -8,6 +8,7 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::fs::File;
+use std::time::Duration;
 
 #[cfg(not(mock))]
 use git2::{DiffFormat, DiffOptions, Oid, Repository, Tree};
@@ -17,6 +18,7 @@ use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
 use ai::chat::generate_commit;
 use clap::Parser;
+use tokio::time::sleep;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -246,7 +248,6 @@ async fn run(args: Args) -> Result<()> {
   // Loading bar to indicate that the program is running
   let is_done = Arc::new(AtomicBool::new(false));
   let pb = ProgressBar::new_spinner();
-  let pb_clone = pb.clone();
   let is_done_clone = is_done.clone();
   pb.set_style(
     ProgressStyle::default_spinner()
@@ -256,8 +257,12 @@ async fn run(args: Args) -> Result<()> {
 
   pb.set_message("Generating commit message...");
 
+  let pb_clone = pb.clone();
   tokio::spawn(async move {
-    spin_progress_bar(pb_clone, is_done_clone).await;
+    loop {
+      pb_clone.tick();
+      sleep(Duration::from_millis(150)).await;
+    }
   });
 
   let repo = Repository::open_from_env().context("Failed to open repository")?;
@@ -278,7 +283,6 @@ async fn run(args: Args) -> Result<()> {
   }
 
   let commit_message = generate_commit(patch.to_string()).await?;
-
 
   args
     .commit_msg_file
