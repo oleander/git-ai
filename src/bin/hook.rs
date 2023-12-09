@@ -2,7 +2,6 @@
 
 #![feature(assert_matches)]
 
-use std::process::{ExitCode, Termination};
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::fs::File;
@@ -31,16 +30,6 @@ struct Args {
 
 lazy_static! {
   static ref MAX_DIFF_TOKENS: usize = dotenv!("MAX_DIFF_TOKENS").parse::<usize>().unwrap();
-}
-
-#[derive(Debug)]
-struct Msg(String);
-
-impl Termination for Msg {
-  fn report(self) -> ExitCode {
-    println!("{}", self.0);
-    ExitCode::SUCCESS
-  }
 }
 
 trait FilePath {
