@@ -277,10 +277,7 @@ async fn run(args: Args) -> Result<()> {
     .write(commit_message.trim().to_string())
     .context("Failed to write commit message")?;
 
-  // // Stop the loading bar
-  // is_done.store(true, Ordering::SeqCst);
-
-  pb.finish_and_clear();
+  // pb.finish_and_clear();
   Ok(())
 }
 
