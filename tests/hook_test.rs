@@ -1,10 +1,10 @@
 use std::fs::File;
 use std::process::Command as Cmd;
 use std::io::{Read, Write};
-use std::env::Args;
 use std::time::Duration;
 use std::path::PathBuf;
 
+use ai::hook::{run, Args};
 use lazy_static::lazy_static;
 use tempfile::{NamedTempFile, TempDir};
 use git2::{DiffFormat, DiffOptions, Oid, Repository, Tree};
