@@ -1,13 +1,12 @@
 // Hook: prepare-commit-msg
 
 use std::io::{Read, Write};
-use std::time::Duration;
 use std::path::PathBuf;
 use std::fs::File;
 
 #[cfg(not(mock))]
 use git2::{DiffFormat, DiffOptions, Oid, Repository, Tree};
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
 use clap::Parser;
