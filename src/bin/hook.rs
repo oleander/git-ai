@@ -140,54 +140,6 @@ async fn spin_progress_bar(pb: ProgressBar, is_done: Arc<AtomicBool>) {
   }
 }
 
-async fn run(args: Args) -> Result<()> {
-  let is_done = Arc::new(AtomicBool::new(false));
-  let pb = ProgressBar::new_spinner();
-  let pb_clone = pb.clone();
-  let is_done_clone = is_done.clone();
-
-  pb.set_style(
-    ProgressStyle::default_spinner()
-      .tick_strings(&["-", "\\", "|", "/"])
-      .template("{spinner:.blue} {msg:.blue}")?
-  );
-
-  pb.set_message("Generating commit message...");
-
-  tokio::spawn(async move {
-    spin_progress_bar(pb_clone, is_done_clone).await;
-  });
-
-  if args.commit_type.is_some() {
-    return Ok(())
-  }
-
-  let repo = Repository::open_from_env().context("Failed to open repository")?;
-
-  let tree = if let Some(sha1) = args.sha1 {
-    repo.find_commit(sha1).ok().and_then(|commit| commit.tree().ok())
-  } else {
-    repo.head().ok().and_then(|head| head.peel_to_tree().ok())
-  };
-
-  let max_tokens = ai::config::get("max-diff-tokens").unwrap_or(*MAX_DIFF_TOKENS as i32);
-  let patch = repo.to_patch(tree, max_tokens.try_into().unwrap()).context("Failed to get patch")?;
-
-  if patch.is_empty() {
-    bail!("Empty diff output");
-  }
-
-  let new_commit_message = commit(patch.to_string()).await?;
-  is_done.store(true, Ordering::SeqCst);
-
-  args
-    .commit_msg_file
-    .write(new_commit_message.trim().to_string())
-    .context("Failed to write commit message")?;
-
-  pb.finish_and_clear();
-  Ok(())
-}
 
 #[cfg(mock)]
 async fn generate_commit_message(diff: String) -> Result<String> {
@@ -285,10 +237,61 @@ mod tests {
   }
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-  env_logger::init();
-  let args = Args::parse();
-  run(args).await?;
+async fn run(args: Args) -> Result<()> {
+
+  // If defined, then the user already provided a commit message
+  if args.commit_type.is_some() {
+    return Ok(())
+  }
+
+  // Loading bar to indicate that the program is running
+  let is_done = Arc::new(AtomicBool::new(false));
+  let pb = ProgressBar::new_spinner();
+  let pb_clone = pb.clone();
+  let is_done_clone = is_done.clone();
+  pb.set_style(
+    ProgressStyle::default_spinner()
+      .tick_strings(&["-", "\\", "|", "/"])
+      .template("{spinner:.blue} {msg}")?
+  );
+
+  pb.set_message("Generating commit message...");
+
+  tokio::spawn(async move {
+    spin_progress_bar(pb_clone, is_done_clone).await;
+  });
+
+  let repo = Repository::open_from_env().context("Failed to open repository")?;
+
+  // Get the tree from the commit if the sha1 is provided
+  // The sha1 is provided when the user is amending a commit
+  let tree = if let Some(sha1) = args.sha1 {
+    repo.find_commit(sha1).ok().and_then(|commit| commit.tree().ok())
+  } else {
+    repo.head().ok().and_then(|head| head.peel_to_tree().ok())
+  };
+
+  let max_tokens: usize = ai::config::get("max-diff-tokens").unwrap_or(*MAX_DIFF_TOKENS);
+  let patch = repo.to_patch(tree, max_tokens).context("Failed to get patch")?;
+
+  if patch.is_empty() {
+    bail!("Empty diff output");
+  }
+
+  let new_commit_message = commit(patch.to_string()).await?;
+  is_done.store(true, Ordering::SeqCst);
+
+  args
+    .commit_msg_file
+    .write(new_commit_message.trim().to_string())
+    .context("Failed to write commit message")?;
+
+  pb.finish_and_clear();
   Ok(())
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+  env_logger::init();
+  run(Args::parse()).await
 }

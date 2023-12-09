@@ -36,5 +36,6 @@ tempfile = "3.8.1"
 rand = "0.8.5"
 
 [profile.release]
+# TODO: enable lto
 # opt-level = "s"
 # lto = true
