@@ -133,7 +133,6 @@ impl PatchRepository for Repository {
   }
 }
 
-
 async fn spin_progress_bar(pb: ProgressBar, is_done: Arc<AtomicBool>) {
   while !is_done.load(Ordering::SeqCst) {
     pb.tick();
@@ -141,7 +140,7 @@ async fn spin_progress_bar(pb: ProgressBar, is_done: Arc<AtomicBool>) {
   }
 }
 
-async fn run(args: Args) -> Result<Msg> {
+async fn run(args: Args) -> Result<()> {
   let is_done = Arc::new(AtomicBool::new(false));
   let pb = ProgressBar::new_spinner();
   let pb_clone = pb.clone();
@@ -160,7 +159,7 @@ async fn run(args: Args) -> Result<Msg> {
   });
 
   if args.commit_type.is_some() {
-    return Ok(Msg("Commit message is not empty".to_string()));
+    return Ok(())
   }
 
   let repo = Repository::open_from_env().context("Failed to open repository")?;
@@ -187,7 +186,7 @@ async fn run(args: Args) -> Result<Msg> {
     .context("Failed to write commit message")?;
 
   pb.finish_and_clear();
-  Ok(Msg(new_commit_message))
+  Ok(())
 }
 
 #[cfg(mock)]
@@ -287,8 +286,9 @@ mod tests {
 }
 
 #[tokio::main]
-async fn main() -> Result<Msg, Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
   env_logger::init();
   let args = Args::parse();
-  Ok(run(args).await?)
+  run(args).await?;
+  Ok(())
 }
