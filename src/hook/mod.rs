@@ -1,19 +1,17 @@
 // Hook: prepare-commit-msg
 mod traits;
 
-use std::io::{Read, Write};
 use std::path::PathBuf;
-use std::fs::File;
 
 #[cfg(not(mock))]
-use git2::{DiffFormat, DiffOptions, Oid, Repository, Tree};
+use git2::{Oid, Repository};
 use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
 use clap::Parser;
-use traits::*;
 
 use crate::chat::{generate_commit, ChatError};
+use crate::hook::traits::{FilePath, PatchRepository};
 use crate::config;
 
 #[derive(Parser, Debug)]
