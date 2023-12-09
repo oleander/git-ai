@@ -244,14 +244,15 @@ async fn run(args: Args) -> Result<()> {
   );
 
   pb.set_message("Generating commit message...");
+  pb.enable_steady_tick(Duration::from_millis(150));
 
-  let pb_clone = pb.clone();
-  tokio::spawn(async move {
-    loop {
-      pb_clone.tick();
-      sleep(Duration::from_millis(150)).await;
-    }
-  });
+  // let pb_clone = pb.clone();
+  // tokio::spawn(async move {
+  //   loop {
+  //     pb_clone.tick();
+  //     sleep(Duration::from_millis(150)).await;
+  //   }
+  // });
 
   let repo = Repository::open_from_env().context("Failed to open repository")?;
 
@@ -277,7 +278,7 @@ async fn run(args: Args) -> Result<()> {
     .write(commit_message.trim().to_string())
     .context("Failed to write commit message")?;
 
-  // pb.finish_and_clear();
+  pb.finish_and_clear();
   Ok(())
 }
 
