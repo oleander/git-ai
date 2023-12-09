@@ -230,11 +230,11 @@ async fn test_something_to_commit() {
   assert_matches!(result, Err(HookError::EmptyDiffOutput));
 
 
-  // // Add deleted file
-  // file.stage().unwrap(); // git add file3
+  // Add deleted file
+  file.stage().unwrap(); // git add file3
 
-  // let result = run(&args).await;
-  // assert_matches!(result, Ok(()));
+  let result = run(&args).await;
+  assert_matches!(result, Ok(()));
 }
 
 // #[tokio::test]

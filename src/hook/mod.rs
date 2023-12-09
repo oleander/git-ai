@@ -7,7 +7,6 @@ use std::fs::File;
 
 #[cfg(not(mock))]
 use git2::{DiffFormat, DiffOptions, Oid, Repository, Tree};
-use indicatif::{ProgressBar, ProgressStyle};
 use anyhow::{bail, Context, Result};
 use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
@@ -153,21 +152,9 @@ async fn generate_commit_message(diff: String) -> Result<String> {
 }
 
 pub async fn run(args: &Args) -> Result<(), HookError> {
-  // If defined, then the user already provided a commit message
-  if args.commit_type.is_some() {
-    return Ok(());
-  }
 
-  // Loading bar to indicate that the program is running
-  let style = ProgressStyle::default_spinner()
-    .tick_strings(&["-", "\\", "|", "/"])
-    .template("{spinner:.blue} {msg}")
-    .context("Failed to create progress bar style")?;
 
-  let pb = ProgressBar::new_spinner();
-  pb.set_style(style);
-  pb.set_message("Generating commit message...");
-  pb.enable_steady_tick(Duration::from_millis(150));
+
 
   let repo = Repository::open_from_env().context("Failed to open repository")?;
 
@@ -193,6 +180,5 @@ pub async fn run(args: &Args) -> Result<(), HookError> {
     .write(commit_message.trim().to_string())
     .context("Failed to write commit message")?;
 
-  pb.finish_and_clear();
   Ok(())
 }
