@@ -10,5 +10,5 @@ use clap::Parser;
 #[tokio::main]
 async fn main() -> Result<()> {
   env_logger::init();
-  ai::hook::run(Args::parse()).await
+  Ok(ai::hook::run(Args::parse()).await?)
 }

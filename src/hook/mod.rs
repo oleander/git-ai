@@ -14,6 +14,7 @@ use dotenv_codegen::dotenv;
 use clap::Parser;
 
 use crate::chat::generate_commit;
+use crate::chat::ChatError;
 use crate::config;
 
 #[derive(Parser, Debug)]
@@ -26,6 +27,31 @@ pub struct Args {
 
   #[clap(required = false)]
   pub sha1: Option<Oid>
+}
+
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum HookError {
+  #[error("Failed to open repository")]
+  OpenRepository,
+
+  #[error("Failed to get patch")]
+  GetPatch,
+
+  #[error("Empty diff output")]
+  EmptyDiffOutput,
+
+  #[error("Failed to write commit message")]
+  WriteCommitMessage,
+
+  // anyhow
+  #[error(transparent)]
+  Anyhow(#[from] anyhow::Error),
+
+  // ChatError
+  #[error(transparent)]
+  Chat(#[from] ChatError)
 }
 
 lazy_static! {
@@ -126,7 +152,7 @@ async fn generate_commit_message(diff: String) -> Result<String> {
   Ok(diff.to_string())
 }
 
-pub async fn run(args: Args) -> Result<()> {
+pub async fn run(args: Args) -> Result<(), HookError> {
   // If defined, then the user already provided a commit message
   if args.commit_type.is_some() {
     return Ok(());
@@ -135,7 +161,8 @@ pub async fn run(args: Args) -> Result<()> {
   // Loading bar to indicate that the program is running
   let style = ProgressStyle::default_spinner()
     .tick_strings(&["-", "\\", "|", "/"])
-    .template("{spinner:.blue} {msg}")?;
+    .template("{spinner:.blue} {msg}")
+    .context("Failed to create progress bar style")?;
 
   let pb = ProgressBar::new_spinner();
   pb.set_style(style);
@@ -156,7 +183,7 @@ pub async fn run(args: Args) -> Result<()> {
   let patch = repo.to_patch(tree, max_tokens).context("Failed to get patch")?;
 
   if patch.is_empty() {
-    bail!("Empty diff output");
+    Err(HookError::EmptyDiffOutput)?;
   }
 
   let commit_message = generate_commit(patch.to_string()).await?;
