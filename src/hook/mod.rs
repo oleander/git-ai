@@ -55,8 +55,6 @@ lazy_static! {
   static ref MAX_DIFF_TOKENS: usize = dotenv!("MAX_DIFF_TOKENS").parse::<usize>().unwrap();
 }
 
-
-
 #[cfg(mock)]
 async fn generate_commit_message(diff: String) -> Result<String> {
   Ok(diff.to_string())

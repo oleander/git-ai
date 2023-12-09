@@ -6,7 +6,6 @@ use std::fs::File;
 use git2::{DiffFormat, DiffOptions, Repository, Tree};
 use anyhow::Result;
 
-
 pub trait FilePath {
   fn is_empty(&self) -> Result<bool> {
     self.read().map(|s| s.is_empty())
