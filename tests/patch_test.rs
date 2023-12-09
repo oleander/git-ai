@@ -6,6 +6,7 @@ use std::io::{Read, Write};
 use std::process::Command as Cmd;
 use std::path::PathBuf;
 
+use git2::DiffFormat;
 use ai::hook::traits::*;
 use tempfile::{NamedTempFile, TempDir};
 use anyhow::Result;
@@ -113,4 +114,40 @@ fn test_utf8_string_to_utf8() {
   let utf8_string = bytes.to_utf8();
 
   assert_eq!(utf8_string, "Hello");
+}
+
+trait TestPatchDiff {
+  fn is_empty(&self) -> Result<bool>;
+}
+
+impl TestPatchDiff for git2::Diff<'_> {
+  fn is_empty(&self) -> Result<bool> {
+    let mut acc = Vec::new();
+    let mut length = 0;
+
+    #[rustfmt::skip]
+    self.print(DiffFormat::Patch, |_, _, line| {
+      let content = line.content();
+      acc.extend_from_slice(content);
+      length += content.len();
+      true
+    })?;
+
+    Ok(length == 0)
+  }
+}
+
+#[test]
+fn test_patch_diff_to_patch() {
+  let repo = TestRepo::default();
+  let file = repo.create_file("test.txt", "Hello, world!").unwrap();
+  file.stage().unwrap();
+  file.commit().unwrap();
+
+  let repo_path = repo.repo_path.path().to_path_buf();
+  let repo = git2::Repository::open(repo_path).unwrap();
+  let tree = repo.head().unwrap().peel_to_tree().unwrap();
+  let diff = repo.to_diff(Some(tree)).unwrap();
+
+  assert!(diff.is_empty().unwrap());
 }
