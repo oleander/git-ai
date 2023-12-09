@@ -1,3 +1,5 @@
+// Hook: prepare-commit-msg
+
 #![feature(assert_matches)]
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -8,7 +10,6 @@ use std::sync::Arc;
 use std::fs::File;
 
 #[cfg(not(mock))]
-// Hook: prepare-commit-msg
 use git2::{DiffFormat, DiffOptions, Oid, Repository, Tree};
 use indicatif::{ProgressBar, ProgressStyle};
 use anyhow::{bail, Context, Result};
@@ -132,12 +133,6 @@ impl PatchRepository for Repository {
   }
 }
 
-#[tokio::main]
-async fn main() -> Result<Msg, Box<dyn std::error::Error>> {
-  env_logger::init();
-  let args = Args::parse();
-  Ok(run(args).await?)
-}
 
 async fn spin_progress_bar(pb: ProgressBar, is_done: Arc<AtomicBool>) {
   while !is_done.load(Ordering::SeqCst) {
@@ -289,4 +284,11 @@ mod tests {
     assert_eq!(FILE.read().unwrap(), "");
     assert!(result.is_ok());
   }
+}
+
+#[tokio::main]
+async fn main() -> Result<Msg, Box<dyn std::error::Error>> {
+  env_logger::init();
+  let args = Args::parse();
+  Ok(run(args).await?)
 }
