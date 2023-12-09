@@ -9,6 +9,7 @@ use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
 use clap::Parser;
+use thiserror::Error;
 
 use crate::chat::{generate_commit, ChatError};
 use crate::hook::traits::{FilePath, PatchRepository};
@@ -25,8 +26,6 @@ pub struct Args {
   #[clap(required = false)]
   pub sha1: Option<Oid>
 }
-
-use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum HookError {
