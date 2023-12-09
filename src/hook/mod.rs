@@ -152,7 +152,7 @@ async fn generate_commit_message(diff: String) -> Result<String> {
   Ok(diff.to_string())
 }
 
-pub async fn run(args: Args) -> Result<(), HookError> {
+pub async fn run(args: &Args) -> Result<(), HookError> {
   // If defined, then the user already provided a commit message
   if args.commit_type.is_some() {
     return Ok(());
