@@ -1,5 +1,5 @@
 // Hook: prepare-commit-msg
-mod traits;
+pub mod traits;
 
 use std::path::PathBuf;
 
@@ -14,6 +14,7 @@ use thiserror::Error;
 use crate::chat::{generate_commit, ChatError};
 use crate::hook::traits::{FilePath, PatchRepository};
 use crate::config;
+use traits::*;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
