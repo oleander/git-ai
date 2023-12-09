@@ -1,10 +1,9 @@
-use git2::RepositoryOpenFlags as Flags;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use anyhow::{Result, Context};
-use git2::Repository;
-use std::env;
-use std::fs;
+use std::{env, fs};
+
+use git2::{Repository, RepositoryOpenFlags as Flags};
+use anyhow::{Context, Result};
 use log::debug;
 
 // Git hook: prepare-commit-msg

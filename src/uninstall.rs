@@ -1,9 +1,8 @@
-use git2::RepositoryOpenFlags as Flags;
-use anyhow::{Result, Context, bail};
 use std::path::{Path, PathBuf};
-use git2::Repository;
-use std::env;
-use std::fs;
+use std::{env, fs};
+
+use git2::{Repository, RepositoryOpenFlags as Flags};
+use anyhow::{bail, Context, Result};
 
 pub fn run() -> Result<()> {
   let current_dir = env::current_dir().with_context(|| "Failed to get current directory".to_string())?;

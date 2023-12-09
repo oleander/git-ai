@@ -4,8 +4,7 @@ mod config;
 
 use anyhow::Result;
 use dotenv::dotenv;
-use clap::Command;
-use clap::Arg;
+use clap::{Arg, Command};
 
 fn cli() -> Command {
   Command::new("git-ai")

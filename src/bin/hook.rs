@@ -1,31 +1,21 @@
 #![feature(assert_matches)]
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::process::{ExitCode, Termination};
+use std::io::{Read, Write};
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::fs::File;
+
 #[cfg(not(mock))]
 // Hook: prepare-commit-msg
-use ai::chat::commit;
-use indicatif::ProgressBar;
-
-use std::process::Termination;
-use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
-use indicatif::ProgressStyle;
+use git2::{DiffFormat, DiffOptions, Oid, Repository, Tree};
+use indicatif::{ProgressBar, ProgressStyle};
+use anyhow::{bail, Context, Result};
 use lazy_static::lazy_static;
-use std::process::ExitCode;
 use dotenv_codegen::dotenv;
-use std::path::PathBuf;
-use git2::DiffOptions;
-use git2::Repository;
-use git2::DiffFormat;
-use anyhow::Context;
-use std::io::Write;
-use anyhow::Result;
-use std::io::Read;
-use std::fs::File;
-use anyhow::bail;
+use ai::chat::commit;
 use clap::Parser;
-use git2::Tree;
-use git2::Oid;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -212,8 +202,10 @@ async fn generate_commit_message(diff: String) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-  use tempfile::{NamedTempFile, TempDir};
   use std::process::Command as Cmd;
+
+  use tempfile::{NamedTempFile, TempDir};
+
   use super::*;
 
   impl FilePath for NamedTempFile {

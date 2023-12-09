@@ -1,9 +1,10 @@
-use lazy_static::lazy_static;
 use std::sync::RwLock;
 use std::str::FromStr;
+use std::env;
+
+use lazy_static::lazy_static;
 use anyhow::Result;
 use ini::Ini;
-use std::env;
 
 lazy_static! {
   static ref CONFIG_PATH: String = {
