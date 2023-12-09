@@ -235,12 +235,12 @@ async fn run(args: Args) -> Result<()> {
   }
 
   // Loading bar to indicate that the program is running
+  let style = ProgressStyle::default_spinner()
+    .tick_strings(&["-", "\\", "|", "/"])
+    .template("{spinner:.blue} {msg}")?;
+
   let pb = ProgressBar::new_spinner();
-  // pb.set_style(
-  //   ProgressStyle::default_spinner()
-  //     .tick_strings(&["-", "\\", "|", "/"])
-  //     .template("{spinner:.blue} {msg}")?
-  // );
+  pb.set_style(style);
   pb.set_message("Generating commit message...");
   pb.enable_steady_tick(Duration::from_millis(150));
 
