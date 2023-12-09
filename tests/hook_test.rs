@@ -1,22 +1,14 @@
 #![feature(assert_matches)]
 
 use std::assert_matches::assert_matches;
-use std::assert_matches;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::process::Command as Cmd;
 use std::path::PathBuf;
 
 use ai::hook::*;
-use lazy_static::lazy_static;
 use tempfile::{NamedTempFile, TempDir};
 use anyhow::Result;
-
-// impl From<NamedTempFile> for PathBuf {
-//   fn from(file: NamedTempFile) -> Self {
-//     file.path().to_path_buf()
-//   }
-// }
 
 impl FilePath for NamedTempFile {
   fn write(&self, msg: String) -> Result<()> {
@@ -55,11 +47,6 @@ impl FilePath for PathBuf {
     file.read_to_string(&mut contents)?;
     Ok(contents)
   }
-}
-
-lazy_static! {
-  // static ref FILE: NamedTempFile = NamedTempFile::new().unwrap();
-  // static ref REPO_PATH: TempDir = TempDir::new().unwrap();
 }
 
 struct TestRepo {
@@ -172,7 +159,7 @@ async fn test_something_to_commit() {
   file.commit().unwrap(); // git commit -m "Add file3"
 
   let result = run(&args).await;
-  // assert_matches!(result, Err(HookError::EmptyDiffOutput));
+  assert_matches!(result, Err(HookError::EmptyDiffOutput));
 
   // Delete file
   file.delete().unwrap(); // rm file3
