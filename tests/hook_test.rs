@@ -138,14 +138,14 @@ async fn test_something_to_commit() {
 
   let result = run(&args).await;
   assert_matches!(result, Err(HookError::EmptyDiffOutput));
-  // assert!(!commit_msg_file.is_empty().unwrap());
+  assert!(commit_msg_file.is_empty().unwrap());
 
   // Add a file to the repo
   repository.create_file("file2", "Hello, world!").unwrap();
 
   let result = run(&args).await;
   assert_matches!(result, Err(HookError::EmptyDiffOutput));
-  // assert!(!commit_msg_file.is_empty().unwrap());
+  assert!(commit_msg_file.is_empty().unwrap());
 
   // Add a file to the repo
   let file = repository.create_file("file3", "Hello, world!").unwrap();
@@ -153,7 +153,7 @@ async fn test_something_to_commit() {
 
   let result = run(&args).await;
   assert_matches!(result, Ok(()));
-  // assert!(!commit_msg_file.is_empty().unwrap());
+  assert!(!commit_msg_file.is_empty().unwrap());
 
   // Commit file
   file.commit().unwrap(); // git commit -m "Add file3"
