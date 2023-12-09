@@ -3,14 +3,9 @@ use std::path::PathBuf;
 use std::fs::File;
 
 #[cfg(not(mock))]
-use git2::{DiffFormat, DiffOptions, Oid, Repository, Tree};
-use anyhow::{Context, Result};
-use lazy_static::lazy_static;
-use dotenv_codegen::dotenv;
-use clap::Parser;
+use git2::{DiffFormat, DiffOptions, Repository, Tree};
+use anyhow::Result;
 
-use crate::chat::{generate_commit, ChatError};
-use crate::config;
 
 pub trait FilePath {
   fn is_empty(&self) -> Result<bool> {
