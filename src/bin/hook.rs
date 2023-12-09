@@ -15,7 +15,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use anyhow::{bail, Context, Result};
 use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
-use ai::chat::commit;
+use ai::chat::generate_commit;
 use clap::Parser;
 
 #[derive(Parser, Debug)]
@@ -238,7 +238,6 @@ mod tests {
 }
 
 async fn run(args: Args) -> Result<()> {
-
   // If defined, then the user already provided a commit message
   if args.commit_type.is_some() {
     return Ok(())
@@ -278,13 +277,16 @@ async fn run(args: Args) -> Result<()> {
     bail!("Empty diff output");
   }
 
-  let new_commit_message = commit(patch.to_string()).await?;
-  is_done.store(true, Ordering::SeqCst);
+  let commit_message = generate_commit(patch.to_string()).await?;
+
 
   args
     .commit_msg_file
-    .write(new_commit_message.trim().to_string())
+    .write(commit_message.trim().to_string())
     .context("Failed to write commit message")?;
+
+  // // Stop the loading bar
+  // is_done.store(true, Ordering::SeqCst);
 
   pb.finish_and_clear();
   Ok(())

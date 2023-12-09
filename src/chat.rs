@@ -93,7 +93,7 @@ async fn response(diff: String) -> Result<Value, ChatError> {
     .map_err(|e| e.into())
 }
 
-pub async fn commit(diff: String) -> Result<String, ChatError> {
+pub async fn generate_commit(diff: String) -> Result<String, ChatError> {
   response(diff).await?["choices"]
     .as_array()
     .and_then(|choices| choices.first())
