@@ -118,6 +118,7 @@ fn test_utf8_string_to_utf8() {
 
 trait TestPatchDiff {
   fn is_empty(&self) -> Result<bool>;
+  fn contains(&self, file: &GitFile) -> Result<bool>;
 }
 
 impl TestPatchDiff for git2::Diff<'_> {
@@ -135,6 +136,29 @@ impl TestPatchDiff for git2::Diff<'_> {
 
     Ok(length == 0)
   }
+
+  fn contains(&self, our_file: &GitFile) -> Result<bool> {
+    let mut found = false;
+    let our_file_name = our_file.path.file_name().unwrap();
+
+    self.foreach(
+      &mut |file, _progress| {
+        let other_path: PathBuf = file.new_file().path().unwrap().to_path_buf();
+        println!("!!other_path: {:?}", other_path);
+        println!("!!our_file.path: {:?}", our_file.path);
+        if (other_path == our_file_name) {
+          found = true;
+        }
+
+        true
+      },
+      None,
+      None,
+      None,
+    )?;
+
+    Ok(found)
+  }
 }
 
 #[test]
@@ -145,9 +169,20 @@ fn test_patch_diff_to_patch() {
   file.commit().unwrap();
 
   let repo_path = repo.repo_path.path().to_path_buf();
-  let repo = git2::Repository::open(repo_path).unwrap();
-  let tree = repo.head().unwrap().peel_to_tree().unwrap();
-  let diff = repo.to_diff(Some(tree)).unwrap();
+  let git_repo = git2::Repository::open(repo_path).unwrap();
+  let tree = git_repo.head().unwrap().peel_to_tree().unwrap();
 
+  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
   assert!(diff.is_empty().unwrap());
+
+  // Add a new line to the file
+  let file = repo.create_file("file", "Hello, world!\n").unwrap();
+  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
+  assert!(diff.is_empty().unwrap()); 
+
+  // stage the file
+  file.stage().unwrap();
+  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
+  assert!(!diff.is_empty().unwrap()); 
+  assert!(diff.contains(&file).unwrap());
 }
