@@ -2,7 +2,6 @@
 
 #![feature(assert_matches)]
 
-
 #[cfg(not(mock))]
 use ai::hook::Args;
 use anyhow::Result;
