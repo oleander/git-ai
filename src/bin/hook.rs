@@ -2,7 +2,6 @@
 
 #![feature(assert_matches)]
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::process::{ExitCode, Termination};
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -135,14 +134,6 @@ impl PatchRepository for Repository {
   }
 }
 
-async fn spin_progress_bar(pb: ProgressBar, is_done: Arc<AtomicBool>) {
-  while !is_done.load(Ordering::SeqCst) {
-    pb.tick();
-    tokio::time::sleep(std::time::Duration::from_millis(150)).await;
-  }
-}
-
-
 #[cfg(mock)]
 async fn generate_commit_message(diff: String) -> Result<String> {
   Ok(diff.to_string())
@@ -242,13 +233,11 @@ mod tests {
 async fn run(args: Args) -> Result<()> {
   // If defined, then the user already provided a commit message
   if args.commit_type.is_some() {
-    return Ok(())
+    return Ok(());
   }
 
   // Loading bar to indicate that the program is running
-  let is_done = Arc::new(AtomicBool::new(false));
   let pb = ProgressBar::new_spinner();
-  let is_done_clone = is_done.clone();
   pb.set_style(
     ProgressStyle::default_spinner()
       .tick_strings(&["-", "\\", "|", "/"])
