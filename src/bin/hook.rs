@@ -5,7 +5,6 @@
 use std::process::{ExitCode, Termination};
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::fs::File;
 use std::time::Duration;
 
