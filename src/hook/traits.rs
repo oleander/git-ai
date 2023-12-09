@@ -94,4 +94,3 @@ impl PatchRepository for Repository {
     self.diff_tree_to_index(tree.as_ref(), None, Some(&mut opts))?.to_patch(max_token_count)
   }
 }
-

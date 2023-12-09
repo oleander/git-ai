@@ -10,11 +10,11 @@ use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
 use clap::Parser;
 use thiserror::Error;
+use traits::*;
 
 use crate::chat::{generate_commit, ChatError};
 use crate::hook::traits::{FilePath, PatchRepository};
 use crate::config;
-use traits::*;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
