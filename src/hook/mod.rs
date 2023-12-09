@@ -1,7 +1,5 @@
 // Hook: prepare-commit-msg
 
-#![feature(assert_matches)]
-
 use std::io::{Read, Write};
 use std::time::Duration;
 use std::path::PathBuf;
