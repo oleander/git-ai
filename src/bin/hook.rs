@@ -271,7 +271,7 @@ async fn run(args: Args) -> Result<()> {
     repo.head().ok().and_then(|head| head.peel_to_tree().ok())
   };
 
-  let max_tokens: usize = ai::config::get("max-diff-tokens").unwrap_or(*MAX_DIFF_TOKENS);
+  let max_tokens = ai::config::get("max-diff-tokens").unwrap_or(*MAX_DIFF_TOKENS);
   let patch = repo.to_patch(tree, max_tokens).context("Failed to get patch")?;
 
   if patch.is_empty() {
