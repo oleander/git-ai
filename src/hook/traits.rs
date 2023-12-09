@@ -4,7 +4,7 @@ use std::fs::File;
 
 #[cfg(not(mock))]
 use git2::{DiffFormat, DiffOptions, Repository, Tree};
-use anyhow::Result;
+use anyhow::{Result, Context};
 
 pub trait FilePath {
   fn is_empty(&self) -> Result<bool> {
@@ -70,10 +70,15 @@ impl PatchDiff for git2::Diff<'_> {
 
 pub trait PatchRepository {
   fn to_patch(&self, tree: Option<Tree<'_>>, max_token_count: usize) -> Result<String>;
+  fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>>;
 }
 
 impl PatchRepository for Repository {
   fn to_patch(&self, tree: Option<Tree<'_>>, max_token_count: usize) -> Result<String> {
+    self.to_diff(tree)?.to_patch(max_token_count)
+  }
+
+  fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>> {
     let mut opts = DiffOptions::new();
     opts
       .enable_fast_untracked_dirs(true)
@@ -91,6 +96,6 @@ impl PatchRepository for Repository {
       .patience(true)
       .minimal(true);
 
-    self.diff_tree_to_index(tree.as_ref(), None, Some(&mut opts))?.to_patch(max_token_count)
+    self.diff_tree_to_index(tree.as_ref(), None, Some(&mut opts)).context("Failed to get diff")
   }
 }
