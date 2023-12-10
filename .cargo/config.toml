@@ -1,5 +1,5 @@
-# [build]
-# rustflags = ["--cfg", "mock"]
+[build]
+rustflags = ["-Z", "macro-backtrace"]
 
 [env]
 RUST_LOG = "trace"
