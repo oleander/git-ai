@@ -45,3 +45,6 @@ This project is under the MIT License. For more details, see the [LICENSE](LICEN
   - Look into ways to simplify the CI process.
 - Define and document configuration options.
 - Implement a feature where CTRL-C resets the terminal.
+- Change the command-line interface (CLI) to use subcommands:
+  - `git ai hook install`
+  - `git ai hook uninstall`
