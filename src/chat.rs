@@ -62,7 +62,8 @@ fn prompt() -> String {
   let lang = config::APP.language.clone();
   let length = config::APP.max_length;
 
-  format!("
+  format!(
+    "
     Create a concise git commit message in present tense for the provided code diff. 
       Follow these guidelines:
         Language: {}.
@@ -71,7 +72,7 @@ fn prompt() -> String {
         Exclude irrelevant and unnecessary details, such as translations.
       Your entire response will be passed directly into git commit.",
     lang, length
-  )
+  ).split_whitespace().collect::<Vec<&str>>().join(" ")
 }
 
 mod response {

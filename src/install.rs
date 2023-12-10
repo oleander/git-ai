@@ -4,7 +4,7 @@ use std::{env, fs};
 use console::{style, Emoji};
 
 use git2::{Repository, RepositoryOpenFlags as Flags};
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use thiserror::Error;
 
 #[derive(Error, Debug)]

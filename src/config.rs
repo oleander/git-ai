@@ -20,6 +20,7 @@ pub struct App {
 }
 
 impl App {
+  #[allow(dead_code)]
   pub fn duration(&self) -> std::time::Duration {
     std::time::Duration::from_secs(self.timeout as u64)
   }
