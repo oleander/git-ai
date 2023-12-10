@@ -2,12 +2,12 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::fs::File;
 
-use lazy_static::lazy_static;
-use dotenv_codegen::dotenv;
-use clap::Parser;
-use thiserror::Error;
 use git2::{DiffFormat, DiffOptions, Oid, Repository, Tree};
 use anyhow::{Context, Result};
+use lazy_static::lazy_static;
+use dotenv_codegen::dotenv;
+use thiserror::Error;
+use clap::Parser;
 
 use crate::chat::{generate_commit, ChatError};
 

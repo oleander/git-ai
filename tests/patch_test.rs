@@ -1,11 +1,8 @@
 #![feature(assert_matches)]
 
-use std::assert_matches::assert_matches;
-use std::fs::File;
-use std::io::{Read, Write};
-use std::process::Command as Cmd;
 use std::path::PathBuf;
 
+use std::process::Command as Cmd;
 use git2::DiffFormat;
 use ai::hook::traits::*;
 use tempfile::{NamedTempFile, TempDir};
