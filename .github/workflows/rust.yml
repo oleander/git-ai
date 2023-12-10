@@ -38,6 +38,7 @@ jobs:
           override: true
           default: true
           profile: minimal
+          components: rustfmt,clippy
       - name: Build git-ai-hook
         uses: actions-rs/cargo@v1
         with:
@@ -52,9 +53,15 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
+      - name: Rust fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+      - name: Rust clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --all -- --deny warnings
       - name: Test install hook
         run: git ai install
-      - name: Run Clippy
-        uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
