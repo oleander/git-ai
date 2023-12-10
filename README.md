@@ -1,4 +1,4 @@
-# Git AI Library [![Rust](https://github.com/oleander/git-ai/actions/workflows/rust.yml/badge.svg)](https://github.com/oleander/git-ai/actions/workflows/rust.yml)
+# Git AI [![Rust](https://github.com/oleander/git-ai/actions/workflows/rust.yml/badge.svg)](https://github.com/oleander/git-ai/actions/workflows/rust.yml)
 
 ## Overview
 
