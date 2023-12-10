@@ -93,6 +93,7 @@ impl PatchRepository for Repository {
       .ignore_whitespace_eol(true)
       .ignore_blank_lines(true)
       .include_untracked(false)
+      .ignore_whitespace(true)
       .indent_heuristic(false)
       .ignore_submodules(true)
       .include_ignored(false)
