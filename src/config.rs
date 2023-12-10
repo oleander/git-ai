@@ -2,13 +2,12 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::fs::File;
 
-use clap::ArgMatches;
-use console::{style, Emoji};
-use indicatif::style;
 use serde::{Deserialize, Serialize};
 use config::{Config, FileFormat};
 use anyhow::{Context, Result};
 use lazy_static::lazy_static;
+use console::{style, Emoji};
+use clap::ArgMatches;
 
 #[derive(Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct App {
