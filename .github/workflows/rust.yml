@@ -12,7 +12,11 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        toolchain: [stable, nightly]
     steps:
       - uses: actions/checkout@v3
       - name: Cache cargo registry
@@ -26,7 +30,7 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: ${{ matrix.toolchain }}
           override: true
           default: true
           profile: minimal
@@ -41,6 +45,9 @@ jobs:
         with:
           command: install
           args: --path . --bin git-ai --no-default-features
+        env:
+          APP_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      # Uncomment the following steps if you need them
       # - name: Run tests
       #   uses: actions-rs/cargo@v1
       #   with:
@@ -58,7 +65,5 @@ jobs:
       #     args: --all -- --deny warnings
       - name: Test install hook
         run: git ai hook install
-      - name: Define api keys
-        run: git ai config set openai-api-key ${{ secrets.OPENAI_API_KEY }}
       - name: Test simulate
         run: ./simulate.sh

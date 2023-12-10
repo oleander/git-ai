@@ -26,7 +26,8 @@ This crate installs a `prepare-commit-msg` Git hook in your repository. When you
 
 - Install the binary as per the instructions above.
 - Use `git ai hook install` to set up the Git hook.
-- Set the OpenAI API key with `git-ai config set api-key <api-key>`.
+- Set the OpenAI API key with `git-ai config set openapi-api-key <api-key>`.
+
 
 ## CLI Options
 
