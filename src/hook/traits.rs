@@ -6,9 +6,7 @@ use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
 use clap::Parser;
 use thiserror::Error;
-use git2::Oid;
-#[cfg(not(mock))]
-use git2::{DiffFormat, DiffOptions, Repository, Tree};
+use git2::{DiffFormat, DiffOptions, Oid, Repository, Tree};
 use anyhow::{Context, Result};
 
 use crate::chat::{generate_commit, ChatError};
