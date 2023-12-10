@@ -29,7 +29,7 @@ impl TestRepo {
   fn create_file(&self, name: &str, content: &str) -> Result<GitFile> {
     let file_path = self.repo_path.path().join(name);
     std::fs::write(&file_path, content)?;
-    let repo = git2::Repository::open(self.repo_path.path())?;
+    let repo = git2::Repository::open(self.repo.path()).unwrap();
     Ok(GitFile::new(repo, file_path, self.repo_path.path().to_path_buf()))
   }
 }
