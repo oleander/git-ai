@@ -1,4 +1,3 @@
-use std::time::Duration;
 use std::io;
 
 use serde_json::{from_str, json, Value};
@@ -6,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
 use thiserror::Error;
-use anyhow::Context;
 use reqwest::Client;
 
 use crate::config;
@@ -19,20 +17,6 @@ lazy_static! {
   static ref API_KEY: String = dotenv!("OPENAI_API_KEY").to_string();
   static ref LANGUAGE: String = dotenv!("LANGUAGE").to_string();
   static ref MODEL: String = dotenv!("MODEL").to_string();
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct ChatMessage {
-  role:    String,
-  content: String
-}
-
-impl ChatMessage {
-  fn new(role: impl Into<String>, content: impl Into<String>) -> Self {
-    Self {
-      role: role.into(), content: content.into()
-    }
-  }
 }
 
 #[derive(Error, Debug)]
@@ -50,18 +34,26 @@ pub enum ChatError {
   #[error("Anyhow error: {0}")]
   Anyhow(#[from] anyhow::Error),
   #[error("OpenAI error: {0}")]
-  OpenAIError(String)
+  OpenAIError(String),
+  #[error("Failed to parse response: {1} ({0})")]
+  ParseError(serde_json::Error, String)
 }
 
 fn payload(diff: String) -> Value {
   let model = config::APP.model.clone();
 
   json!({
-     "model": model,
-     "messages": vec![
-       ChatMessage::new("system", prompt()),
-       ChatMessage::new("user", diff)
-     ]
+    "model": model,
+    "messages": vec![
+      json!({
+        "role": "system",
+        "content": prompt()
+      }),
+      json!({
+        "role": "user",
+        "content": diff
+      })
+    ]
   })
 }
 
@@ -125,22 +117,21 @@ pub enum Response {
 
 async fn response(diff: String) -> Result<Response, ChatError> {
   let api_key = config::APP.openai_api_key.clone();
-  let timeout = config::APP.timeout;
+  let timeout = config::APP.duration();
 
   Client::builder()
     .build()?
     .post(API_URL)
     .bearer_auth(api_key)
     .json(&payload(diff))
-    .timeout(Duration::from_secs(timeout as u64))
+    .timeout(timeout)
     .send()
     .await
-    .context("Failed to send request")?
+    .map_err(ChatError::from)?
     .text()
     .await
-    .context("Failed to get response body")
-    .and_then(|body| from_str::<Response>(&body).context(format!("Failed to parse response body: {}", body)))
     .map_err(ChatError::from)
+    .and_then(|body| from_str::<Response>(&body).map_err(|e| ChatError::ParseError(e, body)))
 }
 
 pub async fn generate_commit(diff: String) -> Result<String, ChatError> {

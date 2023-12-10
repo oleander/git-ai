@@ -19,6 +19,12 @@ pub struct App {
   pub timeout:         usize
 }
 
+impl App {
+  pub fn duration(&self) -> std::time::Duration {
+    std::time::Duration::from_secs(self.timeout as u64)
+  }
+}
+
 lazy_static! {
   pub static ref CONFIG_DIR: PathBuf = home::home_dir().unwrap().join(".config/git-ai");
   pub static ref APP: App = App::new().expect("Failed to load config");
