@@ -12,8 +12,19 @@ fn cli() -> Command {
     .subcommand_required(true)
     .arg_required_else_help(true)
     .allow_external_subcommands(true)
-    .subcommand(Command::new("install").about("Installs the git-ai hook"))
-    .subcommand(Command::new("uninstall").about("Uninstalls the git-ai hook"))
+    // hook install
+    .subcommand(
+      Command::new("hook")
+        .about("Installs the git-ai hook")
+        .subcommand(
+          Command::new("install")
+            .about("Installs the git-ai hook")
+        )
+        .subcommand(
+          Command::new("uninstall")
+            .about("Uninstalls the git-ai hook")
+        )
+    )
     .subcommand(
       Command::new("config")
         .about("Sets or gets configuration values")
@@ -38,11 +49,18 @@ async fn main() -> Result<()> {
   let args = cli().get_matches();
 
   match args.subcommand() {
-    Some(("install", _)) => {
-      install::run()?;
-    },
-    Some(("uninstall", _)) => {
-      uninstall::run()?;
+    Some(("hook", sub)) => {
+      match sub.subcommand() {
+        Some(("install", _)) => {
+          install::run()?;
+        },
+        Some(("uninstall", _)) => {
+          uninstall::run()?;
+        },
+        _ => {
+          println!("No subcommand was used");
+        }
+      }
     },
     Some(("config", args)) => {
       if let Some(matches) = args.subcommand_matches("set") {

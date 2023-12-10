@@ -4,7 +4,7 @@ github-actions:
 install:
 	cargo build --release --bin git-ai-hook --no-default-features
 	cargo install --path . --bin git-ai --no-default-features
-	git ai install
+	git ai hook install
 test:
 	cargo test --all
 build_hook:
