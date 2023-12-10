@@ -2,10 +2,7 @@
 
 ## Overview
 
-Git AI is a Rust library that integrates with Git, leveraging OpenAI's GPT-4 model to automatically generate commit messages from code changes. 
-
-This crate installs a `prepare-commit-msg` Git hook in your repository. When you commit without a message, Git AI uses ChatGPT to craft a commit message based on the staged files.
-
+Git AI uses ChatGPT and git hook to generate commit messages based on the staged files. Leave the commit message empty and let Git AI do the work for you!
 
 ## Installation
 
@@ -27,7 +24,6 @@ This crate installs a `prepare-commit-msg` Git hook in your repository. When you
 - Install the binary as per the instructions above.
 - Use `git ai hook install` to set up the Git hook.
 - Set the OpenAI API key with `git-ai config set openapi-api-key <api-key>`.
-
 
 ## CLI Options
 
