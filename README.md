@@ -50,23 +50,3 @@ Execute `cargo test` to run the test suite.
 ## License
 
 This project is under the MIT License. For more details, see the [LICENSE](LICENSE) file.
-
-## Pre-Publish Checklist
-
-- [x] Decide on an appropriate name for the binary.
-- [x] Update the README with installation and testing instructions.
-- [x] Ensure continuous integration (CI) passes.
-  - [x] Look into ways to simplify the CI process.
-- [x] Define and document configuration options.
-- [x] Implement a feature where CTRL-C resets the terminal.
-- [x] Change the command-line interface (CLI) to use subcommands:
-  - [x] `git ai hook install`
-  - [x] `git ai hook uninstall`
-- [x] Allow proper configuration
-  - [x] With validation
-  - [x] Fallback values
-  - [x] Using environment variables
-- [x] Get rid of the main.rs as binary
-- [x] Move logic from main.rs into sep: config.rs
-- [ ] Test against stable & nightly Rust on both macOS and Linux
-- [ ] Publish the crate to crates.io
