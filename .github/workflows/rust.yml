@@ -39,12 +39,12 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --release --bin git-ai-hook --no-default-features
+          args: --release --bin git-ai-hook
       - name: Install git-ai
         uses: actions-rs/cargo@v1
         with:
           command: install
-          args: --path . --bin git-ai --no-default-features
+          args: --path . --bin git-ai
         env:
           APP_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       # Uncomment the following steps if you need them
@@ -52,7 +52,6 @@ jobs:
       #   uses: actions-rs/cargo@v1
       #   with:
       #     command: test
-      #     args: --no-default-features
       # - name: Rust fmt
       #   uses: actions-rs/cargo@v1
       #   with:
