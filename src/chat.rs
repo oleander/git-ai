@@ -97,7 +97,9 @@ async fn response(diff: String) -> Result<Value, ChatError> {
 }
 
 pub async fn generate_commit(diff: String) -> Result<String, ChatError> {
-  response(diff).await?["choices"]
+  let r = response(diff).await?;
+  println!("{:#?}", r);
+  r["choices"]
     .as_array()
     .and_then(|choices| choices.first())
     .and_then(|choice| choice["message"]["content"].as_str())
