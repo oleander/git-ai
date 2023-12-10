@@ -14,4 +14,3 @@ use traits::*;
 use crate::chat::{generate_commit, ChatError};
 use crate::hook::traits::{FilePath, PatchRepository};
 use crate::config;
-use traits::*;

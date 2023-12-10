@@ -1,6 +1,7 @@
 // Hook: prepare-commit-msg
 
 use std::path::PathBuf;
+use std::time::Duration;
 
 #[cfg(not(mock))]
 use git2::{Oid, Repository};
@@ -9,13 +10,9 @@ use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
-use std::time::Duration;
 use thiserror::Error;
-
-
-use ai::hook::traits::*;
+use ai::hook::traits::{FilePath, PatchRepository, *};
 use ai::chat::{generate_commit, ChatError};
-use ai::hook::traits::{FilePath, PatchRepository};
 use ai::config;
 
 #[tokio::main]

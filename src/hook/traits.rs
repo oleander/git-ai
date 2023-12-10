@@ -1,17 +1,17 @@
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::fs::File;
+
 use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
 use clap::Parser;
 use thiserror::Error;
 use git2::Oid;
-use crate::chat::generate_commit;
-use crate::chat::ChatError;
-
 #[cfg(not(mock))]
 use git2::{DiffFormat, DiffOptions, Repository, Tree};
 use anyhow::{Context, Result};
+
+use crate::chat::{generate_commit, ChatError};
 
 pub trait FilePath {
   fn is_empty(&self) -> Result<bool> {
