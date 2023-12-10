@@ -18,13 +18,21 @@ pub struct App {
 }
 
 lazy_static! {
-  pub static ref CONFIG_PATH: PathBuf = home::home_dir().unwrap().join(".config/git-ai/config.ini");
+  pub static ref CONFIG_DIR: PathBuf = home::home_dir().unwrap().join(".config/git-ai");
   pub static ref APP: App = App::new().expect("Failed to load config");
+  pub static ref CONFIG_PATH: PathBuf = CONFIG_DIR.join("config.ini");
 }
 
 impl App {
   pub fn new() -> Result<Self> {
     dotenv::dotenv().ok();
+
+    if !CONFIG_DIR.exists() {
+      std::fs::create_dir_all(CONFIG_DIR.to_str().unwrap()).context("Failed to create config directory")?;
+      File::create(CONFIG_PATH.to_str().unwrap()).context("Failed to create config file")?;
+    } else if !CONFIG_PATH.exists() {
+      File::create(CONFIG_PATH.to_str().unwrap()).context("Failed to create config file")?;
+    }
 
     let config = Config::builder()
       .add_source(config::Environment::with_prefix("APP").try_parsing(true))
