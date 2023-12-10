@@ -58,5 +58,7 @@ jobs:
       #     args: --all -- --deny warnings
       - name: Test install hook
         run: git ai hook install
+      - name: Define api keys
+        run: git ai config set openai_api_key ${{ secrets.OPENAI_API_KEY }}
       - name: Test simulate
         run: ./simulate.sh

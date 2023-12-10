@@ -70,5 +70,6 @@ This project is under the MIT License. For more details, see the [LICENSE](LICEN
   - [x] Fallback values
   - [x] Using environment variables
 - [x] Get rid of the main.rs as binary
-- [ ] Move logic from main.rs into sep: config.rs
+- [x] Move logic from main.rs into sep: config.rs
+- [ ] Test against stable & nightly Rust on both macOS and Linux
 - [ ] Publish the crate to crates.io
