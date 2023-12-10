@@ -2,8 +2,8 @@ github-actions:
     act --container-architecture linux/amd64
 
 install:
-	cargo build --release --bin git-ai-hook --no-default-features
-	cargo install --path . --bin git-ai --no-default-features
+	cargo build --bin git-ai-hook --no-default-features
+	cargo install --debug --path . --bin git-ai --no-default-features
 	git ai hook install
 test:
 	cargo test --all

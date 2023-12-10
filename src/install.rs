@@ -9,7 +9,7 @@ use log::debug;
 // Git hook: prepare-commit-msg
 // Crates an executable git hook (prepare-commit-msg) in the .git/hooks directory
 pub fn run() -> Result<()> {
-  let script = include_bytes!("../target/release/git-ai-hook");
+  let script = include_bytes!("../target/debug/git-ai-hook");
 
   let current_dir = env::current_dir().with_context(|| "Failed to get current directory".to_string())?;
   debug!("Current directory: {:?}", current_dir);
