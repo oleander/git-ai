@@ -1,49 +1,45 @@
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
 use git2::{Repository, RepositoryOpenFlags as Flags};
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use log::debug;
 
 // Git hook: prepare-commit-msg
 // Crates an executable git hook (prepare-commit-msg) in the .git/hooks directory
 pub fn run() -> Result<()> {
-  let script = include_bytes!("../target/debug/git-ai-hook");
+  let curr_bin = env::current_exe().context("Failed to get current executable")?;
+  let exec_path = curr_bin.parent().context("Failed to get parent directory")?;
+  let hook_bin = exec_path.join("git-ai-hook");
+
+  if !hook_bin.exists() {
+    return Err(anyhow::anyhow!("Executable not found: {:?}", hook_bin));
+  }
+  // absolute path to this executable
+  // let script = include_bytes!("../target/debug/git-ai-hook");
 
   let current_dir = env::current_dir().with_context(|| "Failed to get current directory".to_string())?;
   debug!("Current directory: {:?}", current_dir);
 
   let repo = Repository::open_ext(&current_dir, Flags::empty(), Vec::<&Path>::new())
     .with_context(|| "Failed to open repository".to_string())?;
-  debug!("Repository path: {:?}", repo.path());
+  let git_path = repo.path().parent().context("Failed to get repository path")?;
 
-  let hook_dir = PathBuf::from(repo.path()).join("hooks");
-  let hook_file = hook_dir.join("prepare-commit-msg");
-  debug!("Hook file: {:?}", hook_file);
-
-  debug!("Creating directory: {:?}", hook_dir);
-  fs::create_dir_all(&hook_dir).with_context(|| format!("Failed to create directory: {:?}", hook_dir))?;
-
-  if hook_file.exists() {
-    debug!("Removing file: {:?}", hook_file);
-    fs::remove_file(&hook_file).with_context(|| format!("Failed to remove file: {:?}", hook_file))?;
+  let hook_dir = git_path.join("hooks");
+  if !hook_dir.exists() {
+    fs::create_dir_all(&hook_dir).context("Failed to create .git/hooks")?;
   }
 
-  debug!("Writing file: {:?}", hook_file);
-  fs::write(&hook_file, script).with_context(|| format!("Failed to write file: {:?}", hook_file))?;
+  let hook_file = hook_dir.join("prepare-commit-msg");
+  if hook_file.exists() {
+    bail!("Hook file at .git/hooks/prepare-commit-msg already exists, please remove it first using 'git ai hook uninstall'");
+  }
 
-  let metadata = fs::metadata(&hook_file).context("Failed to get metadata")?;
-  let mut permissions = metadata.permissions();
-  debug!("Current permissions: {:?}", permissions);
+  // Symlink the hook_bin to the hook_file
+  unix_fs::symlink(&hook_bin, &hook_file).with_context(|| format!("Failed to symlink {:?} to {:?}", hook_bin, hook_file))?;
 
-  permissions.set_mode(0o755);
-  debug!("New permissions: {:?}", permissions);
-  fs::set_permissions(&hook_file, permissions).context("Failed to set permissions")?;
-
-  let relative_path = hook_file.strip_prefix(&current_dir).context("Failed to strip prefix")?;
-
-  println!("Hook symlinked successfully to {}", relative_path.display());
+  println!("Hook symlinked successfully to .git/hooks/prepare-commit-msg");
 
   Ok(())
 }
