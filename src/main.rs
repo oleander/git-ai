@@ -16,14 +16,8 @@ fn cli() -> Command {
     .subcommand(
       Command::new("hook")
         .about("Installs the git-ai hook")
-        .subcommand(
-          Command::new("install")
-            .about("Installs the git-ai hook")
-        )
-        .subcommand(
-          Command::new("uninstall")
-            .about("Uninstalls the git-ai hook")
-        )
+        .subcommand(Command::new("install").about("Installs the git-ai hook"))
+        .subcommand(Command::new("uninstall").about("Uninstalls the git-ai hook"))
     )
     .subcommand(
       Command::new("config")
@@ -57,9 +51,7 @@ async fn main() -> Result<()> {
         Some(("uninstall", _)) => {
           uninstall::run()?;
         },
-        _ => {
-          println!("No subcommand was used");
-        }
+        _ => unreachable!()
       }
     },
     Some(("config", args)) => {
@@ -74,9 +66,7 @@ async fn main() -> Result<()> {
         log::info!("Config key {} is set to {}", key, value);
       }
     },
-    _ => {
-      println!("No subcommand was used");
-    }
+    _ => unreachable!()
   }
 
   Ok(())
