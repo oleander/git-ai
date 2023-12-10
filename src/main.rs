@@ -26,7 +26,7 @@ fn cli() -> Command {
             .subcommand(
               Command::new("timeout")
                 .about("Sets the timeout for the OpenAI API")
-                .arg(Arg::new("VALUE").required(true).index(1).value_parser(clap::value_parser!(usize)))
+                .arg(Arg::new("timeout").required(true).index(1).value_parser(clap::value_parser!(usize)))
             )
             .subcommand(
               Command::new("model").about("Sets the model to use").arg(
@@ -47,7 +47,12 @@ fn cli() -> Command {
             .subcommand(
               Command::new("max-diff-tokens")
                 .about("Sets the maximum number of tokens to use for the diff")
-                .arg(Arg::new("VALUE").required(true).index(1).value_parser(clap::value_parser!(usize)))
+                .arg(
+                  Arg::new("max-diff-tokens")
+                    .required(true)
+                    .index(1)
+                    .value_parser(clap::value_parser!(usize))
+                )
             )
             .subcommand(
               Command::new("max-length")

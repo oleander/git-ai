@@ -1,8 +1,8 @@
 use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
-use console::{style, Emoji};
 
+use console::{style, Emoji};
 use git2::{Repository, RepositoryOpenFlags as Flags};
 use anyhow::{Context, Result};
 use thiserror::Error;
@@ -23,7 +23,7 @@ pub enum InstallError {
   GitHookExists(PathBuf),
 
   #[error("Git repository not found at {0}")]
-  GitRepoNotFound(PathBuf),
+  GitRepoNotFound(PathBuf)
 }
 
 // Git hook: prepare-commit-msg
@@ -43,7 +43,7 @@ pub fn run() -> Result<(), InstallError> {
   let git_path = match repo_path.file_name() {
     Some(name) if name == ".git" => repo_path.to_path_buf(),
     Some(_) => repo_path.join(".git"),
-    None => return Err(InstallError::GitRepoNotFound(repo_path.to_path_buf())),
+    None => return Err(InstallError::GitRepoNotFound(repo_path.to_path_buf()))
   };
 
   let hook_dir = git_path.join("hooks");

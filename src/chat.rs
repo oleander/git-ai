@@ -72,7 +72,10 @@ fn prompt() -> String {
         Exclude irrelevant and unnecessary details, such as translations.
       Your entire response will be passed directly into git commit.",
     lang, length
-  ).split_whitespace().collect::<Vec<&str>>().join(" ")
+  )
+  .split_whitespace()
+  .collect::<Vec<&str>>()
+  .join(" ")
 }
 
 mod response {
