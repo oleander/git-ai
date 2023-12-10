@@ -38,16 +38,16 @@ jobs:
           override: true
           default: true
           profile: minimal
-      # - name: Build git-ai-hook
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: build
-      #     args: --release --bin git-ai-hook --no-default-features
-      # - name: Install git-ai
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: install
-      #     args: --path . --bin git-ai --no-default-features
+      - name: Build git-ai-hook
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --bin git-ai-hook --no-default-features
+      - name: Install git-ai
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: --path . --bin git-ai --no-default-features
       - name: Run tests
         uses: actions-rs/cargo@v1
         with:

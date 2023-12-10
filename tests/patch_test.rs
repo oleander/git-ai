@@ -9,24 +9,37 @@ use tempfile::{NamedTempFile, TempDir};
 use anyhow::Result;
 
 struct TestRepo {
+  repo:      Repository,
   repo_path: TempDir
 }
+// impl Default for TestRepo {
+//   fn default() -> Self {
+//     let repo_path = TempDir::new().unwrap();
+
+//     let output = Cmd::new("git")
+//       .arg("init")
+//       .current_dir(repo_path.path())
+//       .output()
+//       .expect("Failed to execute git init");
+
+//     assert!(output.status.success());
+
+//     std::env::set_var("GIT_DIR", repo_path.path().join(".git"));
+
+//     Self {
+//       repo_path
+//     }
+//   }
+// }
 
 impl Default for TestRepo {
   fn default() -> Self {
     let repo_path = TempDir::new().unwrap();
-
-    let output = Cmd::new("git")
-      .arg("init")
-      .current_dir(repo_path.path())
-      .output()
-      .expect("Failed to execute git init");
-
-    assert!(output.status.success());
-
+    let repo = Repository::init(repo_path.path()).unwrap();
     std::env::set_var("GIT_DIR", repo_path.path().join(".git"));
 
     Self {
+      repo,
       repo_path
     }
   }
@@ -35,48 +48,40 @@ impl Default for TestRepo {
 impl TestRepo {
   fn create_file(&self, name: &str, content: &str) -> Result<GitFile> {
     let file_path = self.repo_path.path().join(name);
-    file_path.write(content.to_string())?;
-    GitFile::new(file_path, self.repo_path.path().to_path_buf())
+    std::fs::write(&file_path, content)?;
+    Ok(GitFile::new(repo, file_path, self.repo_path.path().to_path_buf()))
   }
 }
 
 struct GitFile {
+  repo:     Repository,
   path:      PathBuf,
   repo_path: PathBuf
 }
 
 impl GitFile {
-  fn new(path: PathBuf, repo_path: PathBuf) -> Result<Self> {
-    Ok(Self {
+  fn new(repo: Repository, path: PathBuf, repo_path: PathBuf) -> Self {
+    Self {
+      repo,
       path,
       repo_path
-    })
+    }
   }
 
   pub fn stage(&self) -> Result<()> {
-    let output = Cmd::new("git")
-      .arg("add")
-      .arg(&self.path)
-      .current_dir(&self.repo_path)
-      .output()
-      .expect("Failed to execute git add");
-
-    assert!(output.status.success());
-
+    let mut index = self.repo.index()?;
+    index.add_path(self.path.strip_prefix(&self.repo_path).unwrap())?;
+    index.write()?;
     Ok(())
   }
 
-  pub fn commit(&self) -> Result<()> {
-    let output = Cmd::new("git")
-      .arg("commit")
-      .arg("-m")
-      .arg("Initial commit")
-      .current_dir(&self.repo_path)
-      .output()
-      .expect("Failed to execute git commit");
-
-    assert!(output.status.success());
-
+  pub fn commit(&self, repo: &Repository) -> Result<()> {
+    let mut index = repo.index()?;
+    let oid = index.write_tree()?;
+    let signature = Signature::now("Your Name", "email@example.com")?;
+    let parent_commit = find_last_commit(repo)?;
+    let tree = repo.find_tree(oid)?;
+    repo.commit(Some("HEAD"), &signature, &signature, "Initial commit", &tree, &[&parent_commit])?;
     Ok(())
   }
 
