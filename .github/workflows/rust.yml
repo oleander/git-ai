@@ -39,3 +39,14 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
+      - name: Build git-ai-hook for release
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --bin git-ai-hook
+      - name: Build git-ai for release
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --bin git-ai
+
