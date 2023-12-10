@@ -26,7 +26,6 @@ env_logger = "0.10.1"
 lazy_static = "1.4.0"
 thiserror = "1.0.50"
 indicatif = "0.17.7"
-rust-ini = "0.20.0"
 serde_ini = "0.2.0"
 console = "0.15.7"
 anyhow = "1.0.75"
@@ -39,6 +38,8 @@ home = "0.5.5"
 
 [dev-dependencies]
 tempfile = "3.8.1"
+anyhow = "1.0.75"
+git2 = "0.18.1"
 rand = "0.8.5"
 
 [profile.release]
