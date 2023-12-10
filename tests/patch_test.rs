@@ -75,7 +75,7 @@ impl GitFile {
       .output()
       .expect("Failed to execute git commit");
 
-    output.status.success();
+    assert!(output.status.success());
 
     Ok(())
   }
