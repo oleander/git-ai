@@ -15,8 +15,12 @@ git add README.md
 git commit -m "Initial commit"
 echo "Hello World!" >> README.md
 git add README.md
+echo "git ai install"
 $BIN install
+echo "git commit"
 git commit --no-edit
+echo "git show"
 git --no-pager show HEAD 
+echo "git status"
 git status -s
 rm -rf /tmp/git-ai
