@@ -2,7 +2,7 @@ github-actions:
     act --container-architecture linux/amd64
 
 install:
-	cargo install --debug --path . --bin git-ai
+	cargo install --debug --path .
 	git ai hook uninstall
 	git ai hook install
 test:
