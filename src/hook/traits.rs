@@ -6,9 +6,10 @@ use git2::{DiffFormat, DiffOptions, Oid, Repository, Tree};
 use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
-use crate::chat::ChatError;
 use thiserror::Error;
 use clap::Parser;
+
+use crate::chat::ChatError;
 
 pub trait FilePath {
   fn is_empty(&self) -> Result<bool> {

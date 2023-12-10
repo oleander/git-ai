@@ -1,8 +1,8 @@
 #![feature(assert_matches)]
 
 use std::path::PathBuf;
-
 use std::process::Command as Cmd;
+
 use git2::DiffFormat;
 use ai::hook::traits::*;
 use tempfile::{NamedTempFile, TempDir};
