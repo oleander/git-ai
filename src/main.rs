@@ -3,13 +3,13 @@ use std::env;
 use config::{Config, FileFormat};
 
 #[derive(Debug, Default, serde_derive::Deserialize, PartialEq, Eq)]
-struct AppConfig {
+struct App {
   openai_api_key:  String,
   model:           String,
-  max_diff_tokens: u32,
-  max_length:      u32,
+  max_diff_tokens: usize,
+  max_length:      usize,
   language:        String,
-  timeout:         u32
+  timeout:         usize
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -24,10 +24,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     .set_default("max_length", 72)?
     .set_default("max_diff_tokens", 5000)?
     .set_default("model", "gpt-4-1106-preview")?
-    .build()
-    .unwrap();
+    .build()?;
 
-  let app: AppConfig = config.try_deserialize().unwrap();
+  let app: App = config.try_deserialize()?;
 
   println!("{:?}", app);
   // assert_eq!(
