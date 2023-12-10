@@ -52,22 +52,17 @@ impl GitFile {
   pub fn stage(&self) -> Result<()> {
     let mut index = self.repo.index()?;
 
-    // Check if the file still exists in the file system
-      let relative_path = self.path.strip_prefix(&self.repo_path).unwrap();
+    let relative_path = self.path.strip_prefix(&self.repo_path).unwrap();
     if !self.path.exists() {
-      // Convert the file path to a path relative to the repository
-
-      // Remove the file from the index
       index.remove_path(relative_path)?;
       index.write()?;
     } else {
-      // If the file still exists, handle it as a normal addition
       index.add_path(relative_path)?;
       index.write()?;
     }
 
     Ok(())
-}
+  }
 
   pub fn commit(&self) -> Result<()> {
     let mut index = self.repo.index()?;
