@@ -62,9 +62,16 @@ fn prompt() -> String {
   let lang = config::APP.language.clone();
   let length = config::APP.max_length;
 
+  
   format!(
-    "Generate a concise git commit message written in present tense for the following code diff with the given specifications below:\nMessage language: {:?}\nCommit message must be a maximum of {:?} characters.\nExclude anything unnecessary such as translation. Your entire response will be passed directly into git commit.",
-    lang, length
+    "Generate a concise git commit message written in present tense for the following code diff with the given specifications below:
+    Start the summary with a capitalized verb in present tense, like Add, Fix, Change, etc. 
+    Use clear, professional language.
+    Detail the what and why in the body.
+    Start with a short, clear summary (max {:?} chars in {:?}).
+    Exclude anything unnecessary such as translation. 
+    Your entire response will be passed directly into git commit.",
+    length, lang
   )
 }
 
