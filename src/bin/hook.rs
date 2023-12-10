@@ -12,7 +12,7 @@ use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use thiserror::Error;
 use ai::hook::traits::{FilePath, PatchRepository, *};
-use ai::chat::{generate_commit, ChatError};
+use ai::chat::generate_commit;
 use ai::config;
 
 #[tokio::main]

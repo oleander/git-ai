@@ -141,7 +141,7 @@ impl TestPatchDiff for git2::Diff<'_> {
     self.foreach(
       &mut |file, _progress| {
         let other_path: PathBuf = file.new_file().path().unwrap().to_path_buf();
-        if (other_path == our_file_name) {
+        if other_path == our_file_name {
           found = true;
         }
 
