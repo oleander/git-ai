@@ -29,7 +29,7 @@ fn cli() -> Command {
             )
             .subcommand(
               Command::new("model").about("Sets the model to use").arg(
-                Arg::new("model")
+                Arg::new("<VALUE>")
                   .required(true)
                   .index(1)
                   .value_parser(clap::builder::NonEmptyStringValueParser::new())
@@ -37,7 +37,7 @@ fn cli() -> Command {
             )
             .subcommand(
               Command::new("language").about("Sets the language to use").arg(
-                Arg::new("language")
+                Arg::new("<VALUE>")
                   .required(true)
                   .index(1)
                   .value_parser(clap::builder::NonEmptyStringValueParser::new())
@@ -55,7 +55,7 @@ fn cli() -> Command {
             )
             .subcommand(
               Command::new("openai-api-key").about("Sets the OpenAI API key").arg(
-                Arg::new("openai-api-key")
+                Arg::new("<VALUE>")
                   .required(true)
                   .index(1)
                   .value_parser(clap::builder::NonEmptyStringValueParser::new())
@@ -98,10 +98,10 @@ async fn main() -> Result<()> {
               app.timeout = *args.get_one("<VALUE>").context("Failed to parse timeout")?;
             },
             Some(("model", args)) => {
-              app.model = args.get_one::<String>("model").context("Failed to parse model")?.clone();
+              app.model = args.get_one::<String>("<VALUE>").context("Failed to parse model")?.clone();
             },
             Some(("language", args)) => {
-              app.language = args.get_one::<String>("language").context("Failed to parse language")?.clone();
+              app.language = args.get_one::<String>("<VALUE>").context("Failed to parse language")?.clone();
             },
             Some(("max-diff-tokens", args)) => {
               app.max_diff_tokens = *args.get_one("<VALUE>").context("Failed to parse max-diff-tokens")?;
@@ -110,10 +110,7 @@ async fn main() -> Result<()> {
               app.max_length = *args.get_one("<VALUE>").context("Failed to parse max-length")?;
             },
             Some(("openai-api-key", args)) => {
-              app.openai_api_key = args
-                .get_one::<String>("openai-api-key")
-                .context("Failed to parse openai-api-key")?
-                .clone();
+              app.openai_api_key = args.get_one::<String>("<VALUE>").context("Failed to parse openai-api-key")?.clone();
             },
             _ => unreachable!()
           }
