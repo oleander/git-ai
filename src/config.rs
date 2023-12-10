@@ -11,7 +11,7 @@ use clap::ArgMatches;
 
 #[derive(Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct App {
-  pub openai_api_key:  String,
+  pub openai_api_key:  Option<String>,
   pub model:           String,
   pub language:        String,
   pub max_diff_tokens: usize,
@@ -81,7 +81,7 @@ pub fn run(args: &ArgMatches) -> Result<()> {
       app.max_length = *args.get_one("<VALUE>").context("Failed to parse max-length")?;
     },
     Some(("openai-api-key", args)) => {
-      app.openai_api_key = args.get_one::<String>("<VALUE>").context("Failed to parse openai-api-key")?.clone();
+      app.openai_api_key = args.get_one::<String>("<VALUE>").context("Failed to parse openai-api-key")?.clone().into();
     },
     _ => unreachable!()
   }

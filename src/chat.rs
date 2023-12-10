@@ -1,5 +1,6 @@
 use std::io;
 
+use anyhow::Context;
 use serde_json::{from_str, json, Value};
 use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
@@ -116,7 +117,7 @@ pub enum Response {
 }
 
 async fn response(diff: String) -> Result<Response, ChatError> {
-  let api_key = config::APP.openai_api_key.clone();
+  let api_key = config::APP.openai_api_key.clone().context("Failed to get OpenAI API key")?;
   let timeout = config::APP.duration();
 
   Client::builder()
