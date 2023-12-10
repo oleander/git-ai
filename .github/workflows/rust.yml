@@ -65,3 +65,5 @@ jobs:
           args: --all -- --deny warnings
       - name: Test install hook
         run: git ai install
+      - name: Test simulate
+        run: ./simulate.sh
