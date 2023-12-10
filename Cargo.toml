@@ -1,8 +1,8 @@
 [package]
 name = "git-ai"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
-description = "A git extension to help you write better commit messages."
+description = "Git AI: Automates commit messages using ChatGPT. Stage your files, and Git AI generates the messages."
 license = "MIT"
 
 [lib]
