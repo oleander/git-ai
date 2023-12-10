@@ -93,13 +93,8 @@ async fn response(diff: String) -> Result<Value, ChatError> {
     .context("Failed to get response body")
     .and_then(|body| from_str::<Value>(&body).context("Failed to parse JSON"))?;
 
-  if let Some(err) = response["error"]["message"].as_str() {
-    Err(ChatError::OpenAIError(err.to_string()))
-  } else {
-    Ok(response)
-  }
+  if let Some(err) = response["error"]["message"].as_str() { Err(ChatError::OpenAIError(err.to_string())) } else { Ok(response) }
 }
-
 
 pub async fn generate_commit(diff: String) -> Result<String, ChatError> {
   response(diff).await?["choices"]

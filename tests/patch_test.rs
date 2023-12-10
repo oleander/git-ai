@@ -2,8 +2,9 @@
 
 mod common;
 
-use tempfile::NamedTempFile;
 use std::path::PathBuf;
+
+use tempfile::NamedTempFile;
 use git2::DiffFormat;
 use anyhow::Result;
 use ai::hook::*;

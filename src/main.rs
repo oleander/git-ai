@@ -110,7 +110,10 @@ async fn main() -> Result<()> {
               app.max_length = *args.get_one("<VALUE>").context("Failed to parse max-length")?;
             },
             Some(("openai-api-key", args)) => {
-              app.openai_api_key = args.get_one::<String>("openai-api-key").context("Failed to parse openai-api-key")?.clone();
+              app.openai_api_key = args
+                .get_one::<String>("openai-api-key")
+                .context("Failed to parse openai-api-key")?
+                .clone();
             },
             _ => unreachable!()
           }
