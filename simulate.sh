@@ -3,6 +3,9 @@ BIN=$(pwd)/target/release/git-ai
 
 set -e
 
+git config --global user.email "you@example.com"
+git config --global user.name "Your Name"
+
 rm -rf /tmp/git-ai
 mkdir /tmp/git-ai
 cd /tmp/git-ai
