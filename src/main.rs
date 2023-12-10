@@ -1,10 +1,10 @@
-mod install;
 mod uninstall;
-use console::{style, Emoji};
+mod install;
 mod config;
-use anyhow::{Context, Result};
-use dotenv::dotenv;
+
 use clap::{Arg, Command};
+use anyhow::Result;
+use dotenv::dotenv;
 
 fn cli() -> Command {
   Command::new("git-ai")
@@ -93,34 +93,7 @@ async fn main() -> Result<()> {
     Some(("config", args)) => {
       match args.subcommand() {
         Some(("set", args)) => {
-          let mut app = config::App::new()?;
-          match args.subcommand() {
-            Some(("timeout", args)) => {
-              app.timeout = *args.get_one("<VALUE>").context("Failed to parse timeout")?;
-            },
-            Some(("model", args)) => {
-              app.model = args.get_one::<String>("<VALUE>").context("Failed to parse model")?.clone();
-            },
-            Some(("language", args)) => {
-              app.language = args.get_one::<String>("<VALUE>").context("Failed to parse language")?.clone();
-            },
-            Some(("max-diff-tokens", args)) => {
-              app.max_diff_tokens = *args.get_one("<VALUE>").context("Failed to parse max-diff-tokens")?;
-            },
-            Some(("max-length", args)) => {
-              app.max_length = *args.get_one("<VALUE>").context("Failed to parse max-length")?;
-            },
-            Some(("openai-api-key", args)) => {
-              app.openai_api_key = args.get_one::<String>("<VALUE>").context("Failed to parse openai-api-key")?.clone();
-            },
-            _ => unreachable!()
-          }
-
-          if let Some(key) = args.subcommand_name() {
-            println!("{} Configuration option {} updated!", Emoji("✨", ":-)"), style(key).italic());
-          }
-
-          app.save()?;
+          config::run(args)?;
         },
         _ => unreachable!()
       }

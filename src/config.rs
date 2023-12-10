@@ -2,6 +2,9 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::fs::File;
 
+use clap::ArgMatches;
+use console::{style, Emoji};
+use indicatif::style;
 use serde::{Deserialize, Serialize};
 use config::{Config, FileFormat};
 use anyhow::{Context, Result};
@@ -52,4 +55,35 @@ impl App {
     let mut file = File::create(CONFIG_PATH.to_str().unwrap()).context("Failed to create config file")?;
     file.write_all(contents.as_bytes()).context("Failed to write config file")
   }
+}
+
+pub fn run(args: &ArgMatches) -> Result<()> {
+  let mut app = App::new()?;
+  match args.subcommand() {
+    Some(("timeout", args)) => {
+      app.timeout = *args.get_one("<VALUE>").context("Failed to parse timeout")?;
+    },
+    Some(("model", args)) => {
+      app.model = args.get_one::<String>("<VALUE>").context("Failed to parse model")?.clone();
+    },
+    Some(("language", args)) => {
+      app.language = args.get_one::<String>("<VALUE>").context("Failed to parse language")?.clone();
+    },
+    Some(("max-diff-tokens", args)) => {
+      app.max_diff_tokens = *args.get_one("<VALUE>").context("Failed to parse max-diff-tokens")?;
+    },
+    Some(("max-length", args)) => {
+      app.max_length = *args.get_one("<VALUE>").context("Failed to parse max-length")?;
+    },
+    Some(("openai-api-key", args)) => {
+      app.openai_api_key = args.get_one::<String>("<VALUE>").context("Failed to parse openai-api-key")?.clone();
+    },
+    _ => unreachable!()
+  }
+
+  if let Some(key) = args.subcommand_name() {
+    println!("{} Configuration option {} updated!", Emoji("✨", ":-)"), style(key).italic());
+  }
+
+  app.save()
 }

@@ -69,6 +69,6 @@ This project is under the MIT License. For more details, see the [LICENSE](LICEN
   - [x] With validation
   - [x] Fallback values
   - [x] Using environment variables
-- [ ] Get rid of the main.rs as binary
+- [x] Get rid of the main.rs as binary
 - [ ] Move logic from main.rs into sep: config.rs
 - [ ] Publish the crate to crates.io
