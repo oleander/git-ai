@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::process::Command as Cmd;
 
 use git2::DiffFormat;
-use ai::hook::traits::*;
+use ai::hook::*;
 use tempfile::{NamedTempFile, TempDir};
 use anyhow::Result;
 

@@ -6,7 +6,7 @@ use git2::Repository;
 use anyhow::{Context, Result};
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
-use ai::hook::traits::{FilePath, PatchRepository, *};
+use ai::hook::{FilePath, PatchRepository, *};
 use ai::chat::generate_commit;
 use ai::config;
 
