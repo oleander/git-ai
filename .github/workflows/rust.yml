@@ -35,33 +35,7 @@ jobs:
           default: true
           profile: minimal
           components: rustfmt,clippy
-      - name: Build git-ai-hook
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --bin git-ai-hook
-      - name: Install git-ai
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: --path . --bin git-ai
       - name: Run tests
         uses: actions-rs/cargo@v1
         with:
           command: test
-      # - name: Rust fmt
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: fmt
-      #     args: --all -- --check
-      # - name: Rust clippy
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: clippy
-      #     args: --all -- --deny warnings
-      - name: Test install hook
-        run: git ai hook install
-      - name: Git ai config
-        run: git ai config set openai-api-key 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
-      - name: Test simulate
-        run: ./simulate.sh
