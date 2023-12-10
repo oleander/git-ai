@@ -10,7 +10,7 @@ Git AI uses ChatGPT and git hook to generate commit messages based on the staged
 
 1. `cargo binstall cargo-binstall`
 2. `cargo binstall git-ai`
- 
+
 ### From Source
 
 1. Ensure Rust and Cargo are installed on your system.
@@ -42,7 +42,7 @@ Use `git-ai hook` followed by:
 
 - `install`: Install the Git hook.
 - `uninstall`: Uninstall the Git hook.
-  
+
 ## Testing
 
 Execute `cargo test` to run the test suite.

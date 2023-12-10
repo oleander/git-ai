@@ -4,8 +4,8 @@ use anyhow::Result;
 use tempfile::TempDir;
 
 pub struct TestRepo {
-  pub repo:      git2::Repository,
-  pub repo_path: TempDir
+  pub repo: git2::Repository,
+  pub repo_path: TempDir,
 }
 
 impl Default for TestRepo {
@@ -14,10 +14,7 @@ impl Default for TestRepo {
     let repo = git2::Repository::init(repo_path.path()).unwrap();
     std::env::set_var("GIT_DIR", repo_path.path().join(".git"));
 
-    Self {
-      repo,
-      repo_path
-    }
+    Self { repo, repo_path }
   }
 }
 
@@ -31,18 +28,14 @@ impl TestRepo {
 }
 
 pub struct GitFile {
-  pub repo:      git2::Repository,
-  pub path:      PathBuf,
-  pub repo_path: PathBuf
+  pub repo: git2::Repository,
+  pub path: PathBuf,
+  pub repo_path: PathBuf,
 }
 
 impl GitFile {
   pub fn new(repo: git2::Repository, path: PathBuf, repo_path: PathBuf) -> Self {
-    Self {
-      repo,
-      path,
-      repo_path
-    }
+    Self { repo, path, repo_path }
   }
 
   pub fn stage(&self) -> Result<()> {
@@ -74,7 +67,7 @@ impl GitFile {
       },
       Err(_) => {
         self.repo.commit(Some("HEAD"), &signature, &signature, "Initial commit", &tree, &[])?;
-      }
+      },
     }
 
     Ok(())
