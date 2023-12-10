@@ -51,20 +51,44 @@ impl GitFile {
 
   pub fn stage(&self) -> Result<()> {
     let mut index = self.repo.index()?;
-    index.add_path(self.path.strip_prefix(&self.repo_path).unwrap())?;
-    index.write()?;
+
+    // Check if the file still exists in the file system
+      let relative_path = self.path.strip_prefix(&self.repo_path).unwrap();
+    if !self.path.exists() {
+      // Convert the file path to a path relative to the repository
+
+      // Remove the file from the index
+      index.remove_path(relative_path)?;
+      index.write()?;
+    } else {
+      // If the file still exists, handle it as a normal addition
+      index.add_path(relative_path)?;
+      index.write()?;
+    }
+
     Ok(())
-  }
+}
 
   pub fn commit(&self) -> Result<()> {
     let mut index = self.repo.index()?;
     let oid = index.write_tree()?;
     let signature = git2::Signature::now("Your Name", "email@example.com")?;
-    let parent_commit = self.find_last_commit()?;
     let tree = self.repo.find_tree(oid)?;
-    self
-      .repo
-      .commit(Some("HEAD"), &signature, &signature, "Initial commit", &tree, &[&parent_commit])?;
+
+    // Check if there is a last commit. If not, this is an initial commit.
+    match self.find_last_commit() {
+      Ok(parent_commit) => {
+        // If there is a last commit, use it as a parent.
+        self
+          .repo
+          .commit(Some("HEAD"), &signature, &signature, "Commit message", &tree, &[&parent_commit])?;
+      },
+      Err(_) => {
+        // No parent commit, this is an initial commit.
+        self.repo.commit(Some("HEAD"), &signature, &signature, "Initial commit", &tree, &[])?;
+      }
+    }
+
     Ok(())
   }
 
@@ -73,9 +97,20 @@ impl GitFile {
     Ok(())
   }
 
-  fn find_last_commit(&self) -> Result<git2::Commit> {
-    let obj = self.repo.head()?.resolve()?.peel(git2::ObjectType::Commit)?;
-    obj.into_commit().map_err(|_| anyhow::anyhow!("Could not find commit"))
+  fn find_last_commit(&self) -> Result<git2::Commit, git2::Error> {
+    let head = match self.repo.head() {
+      Ok(head) => head,
+      Err(e) => {
+        if e.code() == git2::ErrorCode::UnbornBranch || e.code() == git2::ErrorCode::NotFound {
+          return Err(e);
+        } else {
+          panic!("Failed to retrieve HEAD: {}", e);
+        }
+      },
+    };
+
+    let commit = head.peel_to_commit()?;
+    Ok(commit)
   }
 }
 
