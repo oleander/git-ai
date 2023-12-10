@@ -1,11 +1,11 @@
 use std::os::unix::fs as unix_fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::{env, fs};
 
 use git2::{Repository, RepositoryOpenFlags as Flags};
-use anyhow::{bail, Context, Result};
-use log::debug;
+use anyhow::{Result, Context};
 use thiserror::Error;
+
 #[derive(Error, Debug)]
 pub enum InstallError {
   #[error("Failed to get current executable")]
