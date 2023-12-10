@@ -2,7 +2,8 @@ use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
-use console::{style, Emoji};
+use ai::style::Styled;
+use console::Emoji;
 use git2::{Repository, RepositoryOpenFlags as Flags};
 use anyhow::{Context, Result};
 use thiserror::Error;
@@ -25,6 +26,8 @@ pub enum InstallError {
   #[error("Git repository not found at {0}")]
   GitRepoNotFound(PathBuf)
 }
+
+const EMOJI: Emoji<'_, '_> = Emoji("🔗", "");
 
 // Git hook: prepare-commit-msg
 // Crates an executable git hook (prepare-commit-msg) in the .git/hooks directory
@@ -58,8 +61,8 @@ pub fn run() -> Result<(), InstallError> {
 
   // Symlink the hook_bin to the hook_file
   unix_fs::symlink(&hook_bin, &hook_file)?;
-  let relative_path = hook_file.strip_prefix(&current_dir)?;
-  println!("{} Hook symlinked successfully to {}", Emoji("🔗", "[OK]"), style(relative_path.display()).italic());
+
+  println!("{EMOJI} Hook symlinked successfully to {}", hook_file.relative_path());
 
   Ok(())
 }
