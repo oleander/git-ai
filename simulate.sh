@@ -18,5 +18,5 @@ git add README.md
 $BIN install
 git commit --no-edit
 git --no-pager show HEAD 
-git status | grep -q 'nothing to commit' || echo "Commit failed" && exit 1
+git status -s
 rm -rf /tmp/git-ai
