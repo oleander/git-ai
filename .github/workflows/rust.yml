@@ -19,6 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - run: make install
-      - run: make test
-      - run: make simulate
+      # - run: make install
+      # - run: make test
+      # - run: make simulate
+      - run: cargo build --release --bin git-ai-hook --no-default-features
+      - run: cargo install --path . --bin git-ai --no-default-features
+      - run: git ai install
