@@ -52,9 +52,9 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-      # - name: Test install hook
-      #   run: git ai install
-      # - name: Run Clippy
-      #   uses: actions-rs/clippy-check@v1
-      #   with:
-      #     token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Test install hook
+        run: git ai install
+      - name: Run Clippy
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
