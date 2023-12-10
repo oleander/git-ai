@@ -45,14 +45,16 @@ pub enum ChatError {
   IOError(#[from] io::Error),
   #[error("Failed to parse JSON: {0}")]
   JsonParseError(#[from] serde_json::Error),
-  #[error("Failed to extract message from response")]
+  #[error("Failed to extract message from response body")]
   ResponseExtractionError,
   #[error("Anyhow error: {0}")]
-  Anyhow(#[from] anyhow::Error)
+  Anyhow(#[from] anyhow::Error),
+  #[error("OpenAI error: {0}")]
+  OpenAIError(String)
 }
 
 fn payload(diff: String) -> Value {
-  let model = config::get("model").unwrap_or(MODEL.to_owned());
+  let model = config::APP.model.clone();
 
   json!({
      "model": model,
@@ -64,8 +66,8 @@ fn payload(diff: String) -> Value {
 }
 
 fn prompt() -> String {
-  let lang = config::get("language").unwrap_or(LANGUAGE.as_str().to_owned());
-  let length = config::get("max-length").unwrap_or(*MAX_LENGTH as i32);
+  let lang = config::APP.language.clone();
+  let length = config::APP.max_length;
 
   format!(
     "Generate a concise git commit message written in present tense for the following code diff with the given specifications below:\nMessage language: {:?}\nCommit message must be a maximum of {:?} characters.\nExclude anything unnecessary such as translation. Your entire response will be passed directly into git commit.",
@@ -74,10 +76,10 @@ fn prompt() -> String {
 }
 
 async fn response(diff: String) -> Result<Value, ChatError> {
-  let api_key = config::get("api_key").unwrap_or(API_KEY.as_str().to_owned());
-  let timeout = config::get("timeout").unwrap_or((*TIMEOUT) as i32);
+  let api_key = config::APP.openai_api_key.clone();
+  let timeout = config::APP.timeout;
 
-  Client::builder()
+  let response = Client::builder()
     .build()?
     .post(API_URL)
     .bearer_auth(api_key)
@@ -89,9 +91,15 @@ async fn response(diff: String) -> Result<Value, ChatError> {
     .text()
     .await
     .context("Failed to get response body")
-    .and_then(|body| from_str::<Value>(&body).context("Failed to parse JSON"))
-    .map_err(|e| e.into())
+    .and_then(|body| from_str::<Value>(&body).context("Failed to parse JSON"))?;
+
+  if let Some(err) = response["error"]["message"].as_str() {
+    Err(ChatError::OpenAIError(err.to_string()))
+  } else {
+    Ok(response)
+  }
 }
+
 
 pub async fn generate_commit(diff: String) -> Result<String, ChatError> {
   response(diff).await?["choices"]

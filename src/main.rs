@@ -2,7 +2,7 @@ mod install;
 mod uninstall;
 mod config;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use dotenv::dotenv;
 use clap::{Arg, Command};
 
@@ -23,8 +23,16 @@ fn cli() -> Command {
         .subcommand(
           Command::new("set")
             .about("Sets a configuration value")
-            .arg(Arg::new("KEY").required(true).index(1))
-            .arg(Arg::new("VALUE").required(true).index(2))
+            .subcommand(
+              Command::new("timeout")
+                .about("Sets the timeout for the OpenAI API")
+                .arg(Arg::new("VALUE").required(true).index(1))
+            )
+            .subcommand(
+              Command::new("model")
+                .about("Sets the model to use")
+                .arg(Arg::new("VALUE").required(true).index(1))
+            )
         )
         .subcommand(
           Command::new("get")
@@ -53,15 +61,25 @@ async fn main() -> Result<()> {
       }
     },
     Some(("config", args)) => {
-      if let Some(matches) = args.subcommand_matches("set") {
-        let key = matches.get_one::<String>("KEY").expect("required");
-        let value = matches.get_one::<String>("VALUE").expect("required");
-        log::info!("Setting config key {} to {}", key, value);
-        config::set(key, value.as_str())?;
-      } else if let Some(matches) = args.subcommand_matches("get") {
-        let key = matches.get_one::<String>("KEY").expect("required");
-        let value: String = config::get(key)?;
-        log::info!("Config key {} is set to {}", key, value);
+      match args.subcommand() {
+        Some(("set", args)) => {
+          let mut app = config::App::new()?;
+          match args.subcommand() {
+            Some(("timeout", args)) => {
+              app.timeout = args
+                .get_one::<String>("VALUE")
+                .context("Failed to get timeout value")?
+                .parse::<usize>()
+                .context("Failed to parse timeout value")?;
+            },
+            Some(("model", args)) => {
+              app.model = args.get_one::<String>("VALUE").context("Failed to get model value")?.to_owned();
+            },
+            _ => unreachable!()
+          }
+          app.save()?;
+        },
+        _ => unreachable!()
       }
     },
     _ => unreachable!()

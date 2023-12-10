@@ -47,7 +47,7 @@ async fn main() -> Result<()> {
     repo.head().ok().and_then(|head| head.peel_to_tree().ok())
   };
 
-  let max_tokens = config::get("max-diff-tokens").unwrap_or(*MAX_DIFF_TOKENS);
+  let max_tokens = config::APP.max_diff_tokens;
   let patch = repo.to_patch(tree, max_tokens).context("Failed to get patch")?;
 
   if patch.is_empty() {
