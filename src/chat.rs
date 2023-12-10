@@ -75,11 +75,60 @@ fn prompt() -> String {
   )
 }
 
-async fn response(diff: String) -> Result<Value, ChatError> {
+mod response {
+  use super::*;
+
+  #[derive(Debug, Serialize, Deserialize)]
+  pub struct Success {
+    system_fingerprint: String,
+    pub choices: Vec<Choice>,
+    object: String,
+    model: String,
+    id: String,
+    usage: Usage,
+  }
+
+  #[derive(Debug, Serialize, Deserialize)]
+  pub struct Error {
+    pub error: String,
+    code: usize,
+    pub message: String
+  }
+
+  #[derive(Debug, Serialize, Deserialize)]
+  pub struct Usage {
+    completion_tokens: usize,
+    prompt_tokens:     usize,
+    total_tokens:      usize
+  }
+
+  #[derive(Debug, Serialize, Deserialize)]
+  pub struct Choice {
+    finish_reason: String,
+    index:         usize,
+    pub message:       Message
+  }
+
+  #[derive(Debug, Serialize, Deserialize)]
+  pub struct Message {
+    pub content: String,
+    role:    String
+  }
+
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Response {
+  Success(response::Success),
+  Error(response::Error)
+}
+
+async fn response(diff: String) -> Result<Response, ChatError> {
   let api_key = config::APP.openai_api_key.clone();
   let timeout = config::APP.timeout;
 
-  let response = Client::builder()
+  Client::builder()
     .build()?
     .post(API_URL)
     .bearer_auth(api_key)
@@ -91,18 +140,17 @@ async fn response(diff: String) -> Result<Value, ChatError> {
     .text()
     .await
     .context("Failed to get response body")
-    .and_then(|body| from_str::<Value>(&body).context("Failed to parse JSON"))?;
-
-  if let Some(err) = response["error"]["message"].as_str() { Err(ChatError::OpenAIError(err.to_string())) } else { Ok(response) }
+    .and_then(|body| from_str::<Response>(&body).context(format!("Failed to parse response body: {}", body)))
+    .map_err(ChatError::from)
 }
 
 pub async fn generate_commit(diff: String) -> Result<String, ChatError> {
-  let r = response(diff).await?;
-  println!("{:#?}", r);
-  r["choices"]
-    .as_array()
-    .and_then(|choices| choices.first())
-    .and_then(|choice| choice["message"]["content"].as_str())
-    .map(|s| s.to_string())
-    .ok_or(ChatError::ResponseExtractionError)
+  match response(diff).await? {
+    Response::Success(success) => {
+      Ok(success.choices.first().map(|choice| choice.message.content.clone()).unwrap())
+    },
+    Response::Error(error) => {
+      Err(ChatError::OpenAIError(error.message))
+    }
+  }
 }
