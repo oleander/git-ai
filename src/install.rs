@@ -24,7 +24,7 @@ pub fn run() -> Result<()> {
 
   let repo = Repository::open_ext(&current_dir, Flags::empty(), Vec::<&Path>::new())
     .with_context(|| "Failed to open repository".to_string())?;
-  let git_path = repo.path().parent().context("Failed to get repository path")?;
+  let git_path = repo.path().parent().context("Failed to get repository path")?.join(".git");
 
   let hook_dir = git_path.join("hooks");
   if !hook_dir.exists() {
