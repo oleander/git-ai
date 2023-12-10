@@ -15,7 +15,6 @@ const API_URL: &str = "https://api.openai.com/v1/chat/completions";
 lazy_static! {
   static ref MAX_LENGTH: u8 = dotenv!("MAX_LENGTH").parse::<u8>().unwrap();
   static ref TIMEOUT: u64 = dotenv!("TIMEOUT").parse::<u64>().unwrap();
-  static ref API_KEY: String = dotenv!("OPENAI_API_KEY").to_string();
   static ref LANGUAGE: String = dotenv!("LANGUAGE").to_string();
   static ref MODEL: String = dotenv!("MODEL").to_string();
 }
