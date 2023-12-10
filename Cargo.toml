@@ -16,7 +16,7 @@ path = "src/bin/hook.rs"
 
 [dependencies]
 tokio = { version = "1.34.0", features = ["macros", "rt-multi-thread"] }
-clap = { version = "4.4.10", features = ["derive", "wrap_help"] }
+clap = { version = "4.4.10", features = ["derive", "wrap_help"], default-features = true }
 reqwest = { version = "0.11.22", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 dotenv_codegen = "0.15.0"

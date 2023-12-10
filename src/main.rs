@@ -1,5 +1,6 @@
 mod install;
 mod uninstall;
+use console::{style, Emoji};
 mod config;
 use anyhow::{Context, Result};
 use dotenv::dotenv;
@@ -114,6 +115,11 @@ async fn main() -> Result<()> {
             },
             _ => unreachable!()
           }
+
+          if let Some(key) = args.subcommand_name() {
+            println!("{} Configuration option {} updated!", Emoji("✨", ":-)"), style(key).italic());
+          }
+
           app.save()?;
         },
         _ => unreachable!()
