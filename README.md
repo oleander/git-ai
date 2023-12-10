@@ -6,18 +6,26 @@ Git AI is a Rust library that integrates with Git, leveraging OpenAI's GPT-4 mod
 
 This crate installs a `prepare-commit-msg` Git hook in your repository. When you commit without a message, Git AI uses ChatGPT to craft a commit message based on the staged files.
 
+
 ## Installation
 
+### Pre-Built Binaries
+
+1. `cargo binstall cargo-binstall`
+2. `cargo binstall git-ai`
+ 
+### From Source
+
 1. Ensure Rust and Cargo are installed on your system.
-2. Clone the Git AI repository: `git clone [repository-url]`.
+2. Clone the Git AI repository: `git clone https://github.com/oleander/git-ai`
 3. Change to the project directory: `cd git-ai`.
-4. Build the project with: `cargo build --release`.
-5. Install the Git AI binary: `cargo install --path .`.
+4. Build the hook: `cargo build --release --bin git-ai-hook`
+5. Build & install the binary: `cargo install --path . --bin git-ai`
 
 ## Usage
 
-- Move to the Git repository where you want the hook installed.
-- Use `git-ai hook install` to set up the Git hook.
+- Install the binary as per the instructions above.
+- Use `git ai hook install` to set up the Git hook.
 - Set the OpenAI API key with `git-ai config set api-key <api-key>`.
 
 ## Configuration
