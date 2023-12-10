@@ -1,6 +1,13 @@
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::fs::File;
+use lazy_static::lazy_static;
+use dotenv_codegen::dotenv;
+use clap::Parser;
+use thiserror::Error;
+use git2::Oid;
+use crate::chat::generate_commit;
+use crate::chat::ChatError;
 
 #[cfg(not(mock))]
 use git2::{DiffFormat, DiffOptions, Repository, Tree};
@@ -100,4 +107,43 @@ impl PatchRepository for Repository {
       .diff_tree_to_index(tree.as_ref(), None, Some(&mut opts))
       .context("Failed to get diff")
   }
+}
+
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+pub struct Args {
+  pub commit_msg_file: PathBuf,
+
+  #[clap(required = false)]
+  pub commit_type: Option<String>,
+
+  #[clap(required = false)]
+  pub sha1: Option<Oid>
+}
+
+#[derive(Error, Debug)]
+pub enum HookError {
+  #[error("Failed to open repository")]
+  OpenRepository,
+
+  #[error("Failed to get patch")]
+  GetPatch,
+
+  #[error("Empty diff output")]
+  EmptyDiffOutput,
+
+  #[error("Failed to write commit message")]
+  WriteCommitMessage,
+
+  // anyhow
+  #[error(transparent)]
+  Anyhow(#[from] anyhow::Error),
+
+  // ChatError
+  #[error(transparent)]
+  Chat(#[from] ChatError)
+}
+
+lazy_static! {
+  pub static ref MAX_DIFF_TOKENS: usize = dotenv!("MAX_DIFF_TOKENS").parse::<usize>().unwrap();
 }

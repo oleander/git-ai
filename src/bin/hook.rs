@@ -1,12 +1,22 @@
 // Hook: prepare-commit-msg
 
-#![feature(assert_matches)]
+use std::path::PathBuf;
 
-use indicatif::{ProgressBar, ProgressStyle};
-use tokio::time::Duration;
+#[cfg(not(mock))]
+use git2::{Oid, Repository};
 use anyhow::{Context, Result};
-use ai::hook::Args;
+use lazy_static::lazy_static;
+use dotenv_codegen::dotenv;
 use clap::Parser;
+use indicatif::{ProgressBar, ProgressStyle};
+use std::time::Duration;
+use thiserror::Error;
+
+
+use ai::hook::traits::*;
+use ai::chat::{generate_commit, ChatError};
+use ai::hook::traits::{FilePath, PatchRepository};
+use ai::config;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -29,5 +39,29 @@ async fn main() -> Result<()> {
   pb.set_message("Generating commit message...");
   pb.enable_steady_tick(Duration::from_millis(150));
 
-  Ok(ai::hook::run(&args).await?)
+  let repo = Repository::open_from_env().context("Failed to open repository")?;
+
+  // Get the tree from the commit if the sha1 is provided
+  // The sha1 is provided when the user is amending a commit
+  let tree = if let Some(sha1) = args.sha1 {
+    repo.find_commit(sha1).ok().and_then(|commit| commit.tree().ok())
+  } else {
+    repo.head().ok().and_then(|head| head.peel_to_tree().ok())
+  };
+
+  let max_tokens = config::get("max-diff-tokens").unwrap_or(*MAX_DIFF_TOKENS);
+  let patch = repo.to_patch(tree, max_tokens).context("Failed to get patch")?;
+
+  if patch.is_empty() {
+    Err(HookError::EmptyDiffOutput)?;
+  }
+
+  let commit_message = generate_commit(patch.to_string()).await?;
+
+  args
+    .commit_msg_file
+    .write(commit_message.trim().to_string())
+    .context("Failed to write commit message")?;
+
+  Ok(())
 }
