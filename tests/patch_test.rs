@@ -70,16 +70,13 @@ impl GitFile {
     let signature = git2::Signature::now("Your Name", "email@example.com")?;
     let tree = self.repo.find_tree(oid)?;
 
-    // Check if there is a last commit. If not, this is an initial commit.
     match self.find_last_commit() {
       Ok(parent_commit) => {
-        // If there is a last commit, use it as a parent.
         self
           .repo
           .commit(Some("HEAD"), &signature, &signature, "Commit message", &tree, &[&parent_commit])?;
       },
       Err(_) => {
-        // No parent commit, this is an initial commit.
         self.repo.commit(Some("HEAD"), &signature, &signature, "Initial commit", &tree, &[])?;
       }
     }
