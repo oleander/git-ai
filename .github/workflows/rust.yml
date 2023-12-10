@@ -36,6 +36,8 @@ jobs:
         with:
           toolchain: nightly
           override: true
+          default: true
+          profile: minimal
       - name: Build git-ai-hook
         uses: actions-rs/cargo@v1
         with:
