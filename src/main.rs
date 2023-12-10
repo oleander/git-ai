@@ -1,55 +1,71 @@
-use std::{io::Write, path::PathBuf};
-use std::fs::File;
+mod install;
+mod uninstall;
+mod config;
 
-use serde::{Deserialize, Serialize};
-use config::{Config, FileFormat};
-use anyhow::{Context, Result};
-use lazy_static::lazy_static;
+use anyhow::Result;
+use dotenv::dotenv;
+use clap::{Arg, Command};
 
-#[derive(Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
-pub struct App {
-  pub openai_api_key:  String,
-  pub model:           String,
-  pub language:        String,
-  pub max_diff_tokens: usize,
-  pub max_length:      usize,
-  pub timeout:         usize
+fn cli() -> Command {
+  Command::new("git-ai")
+    .about("A git extension that uses OpenAI to generate commit messages")
+    .subcommand_required(true)
+    .arg_required_else_help(true)
+    .subcommand(
+      Command::new("hook")
+        .about("Installs the git-ai hook")
+        .subcommand(Command::new("install").about("Installs the git-ai hook"))
+        .subcommand(Command::new("uninstall").about("Uninstalls the git-ai hook"))
+    )
+    .subcommand(
+      Command::new("config")
+        .about("Sets or gets configuration values")
+        .subcommand(
+          Command::new("set")
+            .about("Sets a configuration value")
+            .arg(Arg::new("KEY").required(true).index(1))
+            .arg(Arg::new("VALUE").required(true).index(2))
+        )
+        .subcommand(
+          Command::new("get")
+            .about("Gets a configuration value")
+            .arg(Arg::new("KEY").required(true).index(1))
+        )
+    )
 }
+#[tokio::main]
+async fn main() -> Result<()> {
+  env_logger::init();
+  dotenv().ok();
 
-lazy_static! {
-  pub static ref CONFIG_PATH: PathBuf = home::home_dir().unwrap().join(".config/git-ai/config.ini");
-  pub static ref APP: App = App::new().expect("Failed to load config");
-}
+  let args = cli().get_matches();
 
-impl App {
-  pub fn new() -> Result<Self> {
-    let config = Config::builder()
-      .add_source(config::Environment::with_prefix("APP").try_parsing(true))
-      .add_source(config::File::new(CONFIG_PATH.to_str().unwrap(), FileFormat::Ini))
-      .set_default("language", "en")?
-      .set_default("timeout", 30)?
-      .set_default("max_length", 72)?
-      .set_default("max_diff_tokens", 5000)?
-      .set_default("model", "gpt-4-1106-preview")?
-      .build()?;
-
-    config.try_deserialize().context("Failed to deserialize config")
+  match args.subcommand() {
+    Some(("hook", sub)) => {
+      match sub.subcommand() {
+        Some(("install", _)) => {
+          install::run()?;
+        },
+        Some(("uninstall", _)) => {
+          uninstall::run()?;
+        },
+        _ => unreachable!()
+      }
+    },
+    Some(("config", args)) => {
+      if let Some(matches) = args.subcommand_matches("set") {
+        let key = matches.get_one::<String>("KEY").expect("required");
+        let value = matches.get_one::<String>("VALUE").expect("required");
+        log::info!("Setting config key {} to {}", key, value);
+        config::set(key, value.as_str())?;
+      } else if let Some(matches) = args.subcommand_matches("get") {
+        let key = matches.get_one::<String>("KEY").expect("required");
+        let value: String = config::get(key)?;
+        log::info!("Config key {} is set to {}", key, value);
+      }
+    },
+    _ => unreachable!()
   }
 
-  pub fn save(&self) -> Result<()> {
-    let contents = serde_ini::to_string(&self).context("Failed to serialize config")?;
-    let mut file = File::create(CONFIG_PATH.to_str().unwrap()).context("Failed to create config file")?;
-    file.write_all(contents.as_bytes()).context("Failed to write config file")
-  }
-}
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-  dotenv::dotenv().ok();
-  let mut app = App::new().context("Failed to load config")?;
-  println!("{:?}", app.timeout);
-  app.timeout = 300;
-  app.save().context("Failed to save config")?;
-
-  print!("{:?}", app);
   Ok(())
 }
