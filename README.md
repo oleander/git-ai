@@ -61,8 +61,9 @@ This project is under the MIT License. For more details, see the [LICENSE](LICEN
 - [x] Ensure continuous integration (CI) passes.
   - [x] Look into ways to simplify the CI process.
 - [x] Define and document configuration options.
-- [ ] Implement a feature where CTRL-C resets the terminal.
+- [x] Implement a feature where CTRL-C resets the terminal.
 - [ ] Change the command-line interface (CLI) to use subcommands:
   - [ ] `git ai hook install`
   - [ ] `git ai hook uninstall`
 - [ ] Publish the crate to crates.io
+- [ ] Get rid of the main.rs as binary
