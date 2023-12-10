@@ -81,17 +81,17 @@ mod response {
   #[derive(Debug, Serialize, Deserialize)]
   pub struct Success {
     system_fingerprint: String,
-    pub choices: Vec<Choice>,
-    object: String,
-    model: String,
-    id: String,
-    usage: Usage,
+    pub choices:        Vec<Choice>,
+    object:             String,
+    model:              String,
+    id:                 String,
+    usage:              Usage
   }
 
   #[derive(Debug, Serialize, Deserialize)]
   pub struct Error {
-    pub error: String,
-    code: usize,
+    pub error:   String,
+    code:        usize,
     pub message: String
   }
 
@@ -106,15 +106,14 @@ mod response {
   pub struct Choice {
     finish_reason: String,
     index:         usize,
-    pub message:       Message
+    pub message:   Message
   }
 
   #[derive(Debug, Serialize, Deserialize)]
   pub struct Message {
     pub content: String,
-    role:    String
+    role:        String
   }
-
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -146,11 +145,7 @@ async fn response(diff: String) -> Result<Response, ChatError> {
 
 pub async fn generate_commit(diff: String) -> Result<String, ChatError> {
   match response(diff).await? {
-    Response::Success(success) => {
-      Ok(success.choices.first().map(|choice| choice.message.content.clone()).unwrap())
-    },
-    Response::Error(error) => {
-      Err(ChatError::OpenAIError(error.message))
-    }
+    Response::Success(success) => Ok(success.choices.first().map(|choice| choice.message.content.clone()).unwrap()),
+    Response::Error(error) => Err(ChatError::OpenAIError(error.message))
   }
 }
