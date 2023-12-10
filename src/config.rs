@@ -79,7 +79,7 @@ pub fn run(args: &ArgMatches) -> Result<()> {
       app.max_diff_tokens = *args.get_one("<VALUE>").context("Failed to parse max-diff-tokens")?;
     },
     Some(("max-length", args)) => {
-      app.max_length = *args.get_one("<VALUE>").context("Failed to parse max-length")?;
+      app.max_length = *args.get_one("max-length").context("Failed to parse max-length")?;
     },
     Some(("openai-api-key", args)) => {
       app.openai_api_key = args.get_one::<String>("<VALUE>").context("Failed to parse openai-api-key")?.clone().into();
