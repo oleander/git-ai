@@ -45,21 +45,20 @@ jobs:
         with:
           command: install
           args: --path . --bin git-ai
-      # Uncomment the following steps if you need them
-      # - name: Run tests
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: test
-      # - name: Rust fmt
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: fmt
-      #     args: --all -- --check
-      # - name: Rust clippy
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: clippy
-      #     args: --all -- --deny warnings
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+      - name: Rust fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+      - name: Rust clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --all -- --deny warnings
       - name: Test install hook
         run: git ai hook install
       - name: Git ai config
