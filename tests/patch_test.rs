@@ -1,7 +1,6 @@
 #![feature(assert_matches)]
 
 use std::path::PathBuf;
-use std::process::Command as Cmd;
 
 use git2::DiffFormat;
 use ai::hook::*;
@@ -9,33 +8,14 @@ use tempfile::{NamedTempFile, TempDir};
 use anyhow::Result;
 
 struct TestRepo {
-  repo:      Repository,
+  repo:      git2::Repository,
   repo_path: TempDir
 }
-// impl Default for TestRepo {
-//   fn default() -> Self {
-//     let repo_path = TempDir::new().unwrap();
-
-//     let output = Cmd::new("git")
-//       .arg("init")
-//       .current_dir(repo_path.path())
-//       .output()
-//       .expect("Failed to execute git init");
-
-//     assert!(output.status.success());
-
-//     std::env::set_var("GIT_DIR", repo_path.path().join(".git"));
-
-//     Self {
-//       repo_path
-//     }
-//   }
-// }
 
 impl Default for TestRepo {
   fn default() -> Self {
     let repo_path = TempDir::new().unwrap();
-    let repo = Repository::init(repo_path.path()).unwrap();
+    let repo = git2::Repository::init(repo_path.path()).unwrap();
     std::env::set_var("GIT_DIR", repo_path.path().join(".git"));
 
     Self {
@@ -49,18 +29,19 @@ impl TestRepo {
   fn create_file(&self, name: &str, content: &str) -> Result<GitFile> {
     let file_path = self.repo_path.path().join(name);
     std::fs::write(&file_path, content)?;
+    let repo = git2::Repository::open(self.repo_path.path())?;
     Ok(GitFile::new(repo, file_path, self.repo_path.path().to_path_buf()))
   }
 }
 
 struct GitFile {
-  repo:     Repository,
+  repo:      git2::Repository,
   path:      PathBuf,
   repo_path: PathBuf
 }
 
 impl GitFile {
-  fn new(repo: Repository, path: PathBuf, repo_path: PathBuf) -> Self {
+  fn new(repo: git2::Repository, path: PathBuf, repo_path: PathBuf) -> Self {
     Self {
       repo,
       path,
@@ -75,19 +56,26 @@ impl GitFile {
     Ok(())
   }
 
-  pub fn commit(&self, repo: &Repository) -> Result<()> {
-    let mut index = repo.index()?;
+  pub fn commit(&self) -> Result<()> {
+    let mut index = self.repo.index()?;
     let oid = index.write_tree()?;
-    let signature = Signature::now("Your Name", "email@example.com")?;
-    let parent_commit = find_last_commit(repo)?;
-    let tree = repo.find_tree(oid)?;
-    repo.commit(Some("HEAD"), &signature, &signature, "Initial commit", &tree, &[&parent_commit])?;
+    let signature = git2::Signature::now("Your Name", "email@example.com")?;
+    let parent_commit = self.find_last_commit()?;
+    let tree = self.repo.find_tree(oid)?;
+    self
+      .repo
+      .commit(Some("HEAD"), &signature, &signature, "Initial commit", &tree, &[&parent_commit])?;
     Ok(())
   }
 
   pub fn delete(&self) -> Result<()> {
     std::fs::remove_file(&self.path)?;
     Ok(())
+  }
+
+  fn find_last_commit(&self) -> Result<git2::Commit> {
+    let obj = self.repo.head()?.resolve()?.peel(git2::ObjectType::Commit)?;
+    obj.into_commit().map_err(|_| anyhow::anyhow!("Could not find commit"))
   }
 }
 
