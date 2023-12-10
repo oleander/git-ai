@@ -27,7 +27,7 @@ thiserror = "1.0.50"
 rust-ini = "0.20.0"
 anyhow = "1.0.75"
 dotenv = "0.15.0"
-git2 = "0.18.1"
+git2 = { version = "0.18.1", default-features = false }
 log = "0.4.20"
 indicatif = "0.17.7"
 
