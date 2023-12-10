@@ -11,7 +11,6 @@ fn cli() -> Command {
     .about("A git extension that uses OpenAI to generate commit messages")
     .subcommand_required(true)
     .arg_required_else_help(true)
-    // .allow_external_subcommands(true)
     .subcommand(
       Command::new("hook")
         .about("Installs the git-ai hook")

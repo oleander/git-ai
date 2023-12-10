@@ -62,8 +62,13 @@ This project is under the MIT License. For more details, see the [LICENSE](LICEN
   - [x] Look into ways to simplify the CI process.
 - [x] Define and document configuration options.
 - [x] Implement a feature where CTRL-C resets the terminal.
-- [ ] Change the command-line interface (CLI) to use subcommands:
-  - [ ] `git ai hook install`
-  - [ ] `git ai hook uninstall`
-- [ ] Publish the crate to crates.io
+- [x] Change the command-line interface (CLI) to use subcommands:
+  - [x] `git ai hook install`
+  - [x] `git ai hook uninstall`
+- [ ] Allow proper configuration
+  - [ ] With validation
+  - [ ] Fallback values
+  - [ ] Using environment variables
 - [ ] Get rid of the main.rs as binary
+- [ ] Move logic from main.rs into sep: config.rs
+- [ ] Publish the crate to crates.io
