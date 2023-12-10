@@ -27,22 +27,27 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - uses: actions-rs/toolchain@v1
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
           override: true
-      - uses: actions-rs/cargo@v1
+      - name: Build git-ai-hook
+        uses: actions-rs/cargo@v1
         with:
           command: build
           args: --release --bin git-ai-hook --no-default-features
-      - uses: actions-rs/cargo@v1
+      - name: Install git-ai
+        uses: actions-rs/cargo@v1
         with:
           command: install
           args: --path . --bin git-ai --no-default-features
-      - uses: actions-rs/cargo@v1
+      - name: Run tests
+        uses: actions-rs/cargo@v1
         with:
           command: test
-      - run: git ai install
+      - name: Test install hook
+        run: git ai install
       - name: Run Clippy
         uses: actions-rs/clippy-check@v1
         with:
