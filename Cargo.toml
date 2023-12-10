@@ -1,6 +1,6 @@
 [package]
 name = "git-ai"
-version = "1.0.0"
+version = "0.1.0"
 edition = "2021"
 description = "A git extension to help you write better commit messages."
 license = "MIT"
