@@ -47,12 +47,13 @@ This project is under the MIT License. For more details, see the [LICENSE](LICEN
 
 ## Pre-Publish Checklist
 
-- Decide on an appropriate name for the binary.
-- Update the README with installation and testing instructions.
-- Ensure continuous integration (CI) passes.
-  - Look into ways to simplify the CI process.
-- Define and document configuration options.
-- Implement a feature where CTRL-C resets the terminal.
-- Change the command-line interface (CLI) to use subcommands:
-  - `git ai hook install`
-  - `git ai hook uninstall`
+- [x] Decide on an appropriate name for the binary.
+- [x] Update the README with installation and testing instructions.
+- [ ] Ensure continuous integration (CI) passes.
+  - [ ] Look into ways to simplify the CI process.
+- [ ] Define and document configuration options.
+- [ ] Implement a feature where CTRL-C resets the terminal.
+- [ ] Change the command-line interface (CLI) to use subcommands:
+  - [ ] `git ai hook install`
+  - [ ] `git ai hook uninstall`
+- [ ] Publish the crate to crates.io
