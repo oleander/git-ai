@@ -28,7 +28,9 @@ This crate installs a `prepare-commit-msg` Git hook in your repository. When you
 - Use `git ai hook install` to set up the Git hook.
 - Set the OpenAI API key with `git-ai config set api-key <api-key>`.
 
-## Configuration
+## CLI Options
+
+### Configuration
 
 Use `git-ai config set` followed by:
 
@@ -37,6 +39,13 @@ Use `git-ai config set` followed by:
 - `timeout <timeout>`: Set the maximum time in seconds to wait for OpenAI's response (default is 30).
 - `language <language>`: Choose the model language (default is `en`).
 
+### Hooks
+
+Use `git-ai hook` followed by:
+
+- `install`: Install the Git hook.
+- `uninstall`: Uninstall the Git hook.
+  
 ## Testing
 
 Execute `cargo test` to run the test suite.
@@ -49,9 +58,9 @@ This project is under the MIT License. For more details, see the [LICENSE](LICEN
 
 - [x] Decide on an appropriate name for the binary.
 - [x] Update the README with installation and testing instructions.
-- [ ] Ensure continuous integration (CI) passes.
-  - [ ] Look into ways to simplify the CI process.
-- [ ] Define and document configuration options.
+- [x] Ensure continuous integration (CI) passes.
+  - [x] Look into ways to simplify the CI process.
+- [x] Define and document configuration options.
 - [ ] Implement a feature where CTRL-C resets the terminal.
 - [ ] Change the command-line interface (CLI) to use subcommands:
   - [ ] `git ai hook install`
