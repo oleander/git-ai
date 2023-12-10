@@ -1,10 +1,7 @@
 mod install;
 mod uninstall;
 mod config;
-
-use std::str::FromStr;
-
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use dotenv::dotenv;
 use clap::{Arg, Command};
 
