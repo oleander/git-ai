@@ -26,7 +26,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ matrix.os }}-cargo-${{ matrix.toolchain }}-${{ hashFiles('**/Cargo.lock') }}
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -65,6 +65,10 @@ jobs:
       #     args: --all -- --deny warnings
       - name: Test install hook
         run: git ai hook install
+      - name: Git ai config
+        run: git ai config set openai-api-key ${{ env.API_KEY }}
+        env:
+          APP_KEY: ${{ secrets.OPENAI_API_KEY }}
       - name: Test simulate
         run: ./simulate.sh
         env:
