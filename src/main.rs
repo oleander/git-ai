@@ -1,71 +1,32 @@
-mod install;
-mod uninstall;
-mod config;
+use config::Config;
 
-use anyhow::Result;
-use dotenv::dotenv;
-use clap::{Arg, Command};
+// APP_OPENAI_API_KEY="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"
+// APP_MODEL="gpt-4-1106-preview"
+// APP_MAX_DIFF_TOKENS=5000
+// APP_MAX_LENGTH=72
+// APP_LANGUAGE=en
+// APP_TIMEOUT=30
 
-fn cli() -> Command {
-  Command::new("git-ai")
-    .about("A git extension that uses OpenAI to generate commit messages")
-    .subcommand_required(true)
-    .arg_required_else_help(true)
-    .subcommand(
-      Command::new("hook")
-        .about("Installs the git-ai hook")
-        .subcommand(Command::new("install").about("Installs the git-ai hook"))
-        .subcommand(Command::new("uninstall").about("Uninstalls the git-ai hook"))
-    )
-    .subcommand(
-      Command::new("config")
-        .about("Sets or gets configuration values")
-        .subcommand(
-          Command::new("set")
-            .about("Sets a configuration value")
-            .arg(Arg::new("KEY").required(true).index(1))
-            .arg(Arg::new("VALUE").required(true).index(2))
-        )
-        .subcommand(
-          Command::new("get")
-            .about("Gets a configuration value")
-            .arg(Arg::new("KEY").required(true).index(1))
-        )
-    )
+#[derive(Debug, Default, serde_derive::Deserialize, PartialEq, Eq)]
+struct AppConfig {
+  openai_api_key:  Option<String>,
+  model:           Option<String>,
+  max_diff_tokens: Option<u32>,
+  max_length:      Option<u32>,
+  language:        Option<String>,
+  timeout:         Option<u32>
 }
-#[tokio::main]
-async fn main() -> Result<()> {
-  env_logger::init();
-  dotenv().ok();
 
-  let args = cli().get_matches();
+fn main() {
+  dotenv::dotenv().ok();
+  let config = Config::builder()
+    .add_source(config::Environment::with_prefix("APP").try_parsing(true))
+    .build()
+    .unwrap();
 
-  match args.subcommand() {
-    Some(("hook", sub)) => {
-      match sub.subcommand() {
-        Some(("install", _)) => {
-          install::run()?;
-        },
-        Some(("uninstall", _)) => {
-          uninstall::run()?;
-        },
-        _ => unreachable!()
-      }
-    },
-    Some(("config", args)) => {
-      if let Some(matches) = args.subcommand_matches("set") {
-        let key = matches.get_one::<String>("KEY").expect("required");
-        let value = matches.get_one::<String>("VALUE").expect("required");
-        log::info!("Setting config key {} to {}", key, value);
-        config::set(key, value.as_str())?;
-      } else if let Some(matches) = args.subcommand_matches("get") {
-        let key = matches.get_one::<String>("KEY").expect("required");
-        let value: String = config::get(key)?;
-        log::info!("Config key {} is set to {}", key, value);
-      }
-    },
-    _ => unreachable!()
-  }
+  println!("{:?}", config);
+  let app: AppConfig = config.try_deserialize().unwrap();
 
-  Ok(())
+  println!("{:?}", app);
+  // assert_eq!(
 }
