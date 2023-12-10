@@ -10,7 +10,6 @@ use ai::hook::{FilePath, PatchRepository, *};
 use ai::chat::generate_commit;
 use ai::config;
 
-
 #[tokio::main]
 async fn main() -> Result<()> {
   env_logger::init();
