@@ -59,7 +59,7 @@ pub fn run() -> Result<(), InstallError> {
   // Symlink the hook_bin to the hook_file
   unix_fs::symlink(&hook_bin, &hook_file)?;
   let relative_path = hook_file.strip_prefix(&current_dir)?;
-  println!("{} Hook symlinked successfully to {}", Emoji("✅", "[OK]"), style(relative_path.display()).green());
+  println!("{} Hook symlinked successfully to {}", Emoji("🔗", "[OK]"), style(relative_path.display()).italic());
 
   Ok(())
 }
