@@ -10,9 +10,16 @@ use ai::hook::{FilePath, PatchRepository, *};
 use ai::chat::generate_commit;
 use ai::config;
 
+
 #[tokio::main]
 async fn main() -> Result<()> {
   env_logger::init();
+
+  // Show cursor on exit whenever ctrl-c is pressed
+  ctrlc::set_handler(move || {
+    console::Term::stdout().show_cursor().expect("Failed to show cursor");
+  })?;
+
   let args = Args::parse();
 
   // If defined, then the user already provided a commit message

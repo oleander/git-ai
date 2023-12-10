@@ -30,6 +30,8 @@ dotenv = "0.15.0"
 git2 = { version = "0.18.1", default-features = false }
 log = "0.4.20"
 indicatif = "0.17.7"
+ctrlc = "3.4.1"
+console = "0.15.7"
 
 [dev-dependencies]
 tempfile = "3.8.1"
