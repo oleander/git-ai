@@ -27,7 +27,6 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
@@ -44,3 +43,7 @@ jobs:
         with:
           command: test
       - run: git ai install
+      - name: Run Clippy
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
