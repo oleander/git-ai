@@ -3,7 +3,7 @@ github-actions:
 
 install:
 	cargo install --debug --path .
-	git ai hook uninstall
+	git ai hook uninstall || true
 	git ai hook install
 test:
 	cargo test --all
