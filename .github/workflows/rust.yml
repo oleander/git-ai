@@ -22,6 +22,7 @@ jobs:
       # - run: make install
       # - run: make test
       # - run: make simulate
+      - uses: actions-rs/toolchain@v1
       - run: cargo build --release --bin git-ai-hook --no-default-features
       - run: cargo install --path . --bin git-ai --no-default-features
       - run: git ai install
