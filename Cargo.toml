@@ -2,6 +2,8 @@
 name = "git-ai"
 version = "1.0.0"
 edition = "2021"
+description = "A git extension to help you write better commit messages."
+license = "MIT"
 
 [lib]
 name = "ai"
