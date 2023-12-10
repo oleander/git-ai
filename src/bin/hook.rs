@@ -1,6 +1,5 @@
 // Hook: prepare-commit-msg
 
-use std::path::PathBuf;
 use std::time::Duration;
 
 use git2::Repository;
