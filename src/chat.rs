@@ -29,8 +29,8 @@ pub enum ChatError {
   IOError(#[from] io::Error),
   #[error("Failed to parse JSON: {0}")]
   JsonParseError(#[from] serde_json::Error),
-  #[error("Failed to extract message from response body")]
-  ResponseExtractionError,
+  // #[error("Failed to extract message from response body")]
+  // ResponseExtractionError,
   #[error("Anyhow error: {0}")]
   Anyhow(#[from] anyhow::Error),
   #[error("OpenAI error: {0}")]
@@ -63,7 +63,7 @@ fn prompt() -> String {
 
   format!(
     "
-    Create a concise git commit message in present tense for the provided code diff. 
+    Create a concise git commit message in present tense for the provided code diff.
       Follow these guidelines:
         Language: {}.
         Maximum Length: {} characters.

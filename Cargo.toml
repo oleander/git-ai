@@ -49,5 +49,6 @@ git2 = "0.18.1"
 rand = "0.8.5"
 
 [profile.release]
-opt-level = "s"
+opt-level = 2
+debug = true
 lto = true
