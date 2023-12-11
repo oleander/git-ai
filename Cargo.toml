@@ -17,11 +17,12 @@ path = "src/main.rs"
 name = "git-ai-hook"
 path = "src/bin/hook.rs"
 
+[dependencies.clap]
+features = ["derive", "wrap_help"]
+default-features = true
+version = "4.4.10"
+
 [dependencies]
-clap = { version = "4.4.10", features = [
-  "derive",
-  "wrap_help",
-], default-features = true }
 tokio = { version = "1.34.0", features = ["macros", "rt-multi-thread"] }
 reqwest = { version = "0.11.22", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
@@ -49,6 +50,11 @@ git2 = "0.18.1"
 rand = "0.8.5"
 
 [profile.release]
-opt-level = 2
+codegen-units = 1
+opt-level = 3
 debug = true
 lto = true
+
+[profile.dev.package."*"]
+codegen-units = 1
+opt-level = 3
