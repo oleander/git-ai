@@ -5,11 +5,12 @@ Git AI uses ChatGPT and git hook to generate commit messages based on the staged
 ## TL;DR
 
 ```bash
-cargo binstall cargo-binstall
-cargo binstall git-ai
-git ai config set openapi-api-key <api-key>
+cargo install git-ai
+git-ai config set openapi-api-key <api-key>
+
 cd <your-git-repo>
-git ai hook install
+git-ai hook install
+
 # make a change
 git add .
 git commit --no-edit
@@ -17,18 +18,12 @@ git commit --no-edit
 
 ## Installation
 
-### Pre-Built Binaries
-
-1. `cargo binstall cargo-binstall`
-2. `cargo binstall git-ai`
-
 ### From Source
 
 1. Ensure Rust and Cargo are installed on your system.
 2. Clone the Git AI repository: `git clone https://github.com/oleander/git-ai`
 3. Change to the project directory: `cd git-ai`.
-4. Build the hook: `cargo build --release --bin git-ai-hook`
-5. Build & install the binary: `cargo install --path . --bin git-ai`
+4. Build & install the binary: `cargo install --path .`
 
 ## Usage
 
