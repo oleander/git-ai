@@ -1,4 +1,17 @@
-# Git AI [![Rust](https://github.com/oleander/git-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/oleander/git-ai/actions/workflows/ci.yml)
+# git-ai [![Rust](https://github.com/oleander/git-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/oleander/git-ai/actions/workflows/ci.yml)
+
+## TL;DR
+
+```bash
+cargo binstall cargo-binstall
+cargo binstall git-ai
+git ai config set openapi-api-key <api-key>
+cd <your-git-repo>
+git ai hook install
+# make a change
+git add .
+git commit --no-edit
+```
 
 ## Overview
 
