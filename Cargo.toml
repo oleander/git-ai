@@ -38,10 +38,13 @@ console = "0.15.7"
 anyhow = "1.0.75"
 dotenv = "0.15.0"
 config = "0.13.4"
-git2 = "0.18.1"
 ctrlc = "3.4.1"
 log = "0.4.20"
 home = "0.5.9"
+
+[dependencies.git2]
+default-features = false
+version = "0.18.1"
 
 [dev-dependencies]
 tempfile = "3.8.1"
