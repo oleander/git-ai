@@ -1,5 +1,7 @@
 # git-ai [![Rust](https://github.com/oleander/git-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/oleander/git-ai/actions/workflows/ci.yml)
 
+Git AI uses ChatGPT and git hook to generate commit messages based on the staged files. Leave the commit message empty and let Git AI do the work for you!
+
 ## TL;DR
 
 ```bash
@@ -12,10 +14,6 @@ git ai hook install
 git add .
 git commit --no-edit
 ```
-
-## Overview
-
-Git AI uses ChatGPT and git hook to generate commit messages based on the staged files. Leave the commit message empty and let Git AI do the work for you!
 
 ## Installation
 
