@@ -20,7 +20,6 @@ simulate:
 	./simulate.sh
 @release:
   #!/usr/bin/env bash
-	set -euo pipefail
   version=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version' | tr -d '\n')
   git tag -a v$version -m "Release v$version"
 	git push origin v$version
