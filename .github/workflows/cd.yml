@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - v*
-env:
-  CARGO_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
 jobs:
   deploy:
@@ -17,5 +15,3 @@ jobs:
           toolchain: nightly
           override: true
       - uses: katyo/publish-crates@v2
-        with:
-          registry-token: ${{ env.CARGO_TOKEN }}
