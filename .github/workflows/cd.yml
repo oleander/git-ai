@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - v*
+
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
