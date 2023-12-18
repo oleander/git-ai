@@ -18,7 +18,7 @@ install_hook: build_hook
   gln -rfs target/release/hook .git/hooks/prepare-commit-msg
 simulate:
   ./simulate.sh
-@release:
+release:
   #!/usr/bin/env bash
   version=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version' | tr -d '\n')
   git tag -a v$version -m "Release v$version"
