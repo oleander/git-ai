@@ -21,6 +21,7 @@ simulate:
 release:
   #!/usr/bin/env bash
   version=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version' | tr -d '\n')
+  echo "Releasing $version"
   git tag -a v$version -m "Release v$version"
   git push origin v$version
   git push origin main

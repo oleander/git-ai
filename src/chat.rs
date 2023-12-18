@@ -126,7 +126,7 @@ pub enum Response {
 }
 
 async fn response(diff: String) -> Result<Response, ChatError> {
-  let api_key = config::APP.openai_api_key.clone().context("Failed to get OpenAI API key")?;
+  let api_key = config::APP.openai_api_key.clone().context("Failed to get OpenAI API key, please run `git-ai config set openapi-api-key <api-key>`")?;
   let timeout = config::APP.duration();
 
   Client::builder()
