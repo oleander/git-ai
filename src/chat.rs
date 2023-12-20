@@ -9,7 +9,7 @@ use thiserror::Error;
 // use reqwest::Client;
 use async_openai::{
   config::AzureConfig, error::OpenAIError, types::{
-    ChatCompletionRequestSystemMessage, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs, CreateEmbeddingRequestArgs, CreateEditRequestArgs, ChatCompletionRequestMessage
+    ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs, CreateEditRequestArgs, CreateEmbeddingRequestArgs
   }, Client
 };
 
@@ -182,10 +182,8 @@ async fn response(diff: String) -> Result<String, ChatError> {
   let max_tokens = config::APP.max_diff_tokens;
   let max_length_of_commit = config::APP.max_length;
 
-  let mut messages: Vec<ChatCompletionRequestMessage> = vec![
-    system_prompt(language, max_length_of_commit)?.into(),
-    user_prompt(diff)?.into(),
-  ];
+  let mut messages: Vec<ChatCompletionRequestMessage> =
+    vec![system_prompt(language, max_length_of_commit)?.into(), user_prompt(diff)?.into()];
 
   if let Some((git_history, no_commits)) = history() {
     messages.insert(1, history_prompt(git_history, no_commits)?.into());
@@ -197,35 +195,21 @@ async fn response(diff: String) -> Result<String, ChatError> {
 
   let request = CreateChatCompletionRequestArgs::default()
     .max_tokens(max_tokens as u16)
-    .model(model)
     .messages(messages)
+    .model(model)
+    .n(1)
     .build()?;
 
-  let response = client.chat().create(request).await?;
-
-  println!("\nResponse:\n");
-  for choice in response.choices {
-    println!("{}: Role: {}  Content: {:?}", choice.index, choice.message.role, choice.message.content);
-  }
-
-  // Client::builder()
-  //   .build()?
-  //   .post(API_URL)
-  //   .bearer_auth(api_key)
-  //   .json(&payload(diff))
-  //   .timeout(timeout)
-  //   .send()
-  //   .await
-  //   .map_err(ChatError::from)?
-  //   .text()
-  //   .await
-  //   .map_err(ChatError::from)
-  //   .and_then(|body| from_str::<Response>(&body).map_err(|e| ChatError::ParseError(e, body)))
+  client
+    .chat()
+    .create(request)
+    .await?
+    .choices
+    .first()
+    .and_then(|choice| choice.message.content.clone())
+    .ok_or_else(|| ChatError::OpenAIError("Failed to get response from OpenAI".to_string()))
 }
 
 // pub async fn generate_commit(diff: String) -> Result<String, ChatError> {
-//   match response(diff).await? {
-//     Response::Success(success) => Ok(success.choices.first().map(|choice| choice.message.content.clone()).unwrap()),
-//     Response::Error(error) => Err(ChatError::OpenAIError(error.message))
-//   }
+
 // }
