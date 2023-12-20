@@ -71,6 +71,7 @@ use anyhow::{Context, Result};
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let exec = executor!()?;
+  env_logger::init();
 
   let map_prompt = Step::for_prompt_template(prompt!(
     "You are an AI trained to analyze code diffs and generate commit messages that match the style and tonality of previous commits.",
@@ -90,8 +91,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   let docs = commits
     .iter()
-    .map(|payload| parameters!("last_commit_message" => payload.message.clone(), "code_diff" => payload.diff.clone()))
+    .map(|payload| {
+      log::debug!("Commit message: {}", payload.message);
+      log::debug!("Code diff: {}", payload.diff);
+
+      parameters!("last_commit_message" => payload.message.clone(), "code_diff" => payload.diff.clone())
+    })
     .collect::<Vec<_>>();
+
   let res = chain.run(docs, Parameters::new(), &exec).await.context("Failed to run chain")?;
 
   println!("{}", res);
