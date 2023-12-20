@@ -75,12 +75,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   let map_prompt = Step::for_prompt_template(prompt!(
     "You are an AI trained to analyze code diffs and generate commit messages that match the style and tonality of previous commits.",
-    "Given the context of the previous commit message: '{{last_commit_message}}', analyze this code diff: '{{code_diff}}', and suggest a new commit message that maintains a similar style and tone."
+    "Given the context of the previous commit message:  analyze this code diff: '{{text}}', and suggest a new commit message that maintains a similar style and tone."
   ));
 
   let reduce_prompt = Step::for_prompt_template(prompt!(
     "You are an AI summarizing multiple code changes in the context of past commits for a comprehensive commit message.",
-    "Combine these change analyses with the context of the last commit message: '{{last_commit_message}}' into a cohesive new commit message."
+    "Combine these change analyses with the context of the last commit message: '{{text}}' into a cohesive new commit message."
   ));
 
   let chain = Chain::new(map_prompt, reduce_prompt);
@@ -95,7 +95,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       log::debug!("Commit message: {}", payload.message);
       log::debug!("Code diff: {}", payload.diff);
 
-      parameters!("last_commit_message" => payload.message.clone(), "code_diff" => payload.diff.clone())
+    //   parameters!("last_commit_message" => payload.message.clone(), "code_diff" => payload.diff.clone())
+      parameters!(payload.diff.clone())
     })
     .collect::<Vec<_>>();
 
