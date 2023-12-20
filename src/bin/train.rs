@@ -129,6 +129,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .map(|payload| parameters!("text" => payload.message.clone(), "text" => payload.diff.clone()))
     .collect::<Vec<_>>();
 
+  let key = "ai.history";
   let data = chain.run(docs, parameters!(), &exec.unwrap()).await.context("Failed to run chain")?;
   let str = data
     .to_immediate()
@@ -137,7 +138,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .primary_textual_output()
     .unwrap();
 
-  let key = "ai.history";
   let value = hex::encode(str);
   let mut config = repo.config()?;
 
