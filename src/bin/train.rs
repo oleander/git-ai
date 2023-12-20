@@ -5,7 +5,7 @@ use std::str;
 
 use indicatif::{ProgressBar, ProgressStyle};
 use llm_chain::{options, parameters, prompt};
-use base64::{decode};
+use base64::decode;
 use llm_chain::chains::map_reduce::Chain;
 use git2::{Config, DiffOptions, Repository};
 use flate2::write::GzEncoder;
@@ -137,7 +137,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .primary_textual_output()
     .unwrap();
 
-  let key = "git-ai-history";
+  let key = "ai.history";
   let value = hex::encode(str);
   let mut config = repo.config()?;
 

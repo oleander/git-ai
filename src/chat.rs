@@ -1,5 +1,4 @@
-use std::io;
-use std::str;
+use std::{io, str};
 
 use async_openai::error::OpenAIError;
 use git2::Repository;
@@ -77,9 +76,9 @@ fn system_prompt(language: String, max_length_of_commit: usize) -> Result<ChatCo
 }
 
 fn history() -> Option<(String, u8)> {
+  let key = "ai.history";
   let repo = Repository::open_from_env().ok()?;
   let config = repo.config().ok()?;
-  let key = "git-ai-history";
   let compressed_data_str = config.get_str(key).ok()?;
   let raw = hex::decode(compressed_data_str).ok()?;
   let utf8 = str::from_utf8(&raw).ok()?;
@@ -102,7 +101,6 @@ fn user_prompt(diff: String) -> Result<ChatCompletionRequestUserMessage, OpenAIE
 
   ChatCompletionRequestUserMessageArgs::default().content(payload).build()
 }
-
 
 pub async fn generate_commit(diff: String) -> Result<String, ChatError> {
   log::info!("Generating commit message using config: {:?}", config::APP);
