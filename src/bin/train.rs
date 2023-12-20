@@ -66,6 +66,8 @@ fn get_last_n_commits(repo_path: &str, n: usize) -> Vec<Payload> {
     .collect()
 }
 
+use anyhow::{Context, Result};
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let exec = executor!()?;
@@ -87,7 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .iter()
     .map(|payload| parameters!("last_commit_message" => payload.message.clone(), "code_diff" => payload.diff.clone()))
     .collect::<Vec<_>>();
-  let res = chain.run(docs, Parameters::new(), &exec).await?;
+  let res = chain.run(docs, Parameters::new(), &exec).await.context("Failed to run chain")?;
 
   println!("{}", res);
   Ok(())
