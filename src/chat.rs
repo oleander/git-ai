@@ -5,7 +5,6 @@ use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
 use async_openai::Client;
 use thiserror::Error;
-
 use async_openai::types::{
   ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs
 };
@@ -117,7 +116,6 @@ async fn response(diff: String) -> Result<String, ChatError> {
   log::info!("Using backoff timeout of {:?}", timeout);
   let backoff = backoff::ExponentialBackoffBuilder::new().with_max_elapsed_time(Some(timeout)).build();
   let client = Client::new().with_backoff(backoff);
-
 
   log::info!("Creating chat completion request");
   let request = CreateChatCompletionRequestArgs::default()

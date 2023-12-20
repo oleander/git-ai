@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 use std::time::Duration;
 
-use indicatif::{ProgressStyle, ProgressBar};
+use indicatif::{ProgressBar, ProgressStyle};
 use llm_chain::{options, parameters, prompt};
 use llm_chain::chains::map_reduce::Chain;
 use git2::{DiffOptions, Repository};
@@ -32,10 +32,12 @@ impl CommitExt for git2::Commit<'_> {
     let parent_tree = self.parent(0).ok().as_ref().map(|c| c.tree().ok()).flatten();
     let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut opts))?;
 
-    _ = diff.print(git2::DiffFormat::Patch, |_delta, _hunk, line| {
-      commit_info.push_str(std::str::from_utf8(line.content()).unwrap());
-      commit_info.len() < max_tokens
-    }).ok();
+    _ = diff
+      .print(git2::DiffFormat::Patch, |_delta, _hunk, line| {
+        commit_info.push_str(std::str::from_utf8(line.content()).unwrap());
+        commit_info.len() < max_tokens
+      })
+      .ok();
 
     Ok(commit_info)
   }
@@ -109,7 +111,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   let repo = REPO.lock().unwrap();
   let chain = Chain::new(map_prompt, reduce_prompt);
-  let commits = repo.get_last_n_commits(cli.max_commits.unwrap_or(DEFAULT_MAX_COMMITS) as usize, cli.max_tokens.unwrap_or(DEFAULT_MAX_TOKENS) as usize).unwrap();
+  let commits = repo
+    .get_last_n_commits(
+      cli.max_commits.unwrap_or(DEFAULT_MAX_COMMITS) as usize,
+      cli.max_tokens.unwrap_or(DEFAULT_MAX_TOKENS) as usize
+    )
+    .unwrap();
 
   log::info!("Found {} commits", commits.len());
 
