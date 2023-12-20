@@ -67,3 +67,7 @@ lto = true
 [profile.dev.package."*"]
 codegen-units = 1
 opt-level = 3
+
+[env]
+RUST_LOG = "debug"
+

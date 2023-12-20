@@ -75,7 +75,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   let map_prompt = Step::for_prompt_template(prompt!(
     "You are an AI trained to analyze code diffs and generate commit messages that match the style and tonality of previous commits.",
-    "Given the context of the previous commit message:  analyze this code diff: '{{text}}', and suggest a new commit message that maintains a similar style and tone."
+    "Given the context of the previous commit message: '{{text}}' analyze this code diff: '{{text}}', and suggest a new commit message that maintains a similar style and tone."
   ));
 
   let reduce_prompt = Step::for_prompt_template(prompt!(
@@ -91,16 +91,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   let docs = commits
     .iter()
-    .map(|payload| {
-      log::debug!("Commit message: {}", payload.message);
-      log::debug!("Code diff: {}", payload.diff);
-
-    //   parameters!("last_commit_message" => payload.message.clone(), "code_diff" => payload.diff.clone())
-      parameters!(payload.diff.clone())
-    })
+    .map(|payload| parameters!("text" => payload.message.clone(), "text" => payload.diff.clone()))
     .collect::<Vec<_>>();
 
-  let res = chain.run(docs, Parameters::new(), &exec).await.context("Failed to run chain")?;
+  let res = chain.run(docs, parameters!(), &exec).await.context("Failed to run chain")?;
 
   println!("{}", res);
   Ok(())
