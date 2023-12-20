@@ -28,6 +28,7 @@ impl App {
 
 lazy_static! {
   pub static ref CONFIG_DIR: PathBuf = home::home_dir().unwrap().join(".config/git-ai");
+  #[derive(Debug)]
   pub static ref APP: App = App::new().expect("Failed to load config");
   pub static ref CONFIG_PATH: PathBuf = CONFIG_DIR.join("config.ini");
 }

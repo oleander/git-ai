@@ -1,21 +1,16 @@
 use std::io;
 
-use anyhow::Context;
-// use serde_json::{from_str, json, Value};
-// use serde::{Deserialize, Serialize};
+use async_openai::error::OpenAIError;
 use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
+use async_openai::Client;
 use thiserror::Error;
-// use reqwest::Client;
-use async_openai::{
-  config::AzureConfig, error::OpenAIError, types::{
-    ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs, CreateEditRequestArgs, CreateEmbeddingRequestArgs
-  }, Client
+
+use async_openai::types::{
+  ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs
 };
 
 use crate::config;
-
-// const API_URL: &str = "https://api.openai.com/v1/chat/completions";
 
 lazy_static! {
   static ref MAX_LENGTH: u8 = dotenv!("MAX_LENGTH").parse::<u8>().unwrap();
@@ -34,8 +29,6 @@ pub enum ChatError {
   IOError(#[from] io::Error),
   #[error("Failed to parse JSON: {0}")]
   JsonParseError(#[from] serde_json::Error),
-  // #[error("Failed to extract message from response body")]
-  // ResponseExtractionError,
   #[error("Anyhow error: {0}")]
   Anyhow(#[from] anyhow::Error),
   #[error("OpenAI error: {0}")]
@@ -45,24 +38,6 @@ pub enum ChatError {
   #[error("OpenAI error: {0}")]
   OpenAI(#[from] OpenAIError)
 }
-
-// fn payload(diff: String) -> Value {
-//   let model = config::APP.model.clone();
-
-//   json!({
-//     "model": model,
-//     "messages": vec![
-//       json!({
-//         "role": "system",
-//         "content": prompt()
-//       }),
-//       json!({
-//         "role": "user",
-//         "content": diff
-//       })
-//     ]
-//   })
-// }
 
 fn history_prompt(git_history: String, no_commits: u8) -> Result<ChatCompletionRequestUserMessage, OpenAIError> {
   let payload = format!(
@@ -80,8 +55,6 @@ fn history_prompt(git_history: String, no_commits: u8) -> Result<ChatCompletionR
   ChatCompletionRequestUserMessageArgs::default().content(payload).build()
 }
 
-// let lang = config::APP.language.clone();
-// let length = config::APP.max_length;
 fn system_prompt(language: String, max_length_of_commit: usize) -> Result<ChatCompletionRequestSystemMessage, OpenAIError> {
   let payload = format!(
     "
@@ -119,68 +92,18 @@ fn user_prompt(diff: String) -> Result<ChatCompletionRequestUserMessage, OpenAIE
   ChatCompletionRequestUserMessageArgs::default().content(payload).build()
 }
 
-// mod response {
-//   use super::*;
-
-//   #[derive(Debug, Serialize, Deserialize)]
-//   pub struct Success {
-//     system_fingerprint: String,
-//     pub choices:        Vec<Choice>,
-//     object:             String,
-//     model:              String,
-//     id:                 String,
-//     usage:              Usage
-//   }
-
-//   #[derive(Debug, Serialize, Deserialize)]
-//   pub struct Error {
-//     pub error:   String,
-//     code:        usize,
-//     pub message: String
-//   }
-
-//   #[derive(Debug, Serialize, Deserialize)]
-//   pub struct Usage {
-//     completion_tokens: usize,
-//     prompt_tokens:     usize,
-//     total_tokens:      usize
-//   }
-
-//   #[derive(Debug, Serialize, Deserialize)]
-//   pub struct Choice {
-//     finish_reason: String,
-//     index:         usize,
-//     pub message:   Message
-//   }
-
-//   #[derive(Debug, Serialize, Deserialize)]
-//   pub struct Message {
-//     pub content: String,
-//     role:        String
-//   }
-// }
-
-// #[derive(Debug, Serialize, Deserialize)]
-// #[serde(untagged)]
-// pub enum Response {
-//   Success(response::Success),
-//   Error(response::Error)
-// }
-
 fn history() -> Option<(String, u8)> {
   None
 }
 
 async fn response(diff: String) -> Result<String, ChatError> {
-  let api_key = config::APP
-    .openai_api_key
-    .clone()
-    .context("Failed to get OpenAI API key, please run `git-ai config set openapi-api-key <api-key>`")?;
-  let language = config::APP.language.clone();
-  let timeout = config::APP.duration();
-  let model = config::APP.model.clone();
-  let max_tokens = config::APP.max_diff_tokens;
+  log::info!("Generating commit message using config: {:?}", config::APP);
+
   let max_length_of_commit = config::APP.max_length;
+  let max_tokens = config::APP.max_diff_tokens;
+  let language = config::APP.language.clone();
+  let model = config::APP.model.clone();
+  let timeout = config::APP.duration();
 
   let mut messages: Vec<ChatCompletionRequestMessage> =
     vec![system_prompt(language, max_length_of_commit)?.into(), user_prompt(diff)?.into()];
@@ -189,10 +112,14 @@ async fn response(diff: String) -> Result<String, ChatError> {
     messages.insert(1, history_prompt(git_history, no_commits)?.into());
   }
 
-  let backoff = backoff::ExponentialBackoffBuilder::new().with_max_elapsed_time(Some(timeout)).build();
+  log::info!("Sending request to OpenAI API: {:?}", messages);
 
+  log::info!("Using backoff timeout of {:?}", timeout);
+  let backoff = backoff::ExponentialBackoffBuilder::new().with_max_elapsed_time(Some(timeout)).build();
   let client = Client::new().with_backoff(backoff);
 
+
+  log::info!("Creating chat completion request");
   let request = CreateChatCompletionRequestArgs::default()
     .max_tokens(max_tokens as u16)
     .messages(messages)
@@ -200,6 +127,7 @@ async fn response(diff: String) -> Result<String, ChatError> {
     .n(1)
     .build()?;
 
+  log::info!("Sending request to OpenAI API");
   client
     .chat()
     .create(request)
@@ -209,7 +137,3 @@ async fn response(diff: String) -> Result<String, ChatError> {
     .and_then(|choice| choice.message.content.clone())
     .ok_or_else(|| ChatError::OpenAIError("Failed to get response from OpenAI".to_string()))
 }
-
-// pub async fn generate_commit(diff: String) -> Result<String, ChatError> {
-
-// }
