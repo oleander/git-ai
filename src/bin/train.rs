@@ -1,14 +1,23 @@
 use std::sync::Mutex;
 use std::time::Duration;
+use std::io::Write;
+use std::str;
 
 use indicatif::{ProgressBar, ProgressStyle};
 use llm_chain::{options, parameters, prompt};
+use base64::{decode};
 use llm_chain::chains::map_reduce::Chain;
-use git2::{DiffOptions, Repository};
+use git2::{Config, DiffOptions, Repository};
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use llm_chain::traits::Executor;
 use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use llm_chain::step::Step;
+use clap::Parser;
+
+const DEFAULT_MAX_COMMITS: u8 = 10;
+const DEFAULT_MAX_TOKENS: u16 = 3500;
 
 lazy_static! {
   pub static ref REPO: Mutex<Repository> = Mutex::new(Repository::open_from_env().expect("Failed to open repository"));
@@ -65,11 +74,6 @@ impl RepositoryExt for Repository {
   }
 }
 
-const DEFAULT_MAX_COMMITS: u8 = 10;
-const DEFAULT_MAX_TOKENS: u16 = 3500;
-
-use clap::Parser;
-
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
@@ -125,8 +129,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .map(|payload| parameters!("text" => payload.message.clone(), "text" => payload.diff.clone()))
     .collect::<Vec<_>>();
 
-  let res = chain.run(docs, parameters!(), &exec.unwrap()).await.context("Failed to run chain")?;
+  let data = chain.run(docs, parameters!(), &exec.unwrap()).await.context("Failed to run chain")?;
+  let str = data
+    .to_immediate()
+    .await
+    .context("Failed to convert data to immediate")?
+    .primary_textual_output()
+    .unwrap();
 
-  println!("{}", res);
+  let key = "git-ai-history";
+  let value = decode(str)?;
+  let utf8 = str::from_utf8(&value)?;
+
+  let mut config = repo.config()?;
+
+  config.set_str(key, utf8)?;
+
+  log::info!("Wrote {} bytes to {}", value.len(), key);
+
   Ok(())
 }
