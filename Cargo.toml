@@ -48,6 +48,8 @@ home = "0.5.9"
 llm-chain = "0.13.0"
 llm-chain-openai = "0.13.0"
 llm-chain-llama = "0.13.0"
+async-openai = "0.17.1"
+backoff = { version = "0.4.0", features = ["tokio"] }
 
 [dependencies.git2]
 default-features = false
