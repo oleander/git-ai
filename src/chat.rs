@@ -119,9 +119,9 @@ pub async fn generate_commit(diff: String) -> Result<String, ChatError> {
     messages.insert(1, history_prompt(git_history, no_commits)?.into());
   }
 
-  println!("Sending request to OpenAI API: {:?}", messages);
+  log::info!("Sending request to OpenAI API: {:?}", messages);
 
-  println!("Using backoff timeout of {:?}", timeout);
+  log::info!("Using backoff timeout of {:?}", timeout);
   let backoff = backoff::ExponentialBackoffBuilder::new().with_max_elapsed_time(Some(timeout)).build();
   let client = Client::new().with_backoff(backoff);
 
