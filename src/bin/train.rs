@@ -1,5 +1,7 @@
 use std::sync::Mutex;
+use std::time::Duration;
 
+use indicatif::{ProgressStyle, ProgressBar};
 use llm_chain::{options, parameters, prompt};
 use llm_chain::chains::map_reduce::Chain;
 use git2::{DiffOptions, Repository};
@@ -19,41 +21,41 @@ struct Payload {
 }
 
 trait CommitExt {
-  fn show(&self, repo: &Repository) -> Result<String, git2::Error>;
+  fn show(&self, repo: &Repository, max_tokens: usize) -> Result<String, git2::Error>;
 }
 
 impl CommitExt for git2::Commit<'_> {
-  fn show(&self, repo: &Repository) -> Result<String, git2::Error> {
+  fn show(&self, repo: &Repository, max_tokens: usize) -> Result<String, git2::Error> {
     let mut commit_info = "".to_string();
     let mut opts = DiffOptions::new();
     let tree = self.tree()?;
     let parent_tree = self.parent(0).ok().as_ref().map(|c| c.tree().ok()).flatten();
     let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut opts))?;
 
-    diff.print(git2::DiffFormat::Patch, |_delta, _hunk, line| {
+    _ = diff.print(git2::DiffFormat::Patch, |_delta, _hunk, line| {
       commit_info.push_str(std::str::from_utf8(line.content()).unwrap());
-      true
-    })?;
+      commit_info.len() < max_tokens
+    }).ok();
 
     Ok(commit_info)
   }
 }
 
 trait RepositoryExt {
-  fn get_last_n_commits(&self, n: usize) -> Result<Vec<Payload>, git2::Error>;
+  fn get_last_n_commits(&self, max_commits: usize, max_tokens: usize) -> Result<Vec<Payload>, git2::Error>;
 }
 
 impl RepositoryExt for Repository {
-  fn get_last_n_commits(&self, n: usize) -> Result<Vec<Payload>, git2::Error> {
+  fn get_last_n_commits(&self, max_commits: usize, max_tokens: usize) -> Result<Vec<Payload>, git2::Error> {
     let mut revwalk = self.revwalk()?;
     revwalk.push_head()?;
     Ok(
       revwalk
-        .take(n)
+        .take(max_commits)
         .map(move |id| {
           let commit = self.find_commit(id.unwrap()).expect("Failed to find commit");
           Payload {
-            message: commit.message().unwrap().to_string(), diff: commit.show(&self).unwrap()
+            message: commit.message().unwrap().to_string(), diff: commit.show(&self, max_tokens).unwrap()
           }
         })
         .collect()
@@ -80,8 +82,18 @@ struct Cli {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let cli = Cli::parse();
   let max_tokens = cli.max_tokens.unwrap_or(DEFAULT_MAX_TOKENS);
-  let options = options!(MaxTokens: max_tokens);
+  let options = options!(MaxTokens: max_tokens, MaxContextSize: max_tokens);
   let exec = llm_chain_openai::chatgpt::Executor::new_with_options(options);
+
+  let style = ProgressStyle::default_spinner()
+    .tick_strings(&["-", "\\", "|", "/"])
+    .template("{spinner:.blue} {msg}")
+    .context("Failed to create progress bar style")?;
+
+  let pb = ProgressBar::new_spinner();
+  pb.set_style(style);
+  pb.set_message("Building chain...");
+  pb.enable_steady_tick(Duration::from_millis(150));
 
   env_logger::init();
 
@@ -97,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   let repo = REPO.lock().unwrap();
   let chain = Chain::new(map_prompt, reduce_prompt);
-  let commits = repo.get_last_n_commits(cli.max_commits.unwrap_or(DEFAULT_MAX_COMMITS) as usize)?;
+  let commits = repo.get_last_n_commits(cli.max_commits.unwrap_or(DEFAULT_MAX_COMMITS) as usize, cli.max_tokens.unwrap_or(DEFAULT_MAX_TOKENS) as usize).unwrap();
 
   log::info!("Found {} commits", commits.len());
 
