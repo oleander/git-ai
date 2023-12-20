@@ -77,11 +77,12 @@ fn system_prompt(language: String, max_length_of_commit: usize) -> Result<ChatCo
 
 fn history() -> Option<(String, u8)> {
   let key = "ai.history";
-  let repo = Repository::open_from_env().ok()?;
-  let config = repo.config().ok()?;
-  let compressed_data_str = config.get_str(key).ok()?;
-  let raw = hex::decode(compressed_data_str).ok()?;
-  let utf8 = str::from_utf8(&raw).ok()?;
+  let repo = Repository::open_from_env().expect("Failed to open repository");
+  let mut live_config = repo.config().expect("Failed to get config");
+  let config = live_config.snapshot().expect("Failed to get config snapshot");
+  let compressed_data_str = config.get_str(key).expect("Failed to get config value");
+  let raw = hex::decode(compressed_data_str).expect("Failed to decode hex string");
+  let utf8 = str::from_utf8(&raw).expect("Failed to convert to UTF-8");
   Some((utf8.to_string(), 10))
 }
 
