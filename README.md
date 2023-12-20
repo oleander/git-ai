@@ -38,7 +38,7 @@ git commit --no-edit
 Use `git-ai config set` followed by:
 
 - `api-key <api-key>`: Set the OpenAI API key.
-- `max-tokens <max-tokens>`: Set the maximum characters for `git diff` passed to OpenAI (default is 5000).
+- `max-tokens <max-tokens>`: Set the maximum characters for `git diff` passed to OpenAI (default is 3500).
 - `timeout <timeout>`: Set the maximum time in seconds to wait for OpenAI's response (default is 30).
 - `language <language>`: Choose the model language (default is `en`).
 

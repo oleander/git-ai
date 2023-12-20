@@ -66,7 +66,7 @@ impl RepositoryExt for Repository {
 }
 
 const DEFAULT_MAX_COMMITS: u8 = 10;
-const DEFAULT_MAX_TOKENS: u16 = 5000;
+const DEFAULT_MAX_TOKENS: u16 = 3500;
 
 use clap::Parser;
 

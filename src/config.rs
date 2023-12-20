@@ -50,7 +50,7 @@ impl App {
       .set_default("language", "en")?
       .set_default("timeout", 30)?
       .set_default("max_length", 72)?
-      .set_default("max_diff_tokens", 5000)?
+      .set_default("max_diff_tokens", 3500)?
       .set_default("model", "gpt-4-1106-preview")?
       .build()?;
 

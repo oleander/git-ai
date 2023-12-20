@@ -74,6 +74,10 @@ fn system_prompt(language: String, max_length_of_commit: usize) -> Result<ChatCo
   ChatCompletionRequestSystemMessageArgs::default().content(payload).build()
 }
 
+fn history() -> Option<(String, u8)> {
+  None
+}
+
 fn user_prompt(diff: String) -> Result<ChatCompletionRequestUserMessage, OpenAIError> {
   let payload = format!(
     "
@@ -91,9 +95,6 @@ fn user_prompt(diff: String) -> Result<ChatCompletionRequestUserMessage, OpenAIE
   ChatCompletionRequestUserMessageArgs::default().content(payload).build()
 }
 
-fn history() -> Option<(String, u8)> {
-  None
-}
 
 pub async fn generate_commit(diff: String) -> Result<String, ChatError> {
   log::info!("Generating commit message using config: {:?}", config::APP);
