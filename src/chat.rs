@@ -95,7 +95,7 @@ fn history() -> Option<(String, u8)> {
   None
 }
 
-async fn response(diff: String) -> Result<String, ChatError> {
+pub async fn generate_commit(diff: String) -> Result<String, ChatError> {
   log::info!("Generating commit message using config: {:?}", config::APP);
 
   let max_length_of_commit = config::APP.max_length;
