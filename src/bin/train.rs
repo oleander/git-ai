@@ -7,6 +7,10 @@ use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use llm_chain::step::Step;
 
+// lazy_static! {
+//   pub static ref REPO: Mutex<Repository> = Mutex::new(Repository::open_from_env().expect("Failed to open repository"));
+// }
+
 lazy_static! {
   pub static ref REPO: Mutex<Repository> = Mutex::new(Repository::open_from_env().expect("Failed to open repository"));
 }
@@ -47,21 +51,24 @@ impl CommitExt for git2::Commit<'_> {
   }
 }
 
-fn get_last_n_commits(repo_path: &str, n: usize) -> Vec<Payload> {
-  let repo = Repository::open(repo_path).expect("Failed to open repository");
-  let mut revwalk = repo.revwalk().expect("Failed to create revwalk");
-  revwalk.push_head().expect("Failed to push head");
-  revwalk
-    .take(n)
-    .map(move |id| {
-      let id = id.expect("Failed to get commit id");
-      let repo = Repository::open(repo_path).expect("Failed to open repository");
-      let commit = repo.find_commit(id).expect("Failed to find commit");
-      Payload {
-        message: commit.message().unwrap().to_string(), diff: commit.show(&repo).unwrap()
-      }
-    })
-    .collect()
+trait RepositoryExt {
+  fn get_last_n_commits(&self, n: usize) -> Result<Vec<Payload>, git2::Error>;
+}
+
+impl RepositoryExt for Repository {
+  fn get_last_n_commits(&self, n: usize) -> Result<Vec<Payload>, git2::Error> {
+    let mut revwalk = self.revwalk()?;
+    revwalk.push_head()?;
+    Ok(revwalk
+      .take(n)
+      .map(move |id| {
+        let commit = self.find_commit(id.unwrap()).expect("Failed to find commit");
+        Payload {
+          message: commit.message().unwrap().to_string(), diff: commit.show(&self).unwrap()
+        }
+      })
+      .collect())
+  }
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -80,9 +87,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     "Combine these change analyses with the context of the last commit message: '{{text}}' into a cohesive new commit message."
   ));
 
+  let repo = REPO.lock().unwrap();
   let chain = Chain::new(map_prompt, reduce_prompt);
-  let current_dir = std::env::current_dir().unwrap();
-  let commits = get_last_n_commits(current_dir.to_str().unwrap(), 3);
+  let commits = repo.get_last_n_commits(3)?;
 
   log::info!("Found {} commits", commits.len());
 
