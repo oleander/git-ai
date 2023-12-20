@@ -1,15 +1,11 @@
 use std::sync::Mutex;
 
 use llm_chain::chains::map_reduce::Chain;
-use llm_chain::{executor, parameters, prompt};
+use llm_chain::{executor, options, parameters, prompt};
 use git2::{DiffOptions, Repository};
 use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use llm_chain::step::Step;
-
-// lazy_static! {
-//   pub static ref REPO: Mutex<Repository> = Mutex::new(Repository::open_from_env().expect("Failed to open repository"));
-// }
 
 lazy_static! {
   pub static ref REPO: Mutex<Repository> = Mutex::new(Repository::open_from_env().expect("Failed to open repository"));
@@ -27,19 +23,10 @@ trait CommitExt {
 
 impl CommitExt for git2::Commit<'_> {
   fn show(&self, repo: &Repository) -> Result<String, git2::Error> {
-    let message = self.message().unwrap_or_default();
-    let author = self.author().to_string();
-    let datetime = self.time().seconds().to_string();
-    let id = self.id().to_string();
-
-    let mut commit_info = format!("Commit ID: {}\nAuthor: {}\nDate: {}\nMessage: {}\n\n", id, author, datetime, message);
-
-    // Getting diff
-    let tree = self.tree()?;
-    let parent = self.parent(0).ok();
-    let parent_tree = parent.as_ref().map(|c| c.tree().ok()).flatten();
-
+    let mut commit_info = "".to_string();
     let mut opts = DiffOptions::new();
+    let tree = self.tree()?;
+    let parent_tree = self.parent(0).ok().as_ref().map(|c| c.tree().ok()).flatten();
     let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut opts))?;
 
     diff.print(git2::DiffFormat::Patch, |_delta, _hunk, line| {
@@ -73,9 +60,28 @@ impl RepositoryExt for Repository {
   }
 }
 
+const DEFAULT_MAX_COMMITS: u8 = 10;
+const DEFAULT_MAX_TOKENS: u16 = 5000;
+
+use clap::Parser;
+
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+  #[arg(short, long)]
+  max_commits: Option<u8>,
+
+  #[arg(short, long)]
+  max_tokens: Option<u16>
+}
+
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-  let exec = executor!()?;
+  let cli = Cli::parse();
+  let max_tokens = cli.max_tokens.unwrap_or(DEFAULT_MAX_TOKENS);
+  let options = options!(MaxTokens: max_tokens);
+    use llm_chain::traits::Executor;
+    let exec = llm_chain_openai::chatgpt::Executor::new_with_options(options);
 
   env_logger::init();
 
@@ -91,7 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   let repo = REPO.lock().unwrap();
   let chain = Chain::new(map_prompt, reduce_prompt);
-  let commits = repo.get_last_n_commits(3)?;
+  let commits = repo.get_last_n_commits(cli.max_commits.unwrap_or(DEFAULT_MAX_COMMITS) as usize)?;
 
   log::info!("Found {} commits", commits.len());
 
@@ -100,7 +106,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .map(|payload| parameters!("text" => payload.message.clone(), "text" => payload.diff.clone()))
     .collect::<Vec<_>>();
 
-  let res = chain.run(docs, parameters!(), &exec).await.context("Failed to run chain")?;
+  let res = chain.run(docs, parameters!(), &exec.unwrap()).await.context("Failed to run chain")?;
 
   println!("{}", res);
   Ok(())
