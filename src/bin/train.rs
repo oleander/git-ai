@@ -1,8 +1,9 @@
 use std::sync::Mutex;
 
-use llm_chain::chains::map_reduce::Chain;
 use llm_chain::{executor, options, parameters, prompt};
+use llm_chain::chains::map_reduce::Chain;
 use git2::{DiffOptions, Repository};
+use llm_chain::traits::Executor;
 use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use llm_chain::step::Step;
@@ -80,8 +81,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let cli = Cli::parse();
   let max_tokens = cli.max_tokens.unwrap_or(DEFAULT_MAX_TOKENS);
   let options = options!(MaxTokens: max_tokens);
-    use llm_chain::traits::Executor;
-    let exec = llm_chain_openai::chatgpt::Executor::new_with_options(options);
+  let exec = llm_chain_llama::Executor::new_with_options(options);
+
 
   env_logger::init();
 
