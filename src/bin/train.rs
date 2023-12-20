@@ -59,15 +59,17 @@ impl RepositoryExt for Repository {
   fn get_last_n_commits(&self, n: usize) -> Result<Vec<Payload>, git2::Error> {
     let mut revwalk = self.revwalk()?;
     revwalk.push_head()?;
-    Ok(revwalk
-      .take(n)
-      .map(move |id| {
-        let commit = self.find_commit(id.unwrap()).expect("Failed to find commit");
-        Payload {
-          message: commit.message().unwrap().to_string(), diff: commit.show(&self).unwrap()
-        }
-      })
-      .collect())
+    Ok(
+      revwalk
+        .take(n)
+        .map(move |id| {
+          let commit = self.find_commit(id.unwrap()).expect("Failed to find commit");
+          Payload {
+            message: commit.message().unwrap().to_string(), diff: commit.show(&self).unwrap()
+          }
+        })
+        .collect()
+    )
   }
 }
 
