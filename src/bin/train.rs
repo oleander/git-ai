@@ -1,17 +1,21 @@
+use std::sync::Mutex;
+
 use llm_chain::chains::map_reduce::Chain;
-use llm_chain::step::Step;
-use llm_chain::{executor, parameters, prompt, Parameters};
+use llm_chain::{executor, parameters, prompt};
 use git2::{DiffOptions, Repository};
+use anyhow::{Context, Result};
+use lazy_static::lazy_static;
+use llm_chain::step::Step;
 
-// trait CommitMessage {
-//   fn message(&self) -> String;
-// }
+lazy_static! {
+  pub static ref REPO: Mutex<Repository> = Mutex::new(Repository::open_from_env().expect("Failed to open repository"));
+}
 
-// impl CommitMessage for git2::Commit<'_> {
-//   fn message(&self) -> String {
-//     self.summary().unwrap_or_default().to_string()
-//   }
-// }
+#[derive(Debug, Clone)]
+struct Payload {
+  pub message: String,
+  pub diff:    String
+}
 
 trait CommitExt {
   fn show(&self, repo: &Repository) -> Result<String, git2::Error>;
@@ -43,12 +47,6 @@ impl CommitExt for git2::Commit<'_> {
   }
 }
 
-#[derive(Debug, Clone)]
-struct Payload {
-  pub message: String,
-  pub diff:    String
-}
-
 fn get_last_n_commits(repo_path: &str, n: usize) -> Vec<Payload> {
   let repo = Repository::open(repo_path).expect("Failed to open repository");
   let mut revwalk = repo.revwalk().expect("Failed to create revwalk");
@@ -66,11 +64,10 @@ fn get_last_n_commits(repo_path: &str, n: usize) -> Vec<Payload> {
     .collect()
 }
 
-use anyhow::{Context, Result};
-
-#[tokio::main(flavor = "current_thread")]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let exec = executor!()?;
+
   env_logger::init();
 
   let map_prompt = Step::for_prompt_template(prompt!(
