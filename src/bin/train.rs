@@ -34,7 +34,7 @@ impl CommitExt for git2::Commit<'_> {
     let mut opts = DiffOptions::new();
     let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut opts))?;
 
-    diff.print(git2::DiffFormat::Patch, |delta, _hunk, line| {
+    diff.print(git2::DiffFormat::Patch, |_delta, _hunk, line| {
       commit_info.push_str(std::str::from_utf8(line.content()).unwrap());
       true
     })?;
@@ -85,6 +85,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let chain = Chain::new(map_prompt, reduce_prompt);
   let current_dir = std::env::current_dir().unwrap();
   let commits = get_last_n_commits(current_dir.to_str().unwrap(), 3);
+
+  log::info!("Found {} commits", commits.len());
+
   let docs = commits
     .iter()
     .map(|payload| parameters!("last_commit_message" => payload.message.clone(), "code_diff" => payload.diff.clone()))
