@@ -69,10 +69,10 @@ use clap::Parser;
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-  #[arg(short, long)]
+  #[arg(long)]
   max_commits: Option<u8>,
 
-  #[arg(short, long)]
+  #[arg(long)]
   max_tokens: Option<u16>
 }
 
@@ -81,7 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let cli = Cli::parse();
   let max_tokens = cli.max_tokens.unwrap_or(DEFAULT_MAX_TOKENS);
   let options = options!(MaxTokens: max_tokens);
-  let exec = llm_chain_llama::Executor::new_with_options(options);
+  let exec = llm_chain_openai::chatgpt::Executor::new_with_options(options);
 
   env_logger::init();
 
