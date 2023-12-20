@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use llm_chain::{executor, options, parameters, prompt};
+use llm_chain::{options, parameters, prompt};
 use llm_chain::chains::map_reduce::Chain;
 use git2::{DiffOptions, Repository};
 use llm_chain::traits::Executor;
@@ -82,7 +82,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let max_tokens = cli.max_tokens.unwrap_or(DEFAULT_MAX_TOKENS);
   let options = options!(MaxTokens: max_tokens);
   let exec = llm_chain_llama::Executor::new_with_options(options);
-
 
   env_logger::init();
 
