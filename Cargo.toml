@@ -52,6 +52,7 @@ async-openai = "0.17.1"
 backoff = { version = "0.4.0", features = ["tokio"] }
 flate2 = "1.0.28"
 base64 = "0.21.5"
+hex = "0.4.3"
 
 [dependencies.git2]
 default-features = false

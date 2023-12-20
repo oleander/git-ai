@@ -138,12 +138,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .unwrap();
 
   let key = "git-ai-history";
-  let value = decode(str)?;
-  let utf8 = str::from_utf8(&value)?;
-
+  let value = hex::encode(str);
   let mut config = repo.config()?;
 
-  config.set_str(key, utf8)?;
+  config.set_str(key, value.as_str())?;
 
   log::info!("Wrote {} bytes to {}", value.len(), key);
 
