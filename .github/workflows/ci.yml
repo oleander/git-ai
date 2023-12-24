@@ -29,28 +29,28 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ matrix.os }}-cargo-${{ matrix.toolchain }}-${{ hashFiles('**/Cargo.lock') }}
-      # - name: Install Rust toolchain
-      #   uses: actions-rs/toolchain@v1
-      #   with:
-      #     toolchain: ${{ matrix.toolchain }}
-      #     override: true
-      #     default: true
-      #     profile: minimal
-      #     components: rustfmt,clippy
-      # - name: Run tests
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: test
-      # - name: Build git-ai for release
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: build
-      #     args: --release --bin git-ai
-      # - name: Build git-ai-hook for release
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: build
-      #     args: --release --bin git-ai-hook
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+          default: true
+          profile: minimal
+          components: rustfmt,clippy
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+      - name: Build git-ai for release
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --bin git-ai
+      - name: Build git-ai-hook for release
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --bin git-ai-hook
       - name: Run integration tests
         run: ./test.sh
         env:
