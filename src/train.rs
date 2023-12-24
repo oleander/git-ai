@@ -109,7 +109,7 @@ pub async fn run(args: &ArgMatches) -> Result<()> {
   let chain = Chain::new(map_prompt, reduce_prompt);
   let commits = repo.get_last_n_commits(max_commits, max_tokens).unwrap();
 
-  log::info!("Found {} commits", commits.len());
+  println!("Will train on {} commits", commits.len());
 
   let docs = commits
     .iter()
@@ -130,7 +130,7 @@ pub async fn run(args: &ArgMatches) -> Result<()> {
 
   config.set_str(key, value.as_str())?;
 
-  log::info!("Wrote {} bytes to {}", value.len(), key);
+  println!("Finished training!");
 
   Ok(())
 }
