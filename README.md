@@ -14,7 +14,10 @@ git-ai hook install # install the Git hook
 # make a change
 git add .
 git commit --no-edit # leave the commit message empty
-git ai --help # for more options
+git-ai --help # for more options
+
+# or to show some examples
+git-ai examples
 ```
 
 ## Installation
