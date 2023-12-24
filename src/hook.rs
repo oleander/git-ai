@@ -9,7 +9,7 @@ use dotenv_codegen::dotenv;
 use thiserror::Error;
 use clap::Parser;
 
-use crate::chat::ChatError;
+use crate::commit::ChatError;
 
 pub trait FilePath {
   fn is_empty(&self) -> Result<bool> {
