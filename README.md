@@ -4,6 +4,7 @@ Git AI uses ChatGPT and git hook to generate commit messages based on the staged
 
 <table>
   <tr>
+    <!-- This cell contains the GIF -->
     <td style="width: 50%; text-align: center;">
       <img src="resources/demo.gif" alt="demo" style="max-width: 100%;"/>
     </td>
@@ -15,8 +16,6 @@ cd &lt;your-git-repo&gt;
 git-ai hook install # install the Git hook
 git add .
 git commit --no-edit # leave the commit message empty
-git-ai --help # for more options
-git-ai examples
       </code></pre>
     </td>
   </tr>
