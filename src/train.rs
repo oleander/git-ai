@@ -10,6 +10,7 @@ use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use llm_chain::step::Step;
 use clap::{Parser, ArgMatches};
+use ai::config::APP;
 
 lazy_static! {
   pub static ref REPO: Mutex<Repository> = Mutex::new(Repository::open_from_env().expect("Failed to open repository"));
@@ -69,17 +70,19 @@ impl RepositoryExt for Repository {
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-  #[arg(long)]
+  #[arg(long, default_value = "10")]
   max_commits: Option<u8>,
 
-  #[arg(long)]
+  #[arg(long, default_value = "4500")]
   max_tokens: Option<u16>
 }
 
 pub async fn run(args: &ArgMatches) -> Result<()> {
-  let max_commits: usize =  *args.get_one("max-commits").context("Failed to parse timeout")?;
-  let max_tokens: usize =  *args.get_one("max-tokens").context("Failed to parse timeout")?;
-  let options = options!(MaxTokens: max_tokens, MaxContextSize: max_tokens);
+  let max_commits: usize =  *args.get_one("max-commits").unwrap_or(&10);
+  let max_tokens: usize =  *args.get_one("max-tokens").unwrap_or(&4500);
+  let api_key = APP.openai_api_key.clone().context("Failed to get OpenAI API key, please run `git-ai config set openapi-api-key <api-key>`")?;
+
+  let options = options!(MaxTokens: max_tokens, MaxContextSize: max_tokens, ApiKey: api_key);
   let exec = llm_chain_openai::chatgpt::Executor::new_with_options(options);
 
   let style = ProgressStyle::default_spinner()
@@ -91,8 +94,6 @@ pub async fn run(args: &ArgMatches) -> Result<()> {
   pb.set_style(style);
   pb.set_message("Building chain...");
   pb.enable_steady_tick(Duration::from_millis(150));
-
-  env_logger::init();
 
   let map_prompt = Step::for_prompt_template(prompt!(
     "You are an AI trained to analyze code diffs and generate commit messages that match the style and tonality of previous commits.",
