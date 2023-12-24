@@ -60,10 +60,10 @@ opt-level = 3
 debug = true
 lto = true
 
-[profile.dev.package."*"]
+[profile.release.package."*"]
 codegen-units = 1
 opt-level = 3
 
 [env]
-RUST_LOG = "debug"
+RUST_LOG = "info"
 
