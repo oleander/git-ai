@@ -59,11 +59,12 @@ pub async fn run(args: &clap::ArgMatches) -> Result<()> {
   let max_tokens = config::APP.max_diff_tokens;
   let commits = repo.get_last_n_commits(5, max_tokens).context("Failed to get last commit")?;
 
+  println!("Examples of generated commit messages from the last {} commits:", commits.len());
   for (index, commit) in commits.iter().enumerate() {
     let commit_message = generate_commit(commit.show(&repo, max_tokens)?).await?;
-    log::info!("Commit #{}:", index + 1);
-    log::info!("\tGenerated commit message: {}", commit_message);
-    log::info!("\tOriginal commit message: {}", commit.message().unwrap_or(""));
+    println!("Commit #{}:", index + 1);
+    println!("\tGenerated commit message: {}", commit_message);
+    println!("\tOriginal commit message: {}", commit.message().unwrap_or(""));
   }
 
   Ok(())
