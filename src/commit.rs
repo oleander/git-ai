@@ -57,6 +57,7 @@ fn user_prompt(diff: String) -> Result<ChatCompletionRequestUserMessage, OpenAIE
   ChatCompletionRequestUserMessageArgs::default().content(payload).build()
 }
 
+// Generate a commit message using OpenAI's API using the provided git diff
 pub async fn generate(diff: String) -> Result<String, ChatError> {
   log::debug!("Generating commit message using config: {:?}", config::APP);
 
@@ -65,7 +66,6 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {
     .clone()
     .context("Failed to get OpenAI API key, please run `git-ai config set openapi-api-key <api-key>`")?;
   let max_length_of_commit = config::APP.max_length;
-  let max_tokens = config::APP.max_diff_tokens;
   let language = config::APP.language.clone();
   let model = config::APP.model.clone();
 
@@ -79,7 +79,6 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {
 
   log::debug!("Creating chat completion request");
   let request = CreateChatCompletionRequestArgs::default()
-    .max_tokens(max_tokens as u16)
     .messages(messages)
     .model(model)
     .n(1)
