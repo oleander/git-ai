@@ -28,6 +28,7 @@ impl RepositoryExt for Repository {
   }
 }
 
+// TODO: Duplicate code from src/commit.rs
 trait CommitExt {
   fn show(&self, repo: &Repository, max_tokens: usize) -> Result<String, git2::Error>;
 }
