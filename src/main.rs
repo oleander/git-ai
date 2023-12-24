@@ -1,7 +1,6 @@
 mod uninstall;
 mod install;
 mod config;
-mod train;
 mod examples;
 
 use clap::{Arg, Command};
@@ -76,15 +75,6 @@ fn cli() -> Command {
             .arg(Arg::new("KEY").required(true).index(1))
         )
     )
-    // train
-    .subcommand(
-      Command::new("train")
-        .about("Trains the AI")
-        .arg(Arg::new("max-commits").value_parser(clap::value_parser!(usize)))
-        .arg(Arg::new("max-tokens").value_parser(clap::value_parser!(usize)))
-    )
-
-    // examples
     .subcommand(
       Command::new("examples")
         .about("Trains the AI")
@@ -119,9 +109,6 @@ async fn main() -> Result<()> {
         },
         _ => unreachable!()
       }
-    },
-    Some(("train", args)) => {
-      train::run(args).await?;
     },
     Some(("examples", args)) => {
       examples::run(args).await?;
