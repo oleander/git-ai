@@ -1,22 +1,17 @@
 // Hook: prepare-commit-msg
 
 use std::path::Path;
-use std::time::Duration;
 
 use git2::{DiffOptions, Repository, RepositoryOpenFlags};
-use anyhow::{Context, Result};
-use clap::Parser;
-use indicatif::{ProgressBar, ProgressStyle};
-use ai::hook::{FilePath, PatchRepository, *};
 use ai::commit::generate_commit;
-use ai::config;
+use anyhow::{Context, Result};
 
 trait RepositoryExt {
-  fn get_last_n_commits(&self, max_commits: usize, max_tokens: usize) -> Result<Vec<git2::Commit>, git2::Error>;
+  fn get_last_n_commits(&self, max_commits: usize) -> Result<Vec<git2::Commit>, git2::Error>;
 }
 
 impl RepositoryExt for Repository {
-  fn get_last_n_commits(&self, max_commits: usize, max_tokens: usize) -> Result<Vec<git2::Commit>, git2::Error> {
+  fn get_last_n_commits(&self, max_commits: usize) -> Result<Vec<git2::Commit>, git2::Error> {
     let mut revwalk = self.revwalk()?;
     revwalk.push_head()?;
     Ok(
@@ -55,9 +50,9 @@ impl CommitExt for git2::Commit<'_> {
 pub async fn run(args: &clap::ArgMatches) -> Result<()> {
   let current_dir = std::env::current_dir().context("Failed to get current directory")?;
   let repo = Repository::open_ext(&current_dir, RepositoryOpenFlags::empty(), Vec::<&Path>::new())?;
-
-  let max_tokens = config::APP.max_diff_tokens;
-  let commits = repo.get_last_n_commits(5, max_tokens).context("Failed to get last commit")?;
+  let max_tokens = *args.get_one("max-tokens").context("Failed to get max tokens")?;
+  let max_commits = *args.get_one("max-commits").context("Failed to get max commits")?;
+  let commits = repo.get_last_n_commits(max_commits).context("Failed to get last commit")?;
 
   println!("Examples of generated commit messages from the last {} commits:", commits.len());
   for (index, commit) in commits.iter().enumerate() {
