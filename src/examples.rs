@@ -3,9 +3,9 @@
 use std::path::Path;
 
 use git2::{DiffOptions, Repository, RepositoryOpenFlags};
-use ai::commit::generate_commit;
 use anyhow::{Context, Result};
 use ai::config::APP;
+use ai::commit;
 
 const MAX_NUMBER_OF_COMMITS: usize = 5;
 
@@ -59,7 +59,7 @@ pub async fn run(_args: &clap::ArgMatches) -> Result<()> {
 
   println!("Examples of generated commit messages from the last {} commits:", commits.len());
   for (index, commit) in commits.iter().enumerate() {
-    let commit_message = generate_commit(commit.show(&repo, max_tokens)?).await?;
+    let commit_message = commit::generate(commit.show(&repo, max_tokens)?).await?;
     println!("Commit #{}:", index + 1);
     println!("\tGenerated commit message: {}", commit_message);
     println!("\tOriginal commit message: {}", commit.message().unwrap_or(""));

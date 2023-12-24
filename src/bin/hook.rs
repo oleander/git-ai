@@ -7,7 +7,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use ai::hook::{FilePath, PatchRepository, *};
-use ai::commit::generate_commit;
+use ai::commit;
 use ai::config;
 
 #[tokio::main]
@@ -54,7 +54,7 @@ async fn main() -> Result<()> {
     Err(HookError::EmptyDiffOutput)?;
   }
 
-  let commit_message = generate_commit(patch.to_string()).await?;
+  let commit_message = commit::generate(patch.to_string()).await?;
 
   args
     .commit_msg_file

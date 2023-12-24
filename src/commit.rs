@@ -57,7 +57,7 @@ fn user_prompt(diff: String) -> Result<ChatCompletionRequestUserMessage, OpenAIE
   ChatCompletionRequestUserMessageArgs::default().content(payload).build()
 }
 
-pub async fn generate_commit(diff: String) -> Result<String, ChatError> {
+pub async fn generate(diff: String) -> Result<String, ChatError> {
   log::debug!("Generating commit message using config: {:?}", config::APP);
 
   let api_key = config::APP
