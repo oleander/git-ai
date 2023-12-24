@@ -69,15 +69,10 @@ fn cli() -> Command {
               )
             )
         )
-        .subcommand(
-          Command::new("get")
-            .about("Gets a configuration value")
-            .arg(Arg::new("KEY").required(true).index(1))
-        )
     )
     .subcommand(
       Command::new("examples")
-        .about("Trains the AI")
+        .about("Runs examples of generated commit messages")
         .arg(Arg::new("max-commits").value_parser(clap::value_parser!(usize)))
         .arg(Arg::new("max-tokens").value_parser(clap::value_parser!(usize)))
     )

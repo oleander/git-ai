@@ -9,11 +9,12 @@ cargo install git-ai
 git-ai config set openapi-api-key <api-key>
 
 cd <your-git-repo>
-git-ai hook install
+git-ai hook install # install the Git hook
 
 # make a change
 git add .
-git commit --no-edit
+git commit --no-edit # leave the commit message empty
+git ai --help # for more options
 ```
 
 ## Installation

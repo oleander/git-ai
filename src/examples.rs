@@ -50,8 +50,8 @@ impl CommitExt for git2::Commit<'_> {
 pub async fn run(args: &clap::ArgMatches) -> Result<()> {
   let current_dir = std::env::current_dir().context("Failed to get current directory")?;
   let repo = Repository::open_ext(&current_dir, RepositoryOpenFlags::empty(), Vec::<&Path>::new())?;
-  let max_tokens = *args.get_one("max-tokens").context("Failed to get max tokens")?;
-  let max_commits = *args.get_one("max-commits").context("Failed to get max commits")?;
+  let max_tokens: usize = *args.get_one("max-tokens").context("Failed to get max tokens")?;
+  let max_commits: usize = *args.get_one("max-commits").context("Failed to get max commits")?;
   let commits = repo.get_last_n_commits(max_commits).context("Failed to get last commit")?;
 
   println!("Examples of generated commit messages from the last {} commits:", commits.len());
