@@ -56,7 +56,8 @@ Use `git-ai hook` followed by:
 
 ## Testing
 
-Execute `cargo test` to run the test suite.
+* Execute `cargo test` to run the test suite.
+* Use [act](https://github.com/nektos/act)
 
 ## License
 

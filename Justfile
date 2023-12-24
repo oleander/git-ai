@@ -26,3 +26,5 @@ release:
   git push origin v$version
   git push origin main
   git push --tags
+act:
+  act --container-architecture linux/amd64
