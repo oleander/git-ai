@@ -31,6 +31,7 @@ git ai --help # for more options
 - Install the binary as per the instructions above.
 - Use `git ai hook install` to set up the Git hook.
 - Set the OpenAI API key with `git-ai config set openapi-api-key <api-key>`.
+- Use `git ai examples` to see some examples based on your previous commits. This does not change anything in your repository.
 
 ## CLI Options
 
