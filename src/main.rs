@@ -25,11 +25,6 @@ fn cli() -> Command {
           Command::new("set")
             .about("Sets a configuration value")
             .subcommand(
-              Command::new("timeout")
-                .about("Sets the timeout for the OpenAI API")
-                .arg(Arg::new("timeout").required(true).index(1).value_parser(clap::value_parser!(usize)))
-            )
-            .subcommand(
               Command::new("model").about("Sets the model to use").arg(
                 Arg::new("<VALUE>")
                   .required(true)

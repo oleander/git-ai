@@ -67,9 +67,6 @@ impl App {
 pub fn run(args: &ArgMatches) -> Result<()> {
   let mut app = App::new()?;
   match args.subcommand() {
-    Some(("timeout", args)) => {
-      app.timeout = *args.get_one("timeout").context("Failed to parse timeout")?;
-    },
     Some(("model", args)) => {
       app.model = args.get_one::<String>("<VALUE>").context("Failed to parse model")?.clone();
     },
