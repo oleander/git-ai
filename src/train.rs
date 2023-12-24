@@ -14,7 +14,7 @@ use llm_chain::traits::Executor;
 use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use llm_chain::step::Step;
-use clap::Parser;
+use clap::{Parser, ArgMatches};
 
 const DEFAULT_MAX_COMMITS: u8 = 10;
 const DEFAULT_MAX_TOKENS: u16 = 3500;
@@ -84,10 +84,9 @@ struct Cli {
   max_tokens: Option<u16>
 }
 
-#[tokio::main(flavor = "multi_thread")]
-pub fn run(args: &ArgMatches) -> Result<()> {
-  let max_commits = args.value_of("max-commits").unwrap_or(DEFAULT_MAX_COMMITS.to_string()).parse::<u8>().unwrap();
-  let max_tokens = args.value_of("max-tokens").unwrap_or(DEFAULT_MAX_TOKENS.to_string()).parse::<u16>().unwrap();
+pub async fn run(args: &ArgMatches) -> Result<()> {
+  let max_commits: usize =  *args.get_one("max-commits").context("Failed to parse timeout")?;
+  let max_tokens: usize =  *args.get_one("max-tokens").context("Failed to parse timeout")?;
   let options = options!(MaxTokens: max_tokens, MaxContextSize: max_tokens);
   let exec = llm_chain_openai::chatgpt::Executor::new_with_options(options);
 

@@ -1,6 +1,7 @@
 mod uninstall;
 mod install;
 mod config;
+mod train;
 
 use clap::{Arg, Command};
 use anyhow::Result;
@@ -78,8 +79,8 @@ fn cli() -> Command {
     .subcommand(
       Command::new("train")
         .about("Trains the AI")
-        .arg(Arg::new("max-commits").short('c').long("max-commits").takes_value(true))
-        .arg(Arg::new("max-tokens").short('t').long("max-tokens").takes_value(true))
+        .arg(Arg::new("max-commits").value_parser(clap::value_parser!(usize)))
+        .arg(Arg::new("max-tokens").value_parser(clap::value_parser!(usize)))
     )
 }
 
