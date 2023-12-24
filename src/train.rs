@@ -1,7 +1,5 @@
 use std::sync::Mutex;
 use std::time::Duration;
-use std::io::Write;
-use std::str;
 
 use indicatif::{ProgressBar, ProgressStyle};
 use llm_chain::{options, parameters, prompt};
