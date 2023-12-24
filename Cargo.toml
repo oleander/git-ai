@@ -23,8 +23,8 @@ default-features = true
 version = "4.4.11"
 
 [dependencies]
-tokio = { version = "1.35.0", features = ["macros", "rt-multi-thread"] }
-reqwest = { version = "0.11.22", features = ["json"] }
+tokio = { version = "1.35.1", features = ["macros", "rt-multi-thread"] }
+reqwest = { version = "0.11.23", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 dotenv_codegen = "0.15.0"
 serde_derive = "1.0.193"
@@ -35,10 +35,10 @@ thiserror = "1.0.51"
 indicatif = "0.17.7"
 serde_ini = "0.2.0"
 console = "0.15.7"
-anyhow = "1.0.75"
+anyhow = "1.0.76"
 dotenv = "0.15.0"
 config = "0.13.4"
-ctrlc = "3.4.1"
+ctrlc = "3.4.2"
 log = "0.4.20"
 home = "0.5.9"
 llm-chain = "0.13.0"
@@ -53,7 +53,7 @@ version = "0.18.1"
 
 [dev-dependencies]
 tempfile = "3.8.1"
-anyhow = "1.0.75"
+anyhow = "1.0.76"
 git2 = "0.18.1"
 rand = "0.8.5"
 

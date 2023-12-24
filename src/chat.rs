@@ -1,6 +1,7 @@
 use std::{io, str};
 
-use async_openai::error::OpenAIError;
+use anyhow::Context;
+use async_openai::{error::OpenAIError, config::OpenAIConfig};
 use git2::Repository;
 use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
@@ -80,7 +81,7 @@ fn history() -> Option<(String, u8)> {
   let repo = Repository::open_from_env().expect("Failed to open repository");
   let mut live_config = repo.config().expect("Failed to get config");
   let config = live_config.snapshot().expect("Failed to get config snapshot");
-  let compressed_data_str = config.get_str(key).expect("Failed to get config value");
+  let compressed_data_str = config.get_str(key).ok()?;
   let raw = hex::decode(compressed_data_str).expect("Failed to decode hex string");
   let utf8 = str::from_utf8(&raw).expect("Failed to convert to UTF-8");
   Some((utf8.to_string(), 10))
@@ -121,9 +122,13 @@ pub async fn generate_commit(diff: String) -> Result<String, ChatError> {
 
   log::info!("Sending request to OpenAI API: {:?}", messages);
 
+  let api_key = config::APP.openai_api_key.unwrap();
+  let config = OpenAIConfig::new()
+    .with_api_key(api_key);
+
   log::info!("Using backoff timeout of {:?}", timeout);
   let backoff = backoff::ExponentialBackoffBuilder::new().with_max_elapsed_time(Some(timeout)).build();
-  let client = Client::new().with_backoff(backoff);
+  let client = Client::with_config(config).with_backoff(backoff);
 
   log::info!("Creating chat completion request");
   let request = CreateChatCompletionRequestArgs::default()
