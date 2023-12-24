@@ -13,9 +13,9 @@ Git AI uses ChatGPT and git hook to generate commit messages based on the staged
 cargo install git-ai
 git-ai config set openapi-api-key &lt;api-key&gt;
 cd &lt;your-git-repo&gt;
-git-ai hook install # install the Git hook
+git-ai hook install
 git add .
-git commit --no-edit # leave the commit message empty
+git commit --no-edit
       </code></pre>
     </td>
   </tr>
