@@ -2,4 +2,4 @@
 # rustflags = ["-Z", "macro-backtrace"]
 
 [env]
-RUST_LOG = "trace"
+RUST_LOG = "info"

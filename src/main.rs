@@ -2,6 +2,7 @@ mod uninstall;
 mod install;
 mod config;
 mod train;
+mod examples;
 
 use clap::{Arg, Command};
 use anyhow::Result;
@@ -82,6 +83,14 @@ fn cli() -> Command {
         .arg(Arg::new("max-commits").value_parser(clap::value_parser!(usize)))
         .arg(Arg::new("max-tokens").value_parser(clap::value_parser!(usize)))
     )
+
+    // examples
+    .subcommand(
+      Command::new("examples")
+        .about("Trains the AI")
+        .arg(Arg::new("max-commits").value_parser(clap::value_parser!(usize)))
+        .arg(Arg::new("max-tokens").value_parser(clap::value_parser!(usize)))
+    )
 }
 
 #[tokio::main]
@@ -113,6 +122,9 @@ async fn main() -> Result<()> {
     },
     Some(("train", args)) => {
       train::run(args).await?;
+    },
+    Some(("examples", args)) => {
+      examples::run(args).await?;
     },
     _ => unreachable!()
   }
