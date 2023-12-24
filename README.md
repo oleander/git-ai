@@ -2,6 +2,8 @@
 
 Git AI uses ChatGPT and git hook to generate commit messages based on the staged files. Leave the commit message empty and let Git AI do the work for you!
 
+![demo](resources/demo.gif)
+
 ## TL;DR
 
 ```bash

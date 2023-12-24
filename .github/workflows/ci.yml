@@ -37,21 +37,21 @@ jobs:
           default: true
           profile: minimal
           components: rustfmt,clippy
-      # - name: Run tests
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: test
-      # - name: Build git-ai for release
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: build
-      #     args: --release --bin git-ai
-      # - name: Build git-ai-hook for release
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: build
-      #     args: --release --bin git-ai-hook
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+      - name: Build git-ai for release
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --bin git-ai
+      - name: Build git-ai-hook for release
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --bin git-ai-hook
       - name: Run integration tests
-        run: ./test.sh
+        run: ./tools/test.sh
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
