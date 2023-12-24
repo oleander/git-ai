@@ -1,6 +1,6 @@
 [package]
 name = "git-ai"
-version = "0.1.15"
+version = "0.1.16"
 edition = "2021"
 description = "Git AI: Automates commit messages using ChatGPT. Stage your files, and Git AI generates the messages."
 license = "MIT"
@@ -39,10 +39,10 @@ console = "0.15.7"
 anyhow = "1.0.76"
 dotenv = "0.15.0"
 config = "0.13.4"
+colored = "2.1.0"
 ctrlc = "3.4.2"
 log = "0.4.20"
 home = "0.5.9"
-colored = "2.1.0"
 
 [dependencies.git2]
 default-features = false
