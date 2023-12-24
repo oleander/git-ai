@@ -122,7 +122,7 @@ pub async fn generate_commit(diff: String) -> Result<String, ChatError> {
 
   log::info!("Sending request to OpenAI API: {:?}", messages);
 
-  let api_key = config::APP.openai_api_key.unwrap();
+  let api_key = config::APP.openai_api_key.clone().context("Failed to get OpenAI API key, please run `git-ai config set openapi-api-key <api-key>`")?;
   let config = OpenAIConfig::new()
     .with_api_key(api_key);
 
