@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
+use colored::Colorize;
 use ai::style::Styled;
 use console::Emoji;
 use git2::{Repository, RepositoryOpenFlags as Flags};
@@ -32,7 +33,7 @@ pub fn run() -> Result<()> {
 
   fs::remove_file(&hook_file).context("Failed to remove hook file")?;
 
-  println!("{EMOJI} Hook uninstall successfully from {}", hook_file.relative_path());
+  println!("{EMOJI} Hook uninstall successfully from {}", hook_file.relative_path().display().to_string().italic());
 
   Ok(())
 }

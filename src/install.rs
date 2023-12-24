@@ -2,6 +2,7 @@ use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
+use colored::Colorize;
 use ai::style::Styled;
 use console::Emoji;
 use git2::{Repository, RepositoryOpenFlags as Flags};
@@ -56,13 +57,13 @@ pub fn run() -> Result<(), InstallError> {
 
   let hook_file = hook_dir.join("prepare-commit-msg");
   if hook_file.exists() {
-    return Err(InstallError::GitHookExists(hook_file));
+    return Err(InstallError::GitHookExists(hook_file.relative_path()));
   }
 
   // Symlink the hook_bin to the hook_file
   unix_fs::symlink(&hook_bin, &hook_file)?;
 
-  println!("{EMOJI} Hook symlinked successfully to {}", hook_file.relative_path());
+  println!("{EMOJI} Hook symlinked successfully to {}", hook_file.relative_path().display().to_string().italic());
 
   Ok(())
 }
