@@ -1,7 +1,9 @@
 // Hook: prepare-commit-msg
 
 use std::path::Path;
+use std::time::Duration;
 
+use colored::Colorize;
 use git2::{DiffOptions, Repository, RepositoryOpenFlags};
 use anyhow::{Context, Result};
 use ai::config::APP;
@@ -26,7 +28,6 @@ impl RepositoryExt for Repository {
   }
 }
 
-// TOOD: Copy of src/bin/hook.rs
 trait CommitExt {
   fn show(&self, repo: &Repository, max_tokens: usize) -> Result<String, git2::Error>;
 }
@@ -50,19 +51,35 @@ impl CommitExt for git2::Commit<'_> {
   }
 }
 
+use console::Style;
+use indicatif::{ProgressBar, ProgressStyle};
+
 pub async fn run(_args: &clap::ArgMatches) -> Result<()> {
   let max_tokens = APP.max_diff_tokens;
 
   let current_dir = std::env::current_dir().context("Failed to get current directory")?;
   let repo = Repository::open_ext(&current_dir, RepositoryOpenFlags::empty(), Vec::<&Path>::new())?;
-  let commits = repo.get_last_n_commits(MAX_NUMBER_OF_COMMITS).context("Failed to get last commit")?;
+  let commits = repo.get_last_n_commits(MAX_NUMBER_OF_COMMITS).context("Failed to get last commits")?;
 
-  println!("Examples of generated commit messages from the last {} commits:", commits.len());
+  // Create and configure the progress bar
+  let spinner_style = ProgressStyle::default_spinner()
+    .tick_strings(&["-", "\\", "|", "/"])
+    .template("{spinner:.blue} {msg}")
+    .context("Failed to create progress bar style")?;
+
+  let pb = ProgressBar::new_spinner();
+  pb.set_style(spinner_style);
+  pb.enable_steady_tick(Duration::from_millis(100));
+
+  let header_style = Style::new().bold();
+  println!("{}", header_style.apply_to("🛠️  AI-Generated Commit Message Examples"));
+
   for (index, commit) in commits.iter().enumerate() {
+    pb.set_message(format!("Loading commit #{} ...\n", index + 1));
     let commit_message = commit::generate(commit.show(&repo, max_tokens)?).await?;
-    println!("Commit #{}:", index + 1);
-    println!("\tGenerated commit message: {}", commit_message);
-    println!("\tOriginal commit message: {}", commit.message().unwrap_or(""));
+    pb.println(format!("Commit #{}:", index + 1));
+    pb.println(format!("\tOriginal: {}", commit.message().unwrap_or_default().trim().italic()));
+    pb.println(format!("\tGenerated: {}", commit_message.italic()));
   }
 
   Ok(())
