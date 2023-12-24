@@ -11,7 +11,7 @@ rm -rf $DEMO_PATH
 mkdir $DEMO_PATH
 cd $DEMO_PATH
 git init
-echo "Hello World" > README.md
+touch README.md
 git add README.md
 git commit -m "Initial commit"
 
