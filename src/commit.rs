@@ -78,11 +78,7 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {
   let client = Client::with_config(config);
 
   log::debug!("Creating chat completion request");
-  let request = CreateChatCompletionRequestArgs::default()
-    .messages(messages)
-    .model(model)
-    .n(1)
-    .build()?;
+  let request = CreateChatCompletionRequestArgs::default().messages(messages).model(model).n(1).build()?;
 
   log::debug!("Sending request to OpenAI API");
   client

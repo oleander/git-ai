@@ -33,7 +33,10 @@ pub fn run() -> Result<()> {
 
   fs::remove_file(&hook_file).context("Failed to remove hook file")?;
 
-  println!("{EMOJI} Hook uninstall successfully from {}", hook_file.relative_path().display().to_string().italic());
+  println!(
+    "{EMOJI} Hook uninstall successfully from {}",
+    hook_file.relative_path().display().to_string().italic()
+  );
 
   Ok(())
 }

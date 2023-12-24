@@ -7,8 +7,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use ai::hook::{FilePath, PatchRepository, *};
-use ai::commit;
-use ai::config;
+use ai::{commit, config};
 
 #[tokio::main]
 async fn main() -> Result<()> {

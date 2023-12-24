@@ -19,56 +19,51 @@ fn cli() -> Command {
         .subcommand(Command::new("uninstall").about("Uninstalls the git-ai hook"))
     )
     .subcommand(
-      Command::new("config")
-        .about("Sets or gets configuration values")
-        .subcommand(
-          Command::new("set")
-            .about("Sets a configuration value")
-            .subcommand(
-              Command::new("model").about("Sets the model to use").arg(
-                Arg::new("<VALUE>")
+      Command::new("config").about("Sets or gets configuration values").subcommand(
+        Command::new("set")
+          .about("Sets a configuration value")
+          .subcommand(
+            Command::new("model").about("Sets the model to use").arg(
+              Arg::new("<VALUE>")
+                .required(true)
+                .index(1)
+                .value_parser(clap::builder::NonEmptyStringValueParser::new())
+            )
+          )
+          .subcommand(
+            Command::new("language").about("Sets the language to use").arg(
+              Arg::new("<VALUE>")
+                .required(true)
+                .index(1)
+                .value_parser(clap::builder::NonEmptyStringValueParser::new())
+            )
+          )
+          .subcommand(
+            Command::new("max-diff-tokens")
+              .about("Sets the maximum number of tokens to use for the diff")
+              .arg(
+                Arg::new("max-diff-tokens")
                   .required(true)
                   .index(1)
-                  .value_parser(clap::builder::NonEmptyStringValueParser::new())
+                  .value_parser(clap::value_parser!(usize))
               )
+          )
+          .subcommand(
+            Command::new("max-length")
+              .about("Sets the maximum length of the commit message")
+              .arg(Arg::new("max-length").required(true).index(1).value_parser(clap::value_parser!(usize)))
+          )
+          .subcommand(
+            Command::new("openai-api-key").about("Sets the OpenAI API key").arg(
+              Arg::new("<VALUE>")
+                .required(true)
+                .index(1)
+                .value_parser(clap::builder::NonEmptyStringValueParser::new())
             )
-            .subcommand(
-              Command::new("language").about("Sets the language to use").arg(
-                Arg::new("<VALUE>")
-                  .required(true)
-                  .index(1)
-                  .value_parser(clap::builder::NonEmptyStringValueParser::new())
-              )
-            )
-            .subcommand(
-              Command::new("max-diff-tokens")
-                .about("Sets the maximum number of tokens to use for the diff")
-                .arg(
-                  Arg::new("max-diff-tokens")
-                    .required(true)
-                    .index(1)
-                    .value_parser(clap::value_parser!(usize))
-                )
-            )
-            .subcommand(
-              Command::new("max-length")
-                .about("Sets the maximum length of the commit message")
-                .arg(Arg::new("max-length").required(true).index(1).value_parser(clap::value_parser!(usize)))
-            )
-            .subcommand(
-              Command::new("openai-api-key").about("Sets the OpenAI API key").arg(
-                Arg::new("<VALUE>")
-                  .required(true)
-                  .index(1)
-                  .value_parser(clap::builder::NonEmptyStringValueParser::new())
-              )
-            )
-        )
+          )
+      )
     )
-    .subcommand(
-      Command::new("examples")
-        .about("Runs examples of generated commit messages")
-    )
+    .subcommand(Command::new("examples").about("Runs examples of generated commit messages"))
 }
 
 #[tokio::main]

@@ -63,7 +63,10 @@ pub fn run() -> Result<(), InstallError> {
   // Symlink the hook_bin to the hook_file
   unix_fs::symlink(&hook_bin, &hook_file)?;
 
-  println!("{EMOJI} Hook symlinked successfully to {}", hook_file.relative_path().display().to_string().italic());
+  println!(
+    "{EMOJI} Hook symlinked successfully to {}",
+    hook_file.relative_path().display().to_string().italic()
+  );
 
   Ok(())
 }
