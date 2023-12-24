@@ -3,8 +3,7 @@
 # Directory for the test repository
 DIR="/tmp/git-ai-test"
 
-# Stop the script if any command fails
-set -e
+# Stop the script if any command fails set -e
 
 # Install the git-ai
 cargo install --path .

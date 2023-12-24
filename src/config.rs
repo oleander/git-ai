@@ -58,7 +58,7 @@ impl App {
   }
 
   pub fn save(&self) -> Result<()> {
-    let contents = serde_ini::to_string(&self).context("Failed to serialize config")?;
+    let contents = serde_ini::to_string(&self).context(format!("Failed to serialize config: {:?}", self))?;
     let mut file = File::create(CONFIG_PATH.to_str().unwrap()).context("Failed to create config file")?;
     file.write_all(contents.as_bytes()).context("Failed to write config file")
   }
