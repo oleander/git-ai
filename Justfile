@@ -20,6 +20,9 @@ simulate:
   ./simulate.sh
 release:
   #!/usr/bin/env bash
+  cargo update
+  git add Cargo.lock Cargo.toml
+  git commit --no-edit
   version=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version' | tr -d '\n')
   echo "Releasing $version"
   git tag -a v$version -m "Release v$version"
