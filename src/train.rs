@@ -85,9 +85,9 @@ struct Cli {
 }
 
 #[tokio::main(flavor = "multi_thread")]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-  let cli = Cli::parse();
-  let max_tokens = cli.max_tokens.unwrap_or(DEFAULT_MAX_TOKENS);
+pub fn run(args: &ArgMatches) -> Result<()> {
+  let max_commits = args.value_of("max-commits").unwrap_or(DEFAULT_MAX_COMMITS.to_string()).parse::<u8>().unwrap();
+  let max_tokens = args.value_of("max-tokens").unwrap_or(DEFAULT_MAX_TOKENS.to_string()).parse::<u16>().unwrap();
   let options = options!(MaxTokens: max_tokens, MaxContextSize: max_tokens);
   let exec = llm_chain_openai::chatgpt::Executor::new_with_options(options);
 
@@ -115,12 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   let repo = REPO.lock().unwrap();
   let chain = Chain::new(map_prompt, reduce_prompt);
-  let commits = repo
-    .get_last_n_commits(
-      cli.max_commits.unwrap_or(DEFAULT_MAX_COMMITS) as usize,
-      cli.max_tokens.unwrap_or(DEFAULT_MAX_TOKENS) as usize
-    )
-    .unwrap();
+  let commits = repo.get_last_n_commits(max_commits, max_tokens).unwrap();
 
   log::info!("Found {} commits", commits.len());
 

@@ -74,6 +74,13 @@ fn cli() -> Command {
             .arg(Arg::new("KEY").required(true).index(1))
         )
     )
+    // train
+    .subcommand(
+      Command::new("train")
+        .about("Trains the AI")
+        .arg(Arg::new("max-commits").short('c').long("max-commits").takes_value(true))
+        .arg(Arg::new("max-tokens").short('t').long("max-tokens").takes_value(true))
+    )
 }
 
 #[tokio::main]
@@ -102,6 +109,9 @@ async fn main() -> Result<()> {
         },
         _ => unreachable!()
       }
+    },
+    Some(("train", args)) => {
+      train::run(args).await?;
     },
     _ => unreachable!()
   }
