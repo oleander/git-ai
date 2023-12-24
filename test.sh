@@ -19,6 +19,8 @@ git init
 # Configure user details
 git config user.name "Test User"
 git config user.email "hello@world.com"
+git config --global init.defaultBranch main
+git branch -m main
 
 # Test the git-ai hook installation and uninstallation
 echo "Testing git-ai hook installation..."
@@ -32,8 +34,8 @@ git ai hook install
 echo "Setting configuration values..."
 git ai config set model gpt-4
 git ai config set language en
-git ai config set max-diff-tokens 500
-git ai config set max-length 120
+git ai config set max-diff-tokens 1500
+git ai config set max-length 72
 git ai config set openai-api-key $OPENAI_API_KEY
 
 # Create a commit to test hook functionality

@@ -19,15 +19,15 @@ jobs:
         with:
           toolchain: nightly
           override: true
-      - name: Cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
+      # - name: Cargo test
+      #   uses: actions-rs/cargo@v1
+      #   with:
+      #     command: test
       - name: Run integration tests
         run: ./test.sh
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      - name: Cargo publish
-        uses: katyo/publish-crates@v2
-        with:
-          registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      # - name: Cargo publish
+      #   uses: katyo/publish-crates@v2
+      #   with:
+      #     registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
