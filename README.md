@@ -2,25 +2,26 @@
 
 Git AI uses ChatGPT and git hook to generate commit messages based on the staged files. Leave the commit message empty and let Git AI do the work for you!
 
-![demo](resources/demo.gif)
-
-## TL;DR
-
-```bash
+<table>
+  <tr>
+    <td style="width: 50%; text-align: center;">
+      <img src="resources/demo.gif" alt="demo" style="max-width: 100%;"/>
+    </td>
+    <td style="width: 50%; vertical-align: top;">
+      <pre><code>
 cargo install git-ai
-git-ai config set openapi-api-key <api-key>
-
-cd <your-git-repo>
+git-ai config set openapi-api-key &lt;api-key&gt;
+cd &lt;your-git-repo&gt;
 git-ai hook install # install the Git hook
-
-# make a change
 git add .
 git commit --no-edit # leave the commit message empty
 git-ai --help # for more options
-
-# or to show some examples
 git-ai examples
-```
+      </code></pre>
+    </td>
+  </tr>
+</table>
+
 
 ## Installation
 
