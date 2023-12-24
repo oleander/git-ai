@@ -5,19 +5,13 @@ use std::str;
 
 use indicatif::{ProgressBar, ProgressStyle};
 use llm_chain::{options, parameters, prompt};
-use base64::decode;
 use llm_chain::chains::map_reduce::Chain;
-use git2::{Config, DiffOptions, Repository};
-use flate2::write::GzEncoder;
-use flate2::Compression;
+use git2::{DiffOptions, Repository};
 use llm_chain::traits::Executor;
 use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use llm_chain::step::Step;
 use clap::{Parser, ArgMatches};
-
-const DEFAULT_MAX_COMMITS: u8 = 10;
-const DEFAULT_MAX_TOKENS: u16 = 3500;
 
 lazy_static! {
   pub static ref REPO: Mutex<Repository> = Mutex::new(Repository::open_from_env().expect("Failed to open repository"));
