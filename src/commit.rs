@@ -20,7 +20,7 @@ pub enum ChatError {
   #[error("IO error: {0}")]
   IOError(#[from] io::Error),
   #[error("Failed to parse JSON: {0}")]
-  hhhhhJsonParseError(#[from] serde_json::Error),
+  JsonParseError(#[from] serde_json::Error),
   #[error("Anyhow error: {0}")]
   Anyhow(#[from] anyhow::Error),
   #[error("OpenAI error: {0}")]
