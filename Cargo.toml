@@ -20,23 +20,23 @@ path = "src/bin/hook.rs"
 [dependencies.clap]
 features = ["derive", "wrap_help"]
 default-features = true
-version = "4.4.11"
+version = "4.4.14"
 
 [dependencies]
 tokio = { version = "1.35.1", features = ["macros", "rt-multi-thread"] }
 reqwest = { version = "0.11.23", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 dotenv_codegen = "0.15.0"
-serde_derive = "1.0.193"
+serde_derive = "1.0.195"
 async-openai = "0.18.0"
-serde_json = "1.0.108"
+serde_json = "1.0.111"
 env_logger = "0.10.1"
 lazy_static = "1.4.0"
-thiserror = "1.0.51"
+thiserror = "1.0.56"
 indicatif = "0.17.7"
 serde_ini = "0.2.0"
-console = "0.15.7"
-anyhow = "1.0.76"
+console = "0.15.8"
+anyhow = "1.0.79"
 dotenv = "0.15.0"
 config = "0.13.4"
 colored = "2.1.0"
@@ -49,8 +49,8 @@ default-features = false
 version = "0.18.1"
 
 [dev-dependencies]
-tempfile = "3.8.1"
-anyhow = "1.0.76"
+tempfile = "3.9.0"
+anyhow = "1.0.79"
 git2 = "0.18.1"
 rand = "0.8.5"
 
