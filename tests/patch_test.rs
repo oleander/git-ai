@@ -22,6 +22,7 @@ fn test_file_path_write_and_read() {
   let message = "Hello, world!";
 
   path.write(message.to_string()).unwrap();
+
   let contents = path.read().unwrap();
 
   assert_eq!(contents, message);
