@@ -31,3 +31,5 @@ release:
   git push --tags
 act:
   act --container-architecture linux/amd64
+clean:
+  cargo clean
