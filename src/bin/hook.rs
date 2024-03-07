@@ -92,19 +92,16 @@ async fn main() -> Result<()> {
 
   // Wait for either the progress task to complete or an exit signal from the input handler
   let pb1 = pb.clone();
-  let multi1 = multi.clone();
   select! {
-      _ = progress_task => {},
+      _ = progress_task => {
+          pb1.finish_with_message("Done");
+      },
       _ = rx.recv() => {
           pb1.finish_with_message("Aborted");
-          multi1.remove(&pb1);
-          writeln!(stdout, "").unwrap();
-          std::process::exit(0);
       },
   }
 
-  pb.finish_with_message("Done");
-  multi.remove(&pb);
+  multi.remove(&pb1);
   writeln!(stdout, "").unwrap();
 
   Ok(())
