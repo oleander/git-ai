@@ -2,12 +2,20 @@
 FROM rust:1.76.0 as builder
 WORKDIR /git-ai
 
+# Fake project to cache dependenciej
+WORKDIR /git-ai
+RUN cargo init --lib --name ai
+RUN cp src/lib.rs src/main.rs
+COPY Cargo.toml Cargo.lock ./
+RUN cargo build
+
 # Copy project files and build the project
 COPY . .
 RUN cargo build --bins
 
 # Use a slim version of Debian for the final image
 FROM debian:buster-slim
+
 COPY --from=builder /git-ai/target/debug/git-ai /usr/local/bin/git-ai
 COPY --from=builder /git-ai/target/debug/git-ai-hook /usr/local/bin/git-ai-hook
 
