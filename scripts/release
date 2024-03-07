@@ -2,11 +2,14 @@
 
 set -e
 
+echo "Bump version in Cargo.toml, I'm waiting for you to do it"
+read -p "Press enter to continue"
+
 VERSION=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version' | tr -d '\n')
 
 if [ -z "$VERSION" ]; then
-    echo "Failed to get version"
-    exit 1
+  echo "Failed to get version"
+  exit 1
 fi
 
 echo "Releasing $VERSION"
