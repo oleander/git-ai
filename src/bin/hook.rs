@@ -14,6 +14,7 @@ use ai::hook::*;
 use ai::{commit, config};
 use env_logger;
 use indicatif_log_bridge::LogWrapper;
+use crossterm::terminal;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -55,7 +56,7 @@ async fn main() -> Result<()> {
   let repo = Repository::open_from_env().context("Failed to open repository")?;
   let tree = match args.sha1.as_deref() {
     Some("HEAD") => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
-    Some(sha1) => panic!("sha1: {}", sha1),
+    Some(sha1) => repo.find_object(git2::Oid::from_str(sha1)?, None).ok().and_then(|obj| obj.peel_to_tree().ok()),
     None => repo.head().ok().and_then(|head| head.peel_to_tree().ok())
   };
 
@@ -74,7 +75,6 @@ async fn main() -> Result<()> {
 
   // Separate blocking task for progress bar updates
   let pb2 = pb.clone();
-  let multi2 = multi.clone();
   let progress_task = tokio::task::spawn_blocking(move || {
     pb2.set_style(
       ProgressStyle::default_spinner()
@@ -95,11 +95,17 @@ async fn main() -> Result<()> {
 
     _ = rx.recv() => {
       pb.finish_with_message("Aborted");
+      stdout.flush().unwrap();
+      terminal::disable_raw_mode().unwrap();
+      println!("\x1B[?25h");
     },
   }
 
   multi.remove(&pb);
-  writeln!(stdout, "").unwrap();
+  stdout.flush().unwrap();
+  terminal::disable_raw_mode().unwrap();
+  println!("\x1B[?25h"); // ANSI escape code to show curso
+
 
   Ok(())
 }
