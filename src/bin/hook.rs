@@ -1,10 +1,7 @@
 // Hook: prepare-commit-msg
 
 use tokio::time::sleep;
-use tokio::sync::mpsc;
-use tokio::io::AsyncReadExt;
-use tokio::{select, signal, time};
-use termion::raw::IntoRawMode;
+use tokio::signal;
 use termion::input::TermRead;
 use termion::event::Key;
 use std::time::Duration;
