@@ -28,9 +28,8 @@ async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
       }
 
       Some(Ok(_)) => {
-        pb.println("");
+        pb.abandon();
       }
-
 
 
       Some(Err(e)) => {
