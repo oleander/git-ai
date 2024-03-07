@@ -18,14 +18,15 @@ use indicatif_log_bridge::LogWrapper;
 use crossterm::terminal;
 
 async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
-  let mut stdin = tokio::io::stdin();
   let mut buffer = [0u8; 10];
+  let mut stdin = tokio::io::stdin();
 
   loop {
     if stdin.read(&mut buffer).await? == 0 {
       // return Ok(0);
 
-      pb.println(buffer[0].to_string());
+      // pb.println(buffer[0].to_string());
+      pb.println("");
     } else if buffer[0] == 3 {
       // pb.println(buffer[0].to_string());
       // return Ok(0);
@@ -46,6 +47,7 @@ async fn main() -> Result<()> {
   }
 
   let pb = ProgressBar::new_spinner();
+  // pb.set_draw_target(stdin);
   pb.enable_steady_tick(Duration::from_millis(150));
   pb.set_message("Generating commit message...");
   pb.set_style(
