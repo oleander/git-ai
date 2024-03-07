@@ -20,7 +20,7 @@ use crossterm::terminal;
 
 async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
   let mut stdin = termion::async_stdin().keys();
-  let stdout = io::stdout();
+  let mut stdout = io::stdout();
 
   loop {
     match stdin.next() {
@@ -29,7 +29,8 @@ async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
       }
 
       Some(Ok(_)) => {
-        stdout.lock().flush().unwrap();
+        write!(stdout, "{}", termion::clear::CurrentLine).unwrap();
+
       }
 
 
