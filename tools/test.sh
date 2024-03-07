@@ -23,19 +23,19 @@ git branch -m main
 
 # Test the git-ai hook installation and uninstallation
 echo "Testing git-ai hook installation..."
-git ai hook install
+git-ai hook install
 echo "Testing git-ai hook uninstallation..."
-git ai hook uninstall
+git-ai hook uninstall
 echo "Re-testing git-ai hook installation..."
-git ai hook install
+git-ai hook install
 
 # Set various configuration values
 echo "Setting configuration values..."
-git ai config set model gpt-4
-git ai config set language en
-git ai config set max-diff-tokens 1500
-git ai config set max-length 72
-git ai config set openai-api-key $OPENAI_API_KEY
+git-ai config set model gpt-4
+git-ai config set language en
+git-ai config set max-diff-tokens 1500
+git-ai config set max-length 72
+git-ai config set openai-api-key $OPENAI_API_KEY
 
 # Create a commit to test hook functionality
 echo "Hello World" > README.md
