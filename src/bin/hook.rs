@@ -3,20 +3,19 @@
 use std::time::Duration;
 
 use termion::event::Key;
-use git2::Repository;
+use git2::{Oid, Repository};
 use anyhow::{Context, Result};
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 use tokio::time::sleep;
-use git2::Oid;
 use tokio::signal;
 use ai::{commit, config};
 use ai::hook::*;
 
 async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
-  // let _stdout = std::io::stdout().into_raw_mode().unwrap();
+  let _stdout = std::io::stdout().into_raw_mode().unwrap();
   let mut stdin = termion::async_stdin().keys();
 
   loop {
