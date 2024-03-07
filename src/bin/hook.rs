@@ -28,6 +28,7 @@ async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
       return Ok(1);
     } else {
       pb.println("");
+      panic!("Unexpected input");
     }
   }
 }
