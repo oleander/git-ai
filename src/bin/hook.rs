@@ -1,22 +1,30 @@
 // Hook: prepare-commit-msg
 
+use std::io::{self, BufReader, Write};
 use std::time::Duration;
 
-use tokio::time::sleep;
-use tokio::signal;
-use termion::input::TermRead;
 use termion::event::Key;
-use indicatif::{ProgressBar, ProgressStyle};
-use git2::{Oid, Repository};
-use clap::Parser;
+use tokio::io::AsyncReadExt;
+use git2::Repository;
 use anyhow::{Context, Result};
+use clap::Parser;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use termion::input::TermRead;
+use termion::raw::IntoRawMode;
+use tokio::sync::mpsc;
+use tokio::time::sleep;
+use git2::Oid;
+use tokio::{select, signal, time};
 use ai::hook::*;
 use ai::{commit, config};
-use tokio::io::AsyncReadExt;
-
+use env_logger;
+use indicatif_log_bridge::LogWrapper;
+use crossterm::terminal;
+//   let mut stdout = tokio::io::stdout().into_raw_mode().unwrap();
+use termion::async_stdin;
 
 async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
-  let mut stdout = tokio::io::stdout().into_raw_mode().unwrap();
+  let mut stdout = std::io::stdout().into_raw_mode().unwrap();
   let mut stdin = termion::async_stdin().keys();
 
   loop {
