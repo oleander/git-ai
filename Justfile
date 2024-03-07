@@ -5,10 +5,6 @@ GITHUB_REPO := "git-ai"
 LOCAL_IMG := "git-ai:latest"
 RUST_IMG := "rust:1.76.0"
 
-local-github-actions:
-    act --container-architecture linux/amd64
-
-build-hook: (docker-run RUST_IMG "cargo build --bin hook")
 
 # release:
 #     $(docker-cmd) bash -c "\
@@ -22,12 +18,17 @@ build-hook: (docker-run RUST_IMG "cargo build --bin hook")
 #     git push origin main && \
 #     git push --tags"
 
+local-github-actions:
+    act --container-architecture linux/amd64
 local-install-hook:
     git ai hook install -f
 local-install: local-install-hook
     cargo install --debug --path .
 
-test: (docker-run RUST_IMG "cargo test --all")
+test-suite: (docker-run RUST_IMG "cargo test --all")
+test-install: docker-build (docker-run RUST_IMG "cargo install --bin git-ai --path .")
+test-install-hook: docker-build (docker-run RUST_IMG "cargo install --bin git-ai-hook --path .")
+test: test-suite test-install test-install-hook (docker-run RUST_IMG "git ai --version")
 
 docker-exec +CMD:
     docker run --rm -v $PWD:/git-ai -w /git-ai git-ai:latest {{CMD}}
