@@ -92,7 +92,7 @@ async fn main() -> Result<()> {
   select! {
       _ = progress_task => {},
       _ = rx.recv() => {
-          println!("\nExit signal received, stopping...");
+          std::process::exit(0);
       },
   }
 
