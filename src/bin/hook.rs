@@ -40,10 +40,10 @@ async fn main() -> Result<()> {
 
   // Get the tree from the commit if the sha1 is provided
   // The sha1 is provided when the user is amending a commit
-  let tree = if let Some(sha1) = args.sha1 {
-    repo.find_commit(sha1).ok().and_then(|commit| commit.tree().ok())
-  } else {
-    repo.head().ok().and_then(|head| head.peel_to_tree().ok())
+  let tree = match args.sha1.as_ref() {
+    Some("HEAD") => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
+    Some(sha1) => repo.find_commit(sha1.parse()?).ok().and_then(|commit| commit.tree().ok()),
+    None => repo.head().ok().and_then(|head| head.peel_to_tree().ok())
   };
 
   let max_tokens = config::APP.max_diff_tokens;
