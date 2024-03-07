@@ -1,10 +1,11 @@
 // Hook: prepare-commit-msg
 
+use std::time::Duration;
+
 use tokio::time::sleep;
 use tokio::signal;
 use termion::input::TermRead;
 use termion::event::Key;
-use std::time::Duration;
 use indicatif::{ProgressBar, ProgressStyle};
 use git2::{Oid, Repository};
 use clap::Parser;
