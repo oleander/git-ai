@@ -32,7 +32,7 @@ async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
       }
 
       Some(Err(e)) => {
-        return Ok(0);
+        return Ok(1);
       }
 
       None => {
