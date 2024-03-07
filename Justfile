@@ -7,7 +7,7 @@ GITHUB_REPO := "git-ai"
 github-actions:
     act --container-architecture linux/amd64
 install:
-  cargo install --path .
+  cargo install --debug --path .
   git ai hook uninstall || true
   git ai hook install
 test:

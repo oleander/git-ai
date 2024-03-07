@@ -2,11 +2,21 @@
 
 use std::time::Duration;
 
+use git2::Repository;
+use anyhow::{Context, Result};
+use clap::Parser;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use ai::hook::*;
+use indicatif_log_bridge::LogWrapper;
 
+use ai::{commit, config};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-  env_logger::init();
+  let logger = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).build();
+  let multi = MultiProgress::new();
+
+  LogWrapper::new(multi.clone(), logger).try_init().unwrap();
 
   // Show cursor on exit whenever ctrl-c is pressed
   ctrlc::set_handler(move || {
@@ -36,8 +46,11 @@ async fn main() -> Result<()> {
   // Get the tree from the commit if the sha1 is provided
   // The sha1 is provided when the user is amending a commit
   let tree = match args.sha1.as_deref() {
+    // git commit --amend
     Some("HEAD") => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
+    // git ??
     Some(sha1) => repo.find_commit(sha1.parse()?).ok().and_then(|commit| commit.tree().ok()),
+    // git commit
     None => repo.head().ok().and_then(|head| head.peel_to_tree().ok())
   };
 

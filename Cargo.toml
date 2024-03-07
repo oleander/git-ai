@@ -43,6 +43,7 @@ colored = "2.1.0"
 ctrlc = "3.4.2"
 log = "0.4.21"
 home = "0.5.9"
+indicatif-log-bridge = "0.2.2"
 
 [dependencies.git2]
 default-features = false

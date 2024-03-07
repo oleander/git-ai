@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::fs::File;
 
-use git2::{DiffFormat, DiffOptions, Oid, Repository, Tree};
+use git2::{DiffFormat, DiffOptions, Repository, Tree};
 use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
