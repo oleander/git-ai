@@ -28,6 +28,8 @@ async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
       pb.println(buffer[0].to_string());
     } else if buffer[0] == 3 {
       pb.println(buffer[0].to_string());
+
+
     } else {
       pb.println("");
     }
