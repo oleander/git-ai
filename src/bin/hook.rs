@@ -8,6 +8,7 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 use tokio::sync::mpsc;
+use std::io::BufReader;
 use tokio::time::sleep;
 use tokio::{select, time};
 use ai::hook::*;
@@ -18,28 +19,16 @@ use crossterm::terminal;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-  // env_logger::init();
-  let logger = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).build();
-  let multi = MultiProgress::new();
-
-  LogWrapper::new(multi.clone(), logger).try_init().unwrap();
-
-  let mut stdout = io::stdout().into_raw_mode()?;
   let mut stdin = termion::async_stdin().keys();
-  let (tx, mut rx) = mpsc::channel(32);
 
   tokio::spawn(async move {
-    loop {
-      if let Some(key) = stdin.next() {
-        match key {
-          Ok(termion::event::Key::Ctrl('c')) => {
-            let _ = tx.send(()).await;
-            break;
-          },
-          _ => {}
+    match stdin.next() {
+      Some(Ok(key)) => {
+        if termion::event::Key::Ctrl('c') == key {
+          std::process::exit(1);
         }
       }
-      sleep(Duration::from_millis(50)).await;
+      _ => {}
     }
   });
 
@@ -52,6 +41,12 @@ async fn main() -> Result<()> {
   let pb = ProgressBar::new_spinner();
   pb.enable_steady_tick(Duration::from_millis(150));
   pb.set_message("Generating commit message...");
+  pb.set_style(
+    ProgressStyle::default_spinner()
+      .tick_strings(&["-", "\\", "|", "/"])
+      .template("{spinner:.blue} {msg}")
+      .expect("Failed to set progress bar style")
+  );
 
   let repo = Repository::open_from_env().context("Failed to open repository")?;
   let tree = match args.sha1.as_deref() {
@@ -73,42 +68,5 @@ async fn main() -> Result<()> {
     .write(commit_message.trim().to_string())
     .context("Failed to write commit message")?;
 
-  // Separate blocking task for progress bar updates
-  let pb2 = pb.clone();
-  let progress_task = tokio::task::spawn_blocking(move || {
-    pb2.set_style(
-      ProgressStyle::default_spinner()
-        .tick_strings(&["-", "\\", "|", "/"])
-        .template("{spinner:.blue} {msg}")
-        .expect("Failed to set progress bar style")
-    );
-
-    pb2.enable_steady_tick(Duration::from_millis(150));
-  });
-
-  select! {
-    _ = progress_task => {
-      clean_exit(multi, pb, "Done", 0);
-    },
-
-    _ = rx.recv() => {
-      clean_exit(multi, pb, "Aborted", 1);
-    },
-  }
-
-
   Ok(())
-}
-fn clean_exit(multi: MultiProgress, pb: ProgressBar, message: &str, exit_code: i32) -> ! {
-  pb.finish_with_message("Done");
-  multi.remove(&pb);
-
-  let mut stdout = io::stdout();
-  stdout.flush().unwrap();
-  drop(stdout); // Explicitly drop to ensure flush occurs before disabling raw mode
-
-  terminal::disable_raw_mode().unwrap();
-  println!("\x1B[?25h"); // Ensure cursor visibility
-
-  std::process::exit(exit_code);
 }
