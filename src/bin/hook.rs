@@ -74,6 +74,7 @@ async fn main() -> Result<()> {
 
   // Separate blocking task for progress bar updates
   let pb2 = pb.clone();
+  let multi2 = multi.clone();
   let progress_task = tokio::task::spawn_blocking(move || {
     pb2.set_style(
       ProgressStyle::default_spinner()
@@ -86,16 +87,18 @@ async fn main() -> Result<()> {
       std::thread::sleep(Duration::from_millis(100));
     }
     pb2.finish_with_message("Done");
-    multi.remove(&pb2);
+    multi2.remove(&pb2);
   });
 
   // Wait for either the progress task to complete or an exit signal from the input handler
   let pb1 = pb.clone();
+  let multi1 = multi.clone();
   select! {
       _ = progress_task => {},
       _ = rx.recv() => {
           // log::info!("Received exit signal");
           pb1.finish_with_message("Aborted");
+          multi1.remove(&pb1);
 
           // pb.finish_with_message("Done");
           // multi.remove(&pb);
