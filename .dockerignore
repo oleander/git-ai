@@ -11,8 +11,6 @@ Dockerfile
 **/.git
 **/.gitignore
 **/.dockerignore
-Cargo.lock
-**/Cargo.lock
 .env
 **/.env
 .env.*
@@ -33,4 +31,3 @@ examples/
 **/examples/
 benches/
 **/benches/
-

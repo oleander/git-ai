@@ -33,3 +33,5 @@ act:
   act --container-architecture linux/amd64
 clean:
   cargo clean
+docker-build:
+  docker build -t git-ai .
