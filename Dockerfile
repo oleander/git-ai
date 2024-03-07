@@ -18,8 +18,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Add a non-root user and switch to it
-RUN useradd -m myuser
-USER myuser
+RUN useradd -m ai-bot
+USER ai-bot
 
 WORKDIR /repo
 

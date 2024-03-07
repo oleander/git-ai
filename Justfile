@@ -2,36 +2,44 @@ set shell := ["bash", "-cu"]
 
 GITHUB_USER := "oleander"
 GITHUB_REPO := "git-ai"
-# GITHUB_TAG := `shell git describe --tags --abbrev=0`
+
+# Use docker run with --rm for tasks that require Rust environment
+# Mount the current directory into /git-ai in the container
+# Use the image git-ai:latest for all tasks
+docker-cmd := "docker run --rm -v $PWD:/git-ai -w /git-ai git-ai:latest"
 
 github-actions:
-    act --container-architecture linux/amd64
+    $(docker-cmd) act --container-architecture linux/amd64
+
 install:
-  cargo install --path .
-  git ai hook uninstall || true
-  git ai hook install
-test:
-  cargo test --all
+    $(docker-cmd) cargo install --path .
+
+test: docker-build
+    $(docker-cmd) cargo test --all
+
 build_hook:
-  cargo build --bin hook --release
+    $(docker-cmd) cargo build --bin hook --release
+
 install_hook: build_hook
-  gln -rfs target/release/hook .git/hooks/prepare-commit-msg
+    $(docker-cmd) ln -rfs /git-ai/target/release/hook /git-ai/.git/hooks/prepare-commit-msg
+
 simulate:
-  ./simulate.sh
+    $(docker-cmd) ./simulate.sh
+
 release:
-  #!/usr/bin/env bash
-  cargo update
-  git add Cargo.lock Cargo.toml
-  git commit --no-edit
-  version=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version' | tr -d '\n')
-  echo "Releasing $version"
-  git tag -a v$version -m "Release v$version"
-  git push origin v$version
-  git push origin main
-  git push --tags
-act:
-  act --container-architecture linux/amd64
+    $(docker-cmd) bash -c "\
+    cargo update && \
+    git add Cargo.lock Cargo.toml && \
+    git commit --no-edit && \
+    version=$$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version' | tr -d '\n') && \
+    echo 'Releasing $$version' && \
+    git tag -a v$$version -m 'Release v$$version' && \
+    git push origin v$$version && \
+    git push origin main && \
+    git push --tags"
+
 clean:
-  cargo clean
+    $(docker-cmd) cargo clean
+
 docker-build:
-  docker build -t git-ai .
+    docker build -t git-ai .
