@@ -6,7 +6,8 @@ use git2::Repository;
 use anyhow::{Context, Result};
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
-use ai::hook::{FilePath, PatchRepository, *};
+use ai::hook::{PatchRepository, *};
+use ai::hook::FilePath;
 use ai::{commit, config};
 
 #[tokio::main]
@@ -40,7 +41,7 @@ async fn main() -> Result<()> {
 
   // Get the tree from the commit if the sha1 is provided
   // The sha1 is provided when the user is amending a commit
-  let tree = match args.sha1.as_ref() {
+  let tree = match args.sha1.as_deref() {
     Some("HEAD") => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
     Some(sha1) => repo.find_commit(sha1.parse()?).ok().and_then(|commit| commit.tree().ok()),
     None => repo.head().ok().and_then(|head| head.peel_to_tree().ok())

@@ -117,7 +117,7 @@ pub struct Args {
   pub commit_type: Option<String>,
 
   #[clap(required = false)]
-  pub sha1: Option<Oid>
+  pub sha1: Option<String>
 }
 
 #[derive(Error, Debug)]
