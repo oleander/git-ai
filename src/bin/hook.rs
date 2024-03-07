@@ -95,14 +95,13 @@ async fn main() -> Result<()> {
   select! {
       _ = progress_task => {
           pb.finish_with_message("Done");
-          multi.remove(&pb);
       },
       _ = rx.recv() => {
           pb.finish_with_message("Aborted");
-          multi.remove(&pb);
       },
   }
 
+          multi.remove(&pb);
   writeln!(stdout, "").unwrap();
 
   Ok(())
