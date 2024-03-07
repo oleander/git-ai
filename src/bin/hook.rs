@@ -1,6 +1,7 @@
-use std::io::{self, Write};
+use std::io::{self, BufReader, Write};
 use std::time::Duration;
 
+use tokio::io::AsyncReadExt;
 use git2::Repository;
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -8,32 +9,39 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 use tokio::sync::mpsc;
-use std::io::BufReader;
 use tokio::time::sleep;
-use tokio::{select, time};
+use tokio::{select, signal, time};
 use ai::hook::*;
 use ai::{commit, config};
 use env_logger;
 use indicatif_log_bridge::LogWrapper;
 use crossterm::terminal;
 
+async fn read_input(pb: &ProgressBar) -> Result<()> {
+  let mut stdin = tokio::io::stdin();
+  let mut buffer = [0u8; 1];
+
+  loop {
+    if stdin.read(&mut buffer).await? == 0 {
+      break;
+    } else if buffer[0] == b'\n' {
+
+
+      panic!("OKO");
+      pb.println("");
+    } else if buffer[0] == 3 {
+      break;
+    } else {
+      let f = format!("Input: {:?}", buffer[0]);
+      panic!("{}", f);
+    }
+  }
+
+  Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-  let mut stdin = termion::async_stdin().keys();
-
-
-
-  tokio::spawn(async move {
-    match stdin.next() {
-      Some(Ok(key)) => {
-        if termion::event::Key::Ctrl('c') == key {
-          std::process::exit(1);
-        }
-      }
-      _ => {}
-    }
-  });
-
   let args = Args::parse();
 
   if args.commit_type.is_some() {
@@ -53,7 +61,12 @@ async fn main() -> Result<()> {
   let repo = Repository::open_from_env().context("Failed to open repository")?;
   let tree = match args.sha1.as_deref() {
     Some("HEAD") => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
-    Some(sha1) => repo.find_object(git2::Oid::from_str(sha1)?, None).ok().and_then(|obj| obj.peel_to_tree().ok()),
+    Some(sha1) => {
+      repo
+        .find_object(git2::Oid::from_str(sha1)?, None)
+        .ok()
+        .and_then(|obj| obj.peel_to_tree().ok())
+    },
     None => repo.head().ok().and_then(|head| head.peel_to_tree().ok())
   };
 
@@ -69,6 +82,15 @@ async fn main() -> Result<()> {
     .commit_msg_file
     .write(commit_message.trim().to_string())
     .context("Failed to write commit message")?;
+
+  tokio::select! {
+      _ = read_input(&pb) => {
+          // std::process::exit(1);
+      }
+      _ = signal::ctrl_c() => {
+          std::process::exit(1);
+      }
+  }
 
   Ok(())
 }
