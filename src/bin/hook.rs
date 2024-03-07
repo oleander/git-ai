@@ -7,21 +7,17 @@ use tokio::{select, signal, time};
 use termion::raw::IntoRawMode;
 use termion::input::TermRead;
 use termion::event::Key;
-use termion::async_stdin;
 use std::time::Duration;
-use std::io::{self, BufReader, Write};
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use indicatif_log_bridge::LogWrapper;
+use std::io::{self, Write};
+use indicatif::{ProgressBar, ProgressStyle};
 use git2::{Oid, Repository};
 use env_logger;
-use crossterm::terminal;
 use clap::Parser;
 use anyhow::{Context, Result};
 use ai::hook::*;
 use ai::{commit, config};
 
 async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
-  let mut stdout = std::io::stdout().into_raw_mode().unwrap();
   let mut stdin = termion::async_stdin().keys();
 
   loop {
