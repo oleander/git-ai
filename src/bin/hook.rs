@@ -92,7 +92,10 @@ async fn main() -> Result<()> {
   select! {
       _ = progress_task => {},
       _ = rx.recv() => {
-        log::info!("Received exit signal");
+          log::info!("Received exit signal");
+          // pb.finish_with_message("Done");
+          // multi.remove(&pb);
+          writeln!(stdout, "").unwrap(); // Ensure to leave the terminal in a clean state
           std::process::exit(0);
       },
   }
