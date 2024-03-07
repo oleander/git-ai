@@ -82,7 +82,11 @@ async fn main() -> Result<()> {
         .template("{spinner:.blue} {msg}")
         .expect("Failed to set progress bar style")
     );
+
     for i in 0..100 {
+      if pb2.is_finished() {
+        break;
+      }
       pb2.set_position(i);
       std::thread::sleep(Duration::from_millis(100));
     }
@@ -98,7 +102,7 @@ async fn main() -> Result<()> {
       stdout.flush().unwrap();
       terminal::disable_raw_mode().unwrap();
       println!("\x1B[?25h");
-      std::process::exit(1);
+      // terminate progress_task
     },
   }
 
