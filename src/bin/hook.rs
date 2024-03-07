@@ -14,6 +14,7 @@ use ai::hook::*;
 use ai::{commit, config};
 
 async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
+  let mut stdout = tokio::io::stdout().into_raw_mode().unwrap();
   let mut stdin = termion::async_stdin().keys();
 
   loop {
