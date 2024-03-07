@@ -9,7 +9,6 @@ local-github-actions:
     act --container-architecture linux/amd64
 
 build-hook: (docker-run RUST_IMG "cargo build --bin hook")
-install-hook: install (docker-run LOCAL_IMG "git ai hook install -f")
 
 # release:
 #     $(docker-cmd) bash -c "\
@@ -23,7 +22,11 @@ install-hook: install (docker-run LOCAL_IMG "git ai hook install -f")
 #     git push origin main && \
 #     git push --tags"
 
-install: (docker-run RUST_IMG "cargo install --debug  --path .")
+local-install-hook:
+    git ai hook install -f
+local-install: local-install-hook
+    cargo install --debug --path .
+
 test: (docker-run RUST_IMG "cargo test --all")
 
 docker-exec +CMD:
