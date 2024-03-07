@@ -11,16 +11,12 @@ use clap::Parser;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
-use tokio::sync::mpsc;
 use tokio::time::sleep;
 use git2::Oid;
-use tokio::{select, signal, time};
+use tokio::signal;
 use ai::hook::*;
 use ai::{commit, config};
-use env_logger;
 use indicatif_log_bridge::LogWrapper;
-use crossterm::terminal;
-use termion::async_stdin;
 
 async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
   let _stdout = std::io::stdout().into_raw_mode().unwrap();
