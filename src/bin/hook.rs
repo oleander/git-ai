@@ -83,13 +83,7 @@ async fn main() -> Result<()> {
         .expect("Failed to set progress bar style")
     );
 
-    for i in 0..100 {
-      if pb2.is_finished() {
-        break;
-      }
-      pb2.set_position(i);
-      std::thread::sleep(Duration::from_millis(100));
-    }
+    pb2.enable_steady_tick(Duration::from_millis(150));
   });
 
   select! {
