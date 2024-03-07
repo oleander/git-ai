@@ -11,10 +11,6 @@ Dockerfile
 **/.git
 **/.gitignore
 **/.dockerignore
-.env
-**/.env
-.env.*
-**/.env.*
 .editorconfig
 **/.editorconfig
 .idea/
