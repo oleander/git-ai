@@ -73,26 +73,30 @@ async fn main() -> Result<()> {
     .context("Failed to write commit message")?;
 
   // Separate blocking task for progress bar updates
+  let pb2 = pb.clone();
   let progress_task = tokio::task::spawn_blocking(move || {
-    pb.set_style(
+    pb2.set_style(
       ProgressStyle::default_spinner()
         .tick_strings(&["-", "\\", "|", "/"])
         .template("{spinner:.blue} {msg}")
         .expect("Failed to set progress bar style")
     );
     for i in 0..100 {
-      pb.set_position(i);
+      pb2.set_position(i);
       std::thread::sleep(Duration::from_millis(100));
     }
-    pb.finish_with_message("Done");
-    multi.remove(&pb);
+    pb2.finish_with_message("Done");
+    multi.remove(&pb2);
   });
 
   // Wait for either the progress task to complete or an exit signal from the input handler
+  let pb1 = pb.clone();
   select! {
       _ = progress_task => {},
       _ = rx.recv() => {
-          log::info!("Received exit signal");
+          // log::info!("Received exit signal");
+          pb1.finish_with_message("Aborted");
+
           // pb.finish_with_message("Done");
           // multi.remove(&pb);
           writeln!(stdout, "").unwrap(); // Ensure to leave the terminal in a clean state
