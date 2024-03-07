@@ -12,19 +12,16 @@ github-actions:
     $(docker-cmd) act --container-architecture linux/amd64
 
 install:
-    $(docker-cmd) cargo install --path .
+    $(docker-cmd) cargo install --debug  --path .
 
 test: docker-build
     $(docker-cmd) cargo test --all
 
-build_hook:
-    $(docker-cmd) cargo build --bin hook --release
+build-hook:
+    $(docker-cmd) cargo build --bin hook
 
 install-hook: install
-    $(docker-cmd) git ai hook install
-
-simulate:
-    $(docker-cmd) ./simulate.sh
+    $(docker-cmd) git ai hook install -f
 
 release:
     $(docker-cmd) bash -c "\
@@ -43,3 +40,5 @@ clean:
 
 docker-build:
     docker build -t git-ai .
+docker-run +CMD: docker-build
+    docker run --rm -v $PWD:/git-ai -w /git-ai -it git-ai:latest {{CMD}}
