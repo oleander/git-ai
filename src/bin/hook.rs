@@ -51,53 +51,43 @@ async fn main() -> Result<()> {
       .expect("Failed to set progress bar style")
   );
 
+  let process = tokio::spawn(async move {
+    let repo = Repository::open_from_env().context("Failed to open repository")?;
+    let tree = match args.sha1.as_deref() {
+      Some("HEAD") => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
+      Some(sha1) => {
+        repo
+          .find_object(git2::Oid::from_str(sha1)?, None)
+          .ok()
+          .and_then(|obj| obj.peel_to_tree().ok())
+      },
+      None => repo.head().ok().and_then(|head| head.peel_to_tree().ok())
+    };
+
+    let max_tokens = config::APP.max_diff_tokens;
+    let patch = repo.to_patch(tree, max_tokens).context("Failed to get patch")?;
+
+    if patch.is_empty() {
+      return Err(anyhow::Error::new(HookError::EmptyDiffOutput));
+    }
+
+    args
+      .commit_msg_file
+      .write(commit::generate(patch.to_string()).await?.trim().to_string())
+      .context("Failed to write commit message")?;
+
+    Ok(())
+  });
+
   tokio::select! {
-      status = read_input(pb.clone()) => {
+    _ = signal::ctrl_c() => {
+        std::process::exit(1);
+    }
 
-
-        match status {
-          Ok(0) => {
-            println!("Received EOF, exiting");
-          },
-          Ok(n) => {
-            std::process::exit(n);
-          },
-          Err(e) => {
-            eprintln!("Error reading input: {}", e);
-          }
-        }
-      }
-      _ = signal::ctrl_c() => {
-          std::process::exit(1);
-      }
+    _ = process => {
+      pb.finish_and_clear();
+    }
   }
-
-  let repo = Repository::open_from_env().context("Failed to open repository")?;
-  let tree = match args.sha1.as_deref() {
-    Some("HEAD") => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
-    Some(sha1) => {
-      repo
-        .find_object(git2::Oid::from_str(sha1)?, None)
-        .ok()
-        .and_then(|obj| obj.peel_to_tree().ok())
-    },
-    None => repo.head().ok().and_then(|head| head.peel_to_tree().ok())
-  };
-
-  let max_tokens = config::APP.max_diff_tokens;
-  let patch = repo.to_patch(tree, max_tokens).context("Failed to get patch")?;
-
-  if patch.is_empty() {
-    return Err(anyhow::Error::new(HookError::EmptyDiffOutput));
-  }
-
-  let commit_message = commit::generate(patch.to_string()).await?;
-  args
-    .commit_msg_file
-    .write(commit_message.trim().to_string())
-    .context("Failed to write commit message")?;
-
-  let pb_clone = pb.clone();
 
   Ok(())
 }
