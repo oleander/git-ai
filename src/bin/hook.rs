@@ -28,7 +28,7 @@ async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
         return Ok(1);
       }
 
-      Some(Ok(_)) => {
+      Some(Ok(Key::Char('\n'))) => {
         write!(stdout, "{}", termion::clear::CurrentLine).unwrap();
 
       }
@@ -40,7 +40,9 @@ async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
 
       None => {
         sleep(Duration::from_millis(50)).await;
-      }
+      },
+
+      _ => todo!()
     }
   }
 }
