@@ -1,3 +1,5 @@
+// Hook: prepare-commit-msg
+
 use std::io::{self, BufReader, Write};
 use std::time::Duration;
 
@@ -17,22 +19,23 @@ use ai::{commit, config};
 use env_logger;
 use indicatif_log_bridge::LogWrapper;
 use crossterm::terminal;
+//   let mut stdout = tokio::io::stdout().into_raw_mode().unwrap();
+use termion::async_stdin;
 
 async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
-  let mut stdout = io::stdout().into_raw_mode().unwrap();
+  let mut stdout = std::io::stdout().into_raw_mode().unwrap();
+
   let mut stdin = termion::async_stdin().keys();
 
   loop {
     match stdin.next() {
-
-
       Some(Ok(Key::Ctrl('c'))) => {
         return Ok(1);
       },
 
       Some(Ok(Key::Char('\n'))) => {
         pb.println("");
-      }
+      },
 
       _ => {
         sleep(Duration::from_millis(50)).await;
@@ -43,45 +46,58 @@ async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+  env_logger::init();
+
+  // Show cursor on exit whenever ctrl-c is pressed
+  ctrlc::set_handler(move || {
+    console::Term::stdout().show_cursor().expect("Failed to show cursor");
+  })?;
+
   let args = Args::parse();
 
+  // If defined, then the user already provided a commit message
   if args.commit_type.is_some() {
     return Ok(());
   }
 
+  // Loading bar to indicate that the program is running
+  let style = ProgressStyle::default_spinner()
+    .tick_strings(&["-", "\\", "|", "/"])
+    .template("{spinner:.blue} {msg}")
+    .context("Failed to create progress bar style")?;
+
   let pb = ProgressBar::new_spinner();
-  pb.enable_steady_tick(Duration::from_millis(150));
+  pb.set_style(style);
   pb.set_message("Generating commit message...");
-  pb.set_style(
-    ProgressStyle::default_spinner()
-      .tick_strings(&["-", "\\", "|", "/"])
-      .template("{spinner:.blue} {msg}")
-      .expect("Failed to set progress bar style")
-  );
+  pb.enable_steady_tick(Duration::from_millis(150));
+  let repo = Repository::open_from_env().context("Failed to open repository")?;
 
-  let process = tokio::spawn(async move {
-    let repo = Repository::open_from_env().context("Failed to open repository")?;
-    let tree = match args.sha1.as_deref() {
-      Some("HEAD") => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
-      Some(sha1) => {
-        repo
-          .find_object(git2::Oid::from_str(sha1)?, None)
-          .ok()
-          .and_then(|obj| obj.peel_to_tree().ok())
-      },
-      None => repo.head().ok().and_then(|head| head.peel_to_tree().ok())
-    };
+  // Get the tree from the commit if the sha1 is provided
+  // The sha1 is provided when the user is amending a commit
+  let tree = match args.sha1.as_deref() {
+    Some("HEAD") => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
+    Some(sha1) => {
+      repo
+        .find_object(git2::Oid::from_str(sha1)?, None)
+        .ok()
+        .and_then(|obj| obj.peel_to_tree().ok())
+    },
+    None => repo.head().ok().and_then(|head| head.peel_to_tree().ok())
+  };
 
-    let max_tokens = config::APP.max_diff_tokens;
-    let patch = repo.to_patch(tree, max_tokens).context("Failed to get patch")?;
+  let max_tokens = config::APP.max_diff_tokens;
+  let patch = repo.to_patch(tree, max_tokens).context("Failed to get patch")?;
 
-    if patch.is_empty() {
-      return Err(anyhow::Error::new(HookError::EmptyDiffOutput));
-    }
+  if patch.is_empty() {
+    Err(HookError::EmptyDiffOutput)?;
+  }
+
+  let process: tokio::task::JoinHandle<Result<(), anyhow::Error>> = tokio::spawn(async move {
+    let commit_message = commit::generate(patch.to_string()).await.context("Failed to generate commit message")?;
 
     args
       .commit_msg_file
-      .write(commit::generate(patch.to_string()).await?.trim().to_string())
+      .write(commit_message.trim().to_string())
       .context("Failed to write commit message")?;
 
     Ok(())
@@ -89,7 +105,7 @@ async fn main() -> Result<()> {
 
   tokio::select! {
     _ = signal::ctrl_c() => {
-        std::process::exit(1);
+      std::process::exit(1);
     }
 
     _ = process => {
@@ -97,7 +113,7 @@ async fn main() -> Result<()> {
     }
 
     _ = read_input(pb.clone()) => {
-      // pb.finish_and_clear();
+      pb.finish_and_clear();
     }
   }
 
