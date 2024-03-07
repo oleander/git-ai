@@ -8,6 +8,7 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 use tokio::sync::mpsc;
+use tokio::time::sleep;
 use tokio::{select, time};
 use ai::hook::*;
 use ai::{commit, config};
@@ -27,11 +28,17 @@ async fn main() -> Result<()> {
   let (tx, mut rx) = mpsc::channel(32);
 
   tokio::spawn(async move {
-    for key in stdin {
-      if let Ok(termion::event::Key::Ctrl('c')) = key {
-        let _ = tx.send(()).await;
-        break;
+    loop {
+      if let Some(key) = stdin.next() {
+        match key {
+          Ok(termion::event::Key::Ctrl('c')) => {
+            let _ = tx.send(()).await;
+            break;
+          },
+          _ => {}
+        }
       }
+      sleep(Duration::from_millis(50)).await;
     }
   });
 
