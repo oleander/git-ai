@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use termion::event::Key;
 use tokio::io::AsyncReadExt;
-use git2::Repository;
+use git2::{Oid, Repository};
 use anyhow::{Context, Result};
 use clap::Parser;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -45,6 +45,9 @@ async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
 #[tokio::main]
 async fn main() -> Result<()> {
   let args = Args::parse();
+  let max_tokens = config::APP.max_diff_tokens;
+  let pb = ProgressBar::new_spinner();
+  let repo = Repository::open_from_env().context("Failed to open repository")?;
 
   // If defined, then the user already provided a commit message
   if args.commit_type.is_some() {
@@ -57,26 +60,19 @@ async fn main() -> Result<()> {
     .template("{spinner:.blue} {msg}")
     .context("Failed to create progress bar style")?;
 
-  let pb = ProgressBar::new_spinner();
   pb.set_style(style);
   pb.set_message("Generating commit message...");
   pb.enable_steady_tick(Duration::from_millis(150));
-  let repo = Repository::open_from_env().context("Failed to open repository")?;
 
-  // Get the tree from the commit if the sha1 is provided
-  // The sha1 is provided when the user is amending a commit
   let tree = match args.sha1.as_deref() {
+    // git commit --amend
     Some("HEAD") => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
-    Some(sha1) => {
-      repo
-        .find_object(git2::Oid::from_str(sha1)?, None)
-        .ok()
-        .and_then(|obj| obj.peel_to_tree().ok())
-    },
+    // git ???
+    Some(sha1) => repo.find_object(Oid::from_str(sha1)?, None).ok().and_then(|obj| obj.peel_to_tree().ok()),
+    // git commit
     None => repo.head().ok().and_then(|head| head.peel_to_tree().ok())
   };
 
-  let max_tokens = config::APP.max_diff_tokens;
   let patch = repo.to_patch(tree, max_tokens).context("Failed to get patch")?;
 
   if patch.is_empty() {
