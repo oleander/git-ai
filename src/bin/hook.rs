@@ -20,7 +20,6 @@ use ai::{commit, config};
 use env_logger;
 use indicatif_log_bridge::LogWrapper;
 use crossterm::terminal;
-//   let mut stdout = tokio::io::stdout().into_raw_mode().unwrap();
 use termion::async_stdin;
 
 async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
