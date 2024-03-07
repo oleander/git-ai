@@ -88,22 +88,27 @@ async fn main() -> Result<()> {
 
   select! {
     _ = progress_task => {
-      pb.finish_with_message("Done");
+      clean_exit(multi, pb, "Done", 0);
     },
 
     _ = rx.recv() => {
-      pb.finish_with_message("Aborted");
-      stdout.flush().unwrap();
-      terminal::disable_raw_mode().unwrap();
-      println!("\x1B[?25h");
+      clean_exit(multi, pb, "Aborted", 1);
     },
   }
 
-  multi.remove(&pb);
-  stdout.flush().unwrap();
-  terminal::disable_raw_mode().unwrap();
-  println!("\x1B[?25h"); // ANSI escape code to show curso
-
 
   Ok(())
+}
+fn clean_exit(multi: MultiProgress, pb: ProgressBar, message: &str, exit_code: i32) -> ! {
+  pb.finish_with_message("Done");
+  multi.remove(&pb);
+
+  let mut stdout = io::stdout();
+  stdout.flush().unwrap();
+  drop(stdout); // Explicitly drop to ensure flush occurs before disabling raw mode
+
+  terminal::disable_raw_mode().unwrap();
+  println!("\x1B[?25h"); // Ensure cursor visibility
+
+  std::process::exit(exit_code);
 }
