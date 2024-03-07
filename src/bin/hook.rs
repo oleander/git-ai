@@ -19,7 +19,7 @@ use crossterm::terminal;
 
 async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
   let mut stdin = tokio::io::stdin();
-  let mut buffer = [0u8; 1];
+  let mut buffer = [0u8; 10];
 
   loop {
     if stdin.read(&mut buffer).await? == 0 {
