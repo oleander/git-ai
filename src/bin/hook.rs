@@ -98,6 +98,7 @@ async fn main() -> Result<()> {
       stdout.flush().unwrap();
       terminal::disable_raw_mode().unwrap();
       println!("\x1B[?25h");
+      return Ok(());
     },
   }
 
