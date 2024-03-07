@@ -20,8 +20,8 @@ test: docker-build
 build_hook:
     $(docker-cmd) cargo build --bin hook --release
 
-install_hook: build_hook
-    $(docker-cmd) ln -rfs /git-ai/target/release/hook /git-ai/.git/hooks/prepare-commit-msg
+install-hook: install
+    $(docker-cmd) git ai hook install
 
 simulate:
     $(docker-cmd) ./simulate.sh
