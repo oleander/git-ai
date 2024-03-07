@@ -1,25 +1,24 @@
 // Hook: prepare-commit-msg
 
-use std::io::{self, BufReader, Write};
-use std::time::Duration;
-
-use termion::event::Key;
-use tokio::io::AsyncReadExt;
-use git2::{Oid, Repository};
-use anyhow::{Context, Result};
-use clap::Parser;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use termion::input::TermRead;
-use termion::raw::IntoRawMode;
-use tokio::sync::mpsc;
 use tokio::time::sleep;
+use tokio::sync::mpsc;
+use tokio::io::AsyncReadExt;
 use tokio::{select, signal, time};
+use termion::raw::IntoRawMode;
+use termion::input::TermRead;
+use termion::event::Key;
+use termion::async_stdin;
+use std::time::Duration;
+use std::io::{self, BufReader, Write};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use indicatif_log_bridge::LogWrapper;
+use git2::{Oid, Repository};
+use env_logger;
+use crossterm::terminal;
+use clap::Parser;
+use anyhow::{Context, Result};
 use ai::hook::*;
 use ai::{commit, config};
-use env_logger;
-use indicatif_log_bridge::LogWrapper;
-use crossterm::terminal;
-use termion::async_stdin;
 
 async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
   let mut stdout = std::io::stdout().into_raw_mode().unwrap();
@@ -27,14 +26,17 @@ async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
 
   loop {
     match stdin.next() {
+      // Ctrl+C pressed: exit the program
       Some(Ok(Key::Ctrl('c'))) => {
         return Ok(1);
       },
 
+      // Enter pressed: render empty line before progress bar
       Some(Ok(Key::Char('\n'))) => {
         pb.println("");
       },
 
+      // Any other key pressed
       _ => {
         sleep(Duration::from_millis(50)).await;
       }
