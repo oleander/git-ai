@@ -1,5 +1,5 @@
 # Use a specific Rust version
-FROM rust:1.60 as builder
+FROM rust:1.76.0 as builder
 WORKDIR /git-ai
 
 # Copy project files and build the project
