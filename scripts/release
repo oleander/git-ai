@@ -11,7 +11,7 @@ fi
 
 echo "Releasing $VERSION"
 
-cargo update
+cargo update --aggressive
 git add Cargo.lock Cargo.toml
 git commit --no-edit
 
