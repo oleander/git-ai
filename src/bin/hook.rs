@@ -12,6 +12,8 @@ use clap::Parser;
 use anyhow::{Context, Result};
 use ai::hook::*;
 use ai::{commit, config};
+use tokio::io::AsyncReadExt;
+
 
 async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
   let mut stdout = tokio::io::stdout().into_raw_mode().unwrap();
