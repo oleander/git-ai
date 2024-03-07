@@ -12,8 +12,8 @@ use termion::raw::IntoRawMode;
 use tokio::time::sleep;
 use git2::Oid;
 use tokio::signal;
-use ai::hook::*;
 use ai::{commit, config};
+use ai::hook::*;
 
 async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
   let _stdout = std::io::stdout().into_raw_mode().unwrap();
