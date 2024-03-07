@@ -4,12 +4,12 @@ WORKDIR /git-ai
 
 # Copy project files and build the project
 COPY . .
-RUN cargo build --release --bins
+RUN cargo build --bins
 
 # Use a slim version of Debian for the final image
 FROM debian:buster-slim
-COPY --from=builder /git-ai/target/release/git-ai /usr/local/bin/git-ai
-COPY --from=builder /git-ai/target/release/git-ai-hook /usr/local/bin/git-ai-hook
+COPY --from=builder /git-ai/target/debug/git-ai /usr/local/bin/git-ai
+COPY --from=builder /git-ai/target/debug/git-ai-hook /usr/local/bin/git-ai-hook
 
 # Install git and clean up in one layer
 RUN apt-get update && \
