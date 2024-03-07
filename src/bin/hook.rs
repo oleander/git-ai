@@ -23,12 +23,13 @@ async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
 
   loop {
     if stdin.read(&mut buffer).await? == 0 {
-      return Ok(0);
+      // return Ok(0);
+
+      pb.println(buffer[0].to_string());
     } else if buffer[0] == 3 {
-      return Ok(1);
+      pb.println(buffer[0].to_string());
     } else {
       pb.println("");
-      panic!("Unexpected input");
     }
   }
 }
@@ -76,6 +77,7 @@ async fn main() -> Result<()> {
       .write(commit::generate(patch.to_string()).await?.trim().to_string())
       .context("Failed to write commit message")?;
 
+
     Ok(())
   });
 
@@ -86,6 +88,10 @@ async fn main() -> Result<()> {
 
     _ = process => {
       pb.finish_and_clear();
+    }
+
+    _ = read_input(pb.clone()) => {
+      // pb.finish_and_clear();
     }
   }
 
