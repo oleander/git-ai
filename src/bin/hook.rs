@@ -19,17 +19,17 @@ use indicatif_log_bridge::LogWrapper;
 use crossterm::terminal;
 
 async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
-  let mut stdin = termion::async_stdin().keys();
   let mut stdout = io::stdout().into_raw_mode().unwrap();
+  let mut stdin = termion::async_stdin().keys();
 
   loop {
     match stdin.next() {
       Some(Ok(Key::Ctrl('c'))) => {
         return Ok(1);
-      }
+      },
 
       Some(Ok(Key::Char('\n'))) => {
-        /* NOP */
+        pb.println("");
       }
 
       _ => {
@@ -82,7 +82,6 @@ async fn main() -> Result<()> {
       .commit_msg_file
       .write(commit::generate(patch.to_string()).await?.trim().to_string())
       .context("Failed to write commit message")?;
-
 
     Ok(())
   });
