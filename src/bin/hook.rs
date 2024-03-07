@@ -50,7 +50,6 @@ async fn main() -> Result<()> {
   }
 
   let pb = ProgressBar::new_spinner();
-  // pb.set_draw_target(stdin);
   pb.enable_steady_tick(Duration::from_millis(150));
   pb.set_message("Generating commit message...");
   pb.set_style(
