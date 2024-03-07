@@ -1,6 +1,7 @@
 use std::io::{self, BufReader, Write};
 use std::time::Duration;
 
+use termion::event::Key;
 use tokio::io::AsyncReadExt;
 use git2::Repository;
 use anyhow::{Context, Result};
@@ -18,28 +19,25 @@ use indicatif_log_bridge::LogWrapper;
 use crossterm::terminal;
 
 async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
-  let mut buffer = [0u8; 10];
-  let mut stdin = tokio::io::stdin();
-
-
-
-
-
-
+  let mut stdin = termion::async_stdin().keys();
 
   loop {
-    if stdin.read(&mut buffer).await? == 0 {
-      // return Ok(0);
+    match stdin.next() {
+      Some(Ok(Key::Ctrl('c'))) => {
+        return Ok(1);
+      }
 
-      // pb.println(buffer[0].to_string());
-      pb.println("");
-    } else if buffer[0] == 3 {
-      // pb.println(buffer[0].to_string());
-      // return Ok(0);
+      Some(Ok(_)) => {
+        pb.println("");
+      }
 
+      Some(Err(e)) => {
+        return Ok(0);
+      }
 
-    } else {
-      pb.println("");
+      None => {
+        sleep(Duration::from_millis(50)).await;
+      }
     }
   }
 }
