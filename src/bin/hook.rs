@@ -5,7 +5,7 @@ use tokio::signal;
 use termion::input::TermRead;
 use termion::event::Key;
 use std::time::Duration;
-use std::io::{self, Write};
+use std::io::Write;
 use indicatif::{ProgressBar, ProgressStyle};
 use git2::{Oid, Repository};
 use env_logger;
