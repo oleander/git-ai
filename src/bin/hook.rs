@@ -17,27 +17,19 @@ use env_logger;
 use indicatif_log_bridge::LogWrapper;
 use crossterm::terminal;
 
-async fn read_input(pb: &ProgressBar) -> Result<()> {
+async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
   let mut stdin = tokio::io::stdin();
   let mut buffer = [0u8; 1];
 
   loop {
     if stdin.read(&mut buffer).await? == 0 {
-      break;
-    } else if buffer[0] == b'\n' {
-
-
-      panic!("OKO");
-      pb.println("");
+      return Ok(0);
     } else if buffer[0] == 3 {
-      break;
+      return Ok(1);
     } else {
-      let f = format!("Input: {:?}", buffer[0]);
-      panic!("{}", f);
+      pb.println("");
     }
   }
-
-  Ok(())
 }
 
 #[tokio::main]
@@ -57,6 +49,25 @@ async fn main() -> Result<()> {
       .template("{spinner:.blue} {msg}")
       .expect("Failed to set progress bar style")
   );
+
+  tokio::select! {
+      status = read_input(pb.clone()) => {
+        match status {
+          Ok(0) => {
+            println!("Received EOF, exiting");
+          },
+          Ok(n) => {
+            std::process::exit(n);
+          },
+          Err(e) => {
+            eprintln!("Error reading input: {}", e);
+          }
+        }
+      }
+      _ = signal::ctrl_c() => {
+          std::process::exit(1);
+      }
+  }
 
   let repo = Repository::open_from_env().context("Failed to open repository")?;
   let tree = match args.sha1.as_deref() {
@@ -83,14 +94,7 @@ async fn main() -> Result<()> {
     .write(commit_message.trim().to_string())
     .context("Failed to write commit message")?;
 
-  tokio::select! {
-      _ = read_input(&pb) => {
-          // std::process::exit(1);
-      }
-      _ = signal::ctrl_c() => {
-          std::process::exit(1);
-      }
-  }
+  let pb_clone = pb.clone();
 
   Ok(())
 }
