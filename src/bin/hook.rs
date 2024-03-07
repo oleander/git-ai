@@ -105,7 +105,7 @@ async fn main() -> Result<()> {
 
   pb.finish_with_message("Done");
   multi.remove(&pb);
-  writeln!(stdout, "").unwrap(); // Ensure to leave the terminal in a clean state
+  writeln!(stdout, "").unwrap();
 
   Ok(())
 }
