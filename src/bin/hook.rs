@@ -19,12 +19,10 @@ use ai::{commit, config};
 use env_logger;
 use indicatif_log_bridge::LogWrapper;
 use crossterm::terminal;
-//   let mut stdout = tokio::io::stdout().into_raw_mode().unwrap();
 use termion::async_stdin;
 
 async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
   let mut stdout = std::io::stdout().into_raw_mode().unwrap();
-
   let mut stdin = termion::async_stdin().keys();
 
   loop {
@@ -46,13 +44,6 @@ async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-  env_logger::init();
-
-  // Show cursor on exit whenever ctrl-c is pressed
-  ctrlc::set_handler(move || {
-    console::Term::stdout().show_cursor().expect("Failed to show cursor");
-  })?;
-
   let args = Args::parse();
 
   // If defined, then the user already provided a commit message
@@ -105,6 +96,7 @@ async fn main() -> Result<()> {
 
   tokio::select! {
     _ = signal::ctrl_c() => {
+      console::Term::stdout().show_cursor().expect("Failed to show cursor");
       std::process::exit(1);
     }
 
