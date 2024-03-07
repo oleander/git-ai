@@ -1,5 +1,7 @@
 // Hook: prepare-commit-msg
 
+use std::io::{stdin, stdout};
+use tokio::{io, sync::mpsc};
 use std::time::Duration;
 
 use git2::Repository;
@@ -7,12 +9,32 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use ai::hook::*;
+use termion::raw::IntoRawMode;
+use termion::input::TermRead;
 use indicatif_log_bridge::LogWrapper;
-
 use ai::{commit, config};
+use tokio::time::sleep;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+  let stdout = io::stdout().into_raw_mode().unwrap();
+  let mut stdin = termion::async_stdin().keys();
+  let (tx, mut rx) = mpsc::channel(100);
+
+  tokio::spawn(async move {
+    loop {
+      if let Some(key) = stdin.next() {
+        let key = key.unwrap();
+        match key {
+          // Exit on 'q'
+          termion::event::Key::Char('q') => break,
+          // Ignore Enter and other keys
+          _ => {}
+        }
+      }
+    }
+  });
+
   let logger = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).build();
   let multi = MultiProgress::new();
 
@@ -41,6 +63,17 @@ async fn main() -> Result<()> {
   pb.set_message("Generating commit message...");
   pb.enable_steady_tick(Duration::from_millis(150));
 
+  tokio::spawn(async move {
+    for _ in 0..100 {
+      if let Some(_) = rx.try_recv().ok() {
+        // Handle received input (if any)
+      }
+      // Simulate work
+      pb.inc(1);
+      sleep(Duration::from_millis(100)).await;
+    }
+  });
+
   let repo = Repository::open_from_env().context("Failed to open repository")?;
 
   // Get the tree from the commit if the sha1 is provided
@@ -67,6 +100,10 @@ async fn main() -> Result<()> {
     .commit_msg_file
     .write(commit_message.trim().to_string())
     .context("Failed to write commit message")?;
+
+  pb.finish_with_message("Done");
+  multi.remove(&pb);
+  writeln!(stdout, "\n").unwrap();
 
   Ok(())
 }
