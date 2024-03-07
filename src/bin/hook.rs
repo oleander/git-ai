@@ -24,6 +24,8 @@ async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
 
   loop {
     match stdin.next() {
+
+
       Some(Ok(Key::Ctrl('c'))) => {
         return Ok(1);
       },
