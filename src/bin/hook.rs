@@ -2,13 +2,7 @@
 
 use std::time::Duration;
 
-use git2::Repository;
-use anyhow::{Context, Result};
-use clap::Parser;
-use indicatif::{ProgressBar, ProgressStyle};
-use ai::hook::{PatchRepository, *};
-use ai::hook::FilePath;
-use ai::{commit, config};
+
 
 #[tokio::main]
 async fn main() -> Result<()> {
