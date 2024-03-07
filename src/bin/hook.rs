@@ -78,6 +78,7 @@ async fn main() -> Result<()> {
       std::thread::sleep(Duration::from_millis(100));
     }
     pb.finish_with_message("Done");
+    multi.remove(&pb);
   });
 
   // Wait for either the progress task to complete or an exit signal from the input handler
