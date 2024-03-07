@@ -6,7 +6,7 @@ DIR="/tmp/git-ai-test"
 # Stop the script if any command fails set -e
 
 # Install the git-ai
-cargo install --path .
+cargo install --debug --path .
 
 # Clean up any existing directory and create a new one
 rm -rf $DIR

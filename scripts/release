@@ -2,9 +2,6 @@
 
 set -e
 
-# echo "Bump version in Cargo.toml, I'm waiting for you to do it"
-# read -p "Press enter to continue\n"
-
 VERSION=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version' | tr -d '\n')
 
 if [ -z "$VERSION" ]; then
