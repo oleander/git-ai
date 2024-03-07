@@ -1,0 +1,21 @@
+#!/bin/sh
+
+set -e
+
+VERSION=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version' | tr -d '\n')
+
+if [ -z "$VERSION" ]; then
+    echo "Failed to get version"
+    exit 1
+fi
+
+echo "Releasing $VERSION"
+
+cargo update
+git add Cargo.lock Cargo.toml
+git commit --no-edit
+
+git tag -a v$VERSION -m "Release v$VERSION"
+git push origin v$VERSION
+git push origin main
+git push --tags
