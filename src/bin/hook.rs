@@ -91,15 +91,15 @@ async fn main() -> Result<()> {
   });
 
   // Wait for either the progress task to complete or an exit signal from the input handler
-  let pb1 = pb.clone();
+  // let pb1 = pb.clone();
   select! {
       _ = progress_task => {
-          pb1.finish_with_message("Done");
-          multi.remove(&pb1);
+          pb.finish_with_message("Done");
+          multi.remove(&pb);
       },
       _ = rx.recv() => {
-          pb1.finish_with_message("Aborted");
-          multi.remove(&pb1);
+          pb.finish_with_message("Aborted");
+          multi.remove(&pb);
       },
   }
 
