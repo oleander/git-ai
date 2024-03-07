@@ -21,6 +21,10 @@ async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
   let mut buffer = [0u8; 10];
   let mut stdin = tokio::io::stdin();
 
+
+
+
+
   loop {
     if stdin.read(&mut buffer).await? == 0 {
       // return Ok(0);
