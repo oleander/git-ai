@@ -17,9 +17,6 @@ local-install-hook:
 local-install: local-install-hook
     cargo install --debug --path .
 
-docker-exec +CMD:
-    docker run --rm -v $PWD:/git-ai -w /git-ai git-ai:latest {{CMD}}
-
 docker-build:
     docker build -t git-ai .
 
