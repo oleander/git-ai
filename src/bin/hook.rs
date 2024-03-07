@@ -52,6 +52,8 @@ async fn main() -> Result<()> {
 
   tokio::select! {
       status = read_input(pb.clone()) => {
+
+
         match status {
           Ok(0) => {
             println!("Received EOF, exiting");
