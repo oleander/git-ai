@@ -25,9 +25,10 @@ async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
     if stdin.read(&mut buffer).await? == 0 {
       // return Ok(0);
 
-      pb.println(buffer[0].to_string());
+      // pb.println(buffer[0].to_string());
     } else if buffer[0] == 3 {
-      pb.println(buffer[0].to_string());
+      // pb.println(buffer[0].to_string());
+      return Ok(0);
 
 
     } else {
