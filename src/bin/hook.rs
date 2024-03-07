@@ -23,7 +23,7 @@ use crossterm::terminal;
 use termion::async_stdin;
 
 async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
-  let mut stdout = std::io::stdout().into_raw_mode().unwrap();
+  let _stdout = std::io::stdout().into_raw_mode().unwrap();
   let mut stdin = termion::async_stdin().keys();
 
   loop {
