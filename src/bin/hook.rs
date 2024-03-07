@@ -92,6 +92,7 @@ async fn main() -> Result<()> {
   select! {
       _ = progress_task => {},
       _ = rx.recv() => {
+        log::info!("Received exit signal");
           std::process::exit(0);
       },
   }
