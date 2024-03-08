@@ -1,6 +1,17 @@
 #!/bin/bash
 
-source .env .env.local
+if [ ! -f .env.local ]; then
+  echo ".env.local missing"
+  exit 1
+fi
+
+if [ ! -f .env ]; then
+  echo ".env missing"
+  exit 1
+fi
+
+source .env
+source .env.local
 
 # Directory for the test repository
 DIR="/tmp/git-ai-test"
