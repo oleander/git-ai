@@ -1,8 +1,8 @@
 use std::{io, str};
 
+use async_openai::Client;
 use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
-use async_openai::Client;
 use thiserror::Error;
 use anyhow::Context;
 use async_openai::types::{
