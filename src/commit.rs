@@ -34,15 +34,16 @@ pub enum ChatError {
 fn system_prompt(language: String, max_length_of_commit: usize) -> Result<ChatCompletionRequestSystemMessage, OpenAIError> {
   let payload = format!(
     "
-    Create a concise git commit message in present tense for the user provided code diff.
-    Follow these guidelines:
-    * Language: {language}.
-    * Maximum Length: {max_length_of_commit} characters.
-    * Clearly detail what changes were made and why.
-    * Exclude irrelevant and unnecessary details, such as translations.
-    Your entire response will be passed directly into git commit:
+    Your role is to create concise git commit messages based on user-provided git diffs. When crafting these messages:
+    - Use {language}.
+    - - Maximum Length: {max_length_of_commit} characters.
+    - Focus on detailing the changes and reasons behind them, ensuring clarity and relevance.
+    - Avoid including irrelevant or unnecessary details, such as translations, to maintain focus on the core changes.
+    Your responses should be direct and immediately usable in a git commit, crafted in present tense to fit git conventions.
+    You work primarily with git diffs, interpreting them to generate meaningful commit messages that succinctly summarize the changes.
   "
   )
+
   .split_whitespace()
   .collect::<Vec<&str>>()
   .join(" ");

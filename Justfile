@@ -11,11 +11,10 @@ test: (docker-run RUST_IMG "tools/test.sh")
 local-github-actions:
     act --container-architecture linux/amd64
 
-local-install-hook:
-    git ai hook install -f
-
-local-install: local-install-hook
+local-install:
     cargo install --debug --path .
+    git ai hook uninstall || true
+    git ai hook install
 
 docker-build:
     docker build -t git-ai .

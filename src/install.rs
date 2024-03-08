@@ -8,15 +8,6 @@ use console::Emoji;
 use git2::{Repository, RepositoryOpenFlags as Flags};
 use anyhow::{Context, Result};
 use thiserror::Error;
-use clap::Parser;
-
-/// This is a simple program
-#[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
-struct Args {
-  #[clap(long, short, action)]
-  force: bool
-}
 
 #[derive(Error, Debug)]
 pub enum InstallError {
@@ -38,6 +29,11 @@ pub enum InstallError {
 }
 
 const EMOJI: Emoji<'_, '_> = Emoji("🔗", "");
+
+
+fn can_override_hook() -> bool {
+  std::env::args().collect::<Vec<String>>().iter().any(|arg| arg == "-f")
+}
 
 // Git hook: prepare-commit-msg
 // Crates an executable git hook (prepare-commit-msg) in the .git/hooks directory
@@ -65,8 +61,7 @@ pub fn run() -> Result<(), InstallError> {
   }
 
   let hook_file = hook_dir.join("prepare-commit-msg");
-  let args = Args::parse();
-  if hook_file.exists() && !args.force {
+  if hook_file.exists() && !can_override_hook() {
     return Err(InstallError::GitHookExists(hook_file.relative_path()));
   }
 
