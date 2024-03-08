@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source .env .env.local
+
 # Directory for the test repository
 DIR="/tmp/git-ai-test"
 
@@ -12,6 +14,11 @@ cargo install --debug --path .
 rm -rf $DIR
 mkdir $DIR
 cd $DIR
+
+if [ -z "$OPENAI_API_KEY" ]; then
+  echo "Please set the OPENAI_API_KEY environment variable."
+  exit 1
+fi
 
 # Initialize a new Git repository
 git init
