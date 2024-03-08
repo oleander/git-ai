@@ -30,7 +30,6 @@ pub enum InstallError {
 
 const EMOJI: Emoji<'_, '_> = Emoji("🔗", "");
 
-
 fn can_override_hook() -> bool {
   std::env::args().collect::<Vec<String>>().iter().any(|arg| arg == "-f")
 }
