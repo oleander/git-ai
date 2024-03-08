@@ -69,7 +69,7 @@ echo "Hello World 2" > README.md
 git add README.md
 git commit --no-edit
 
-# TODO: git commit --amend
+git commit --amend --no-edit
 
 # Check the status of the repository
 git status
