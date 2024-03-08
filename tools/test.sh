@@ -1,8 +1,8 @@
 #!/bin/bash
 
-if [ ! -f .env.local ]; then
-  echo ".env.local missing"
-  exit 1
+if [ -f .env.local ]; then
+  echo "Sourcing .env.local"
+  source .env.local
 fi
 
 if [ ! -f .env ]; then
@@ -11,7 +11,6 @@ if [ ! -f .env ]; then
 fi
 
 source .env
-source .env.local
 
 # Directory for the test repository
 DIR="/tmp/git-ai-test"
