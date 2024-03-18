@@ -1,13 +1,13 @@
 use std::{io, str};
 
+use async_openai::types::{
+  ChatCompletionNamedToolChoice, ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageArgs, ChatCompletionTool, ChatCompletionToolArgs, ChatCompletionToolChoiceOption, ChatCompletionToolType, CreateAssistantRequestArgs, CreateChatCompletionRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus
+};
 use async_openai::Client;
 use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
 use thiserror::Error;
 use anyhow::Context;
-use async_openai::types::{
-  ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs
-};
 
 use crate::config;
 
@@ -31,8 +31,8 @@ pub enum ChatError {
   OpenAI(#[from] OpenAIError)
 }
 
-fn system_prompt(language: String, max_length_of_commit: usize) -> Result<ChatCompletionRequestSystemMessage, OpenAIError> {
-  let payload = format!(
+fn instruction(language: String, max_length_of_commit: usize) -> String {
+  format!(
     "
     Your role is to create concise git commit messages based on user-provided git diffs. When crafting these messages:
     - Use {language}.
@@ -43,19 +43,13 @@ fn system_prompt(language: String, max_length_of_commit: usize) -> Result<ChatCo
     You work primarily with git diffs, interpreting them to generate meaningful commit messages that succinctly summarize the changes.
   "
   )
-
   .split_whitespace()
   .collect::<Vec<&str>>()
-  .join(" ");
-
-  // TODO: Check out the options
-  ChatCompletionRequestSystemMessageArgs::default().content(payload).build()
+  .join(" ")
 }
 
-fn user_prompt(diff: String) -> Result<ChatCompletionRequestUserMessage, OpenAIError> {
-  let payload = format!("Staged changes: {diff}").split_whitespace().collect::<Vec<&str>>().join(" ");
-
-  ChatCompletionRequestUserMessageArgs::default().content(payload).build()
+fn user_prompt(diff: String) -> String {
+  format!("Staged changes: {diff}").split_whitespace().collect::<Vec<&str>>().join(" ")
 }
 
 // Generate a commit message using OpenAI's API using the provided git diff
@@ -70,24 +64,76 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {
   let language = config::APP.language.clone();
   let model = config::APP.model.clone();
 
-  let messages: Vec<ChatCompletionRequestMessage> =
-    vec![system_prompt(language, max_length_of_commit)?.into(), user_prompt(diff)?.into()];
-
-  log::debug!("Sending request to OpenAI API: {:?}", messages);
-
   let config = OpenAIConfig::new().with_api_key(api_key);
   let client = Client::with_config(config);
+  let query = [("limit", "1")];
+  let thread_request = CreateThreadRequestArgs::default().build()?;
+  let thread = client.threads().create(thread_request.clone()).await?;
+  let instruction = instruction(language, max_length_of_commit);
+  let assistant_request = CreateAssistantRequestArgs::default()
+    .name("Git Commit Assistant")
+    .instructions(&instruction)
+    .model(model)
+    .build()?;
 
-  log::debug!("Creating chat completion request");
-  let request = CreateChatCompletionRequestArgs::default().messages(messages).model(model).n(1).build()?;
+  let assistant = client.assistants().create(assistant_request).await?;
+  let assistant_id = &assistant.id;
+  let message = CreateMessageRequestArgs::default().role("user").content(user_prompt(diff)).build()?;
 
-  log::debug!("Sending request to OpenAI API");
-  client
-    .chat()
-    .create(request)
-    .await?
-    .choices
-    .first()
-    .and_then(|choice| choice.message.content.clone())
-    .ok_or_else(|| ChatError::OpenAIError("Failed to get response from OpenAI".to_string()))
+  //attach message to the thread
+  let _message_obj = client.threads().messages(&thread.id).create(message).await?;
+
+  let run_request = CreateRunRequestArgs::default().assistant_id(assistant_id).build()?;
+
+  let run = client.threads().runs(&thread.id).create(run_request).await?;
+
+  let mut awaiting_response = true;
+  let result = loop {
+    let run = client.threads().runs(&thread.id).retrieve(&run.id).await?;
+    match run.status {
+      RunStatus::Completed => {
+        awaiting_response = false;
+        let response = client.threads().messages(&thread.id).list(&query).await?;
+        let message_id = response.data.get(0).unwrap().id.clone();
+        let message = client.threads().messages(&thread.id).retrieve(&message_id).await?;
+        let content = message.content.get(0).unwrap();
+        let text = match content {
+          MessageContent::Text(text) => text.text.value.clone(),
+          MessageContent::ImageFile(_) => {
+            panic!("imaged are not supported in the terminal")
+          }
+        };
+
+        break Ok(text);
+      },
+      RunStatus::Failed => {
+        break Err(ChatError::OpenAIError("Run failed".to_string()));
+        println!("--- Run Failed: {:#?}", run);
+      },
+      RunStatus::Queued => {
+        println!("--- Run Queued");
+      },
+      RunStatus::Cancelling => {
+        println!("--- Run Cancelling");
+      },
+      RunStatus::Cancelled => {
+        println!("--- Run Cancelled");
+      },
+      RunStatus::Expired => {
+        println!("--- Run Expired");
+      },
+      RunStatus::RequiresAction => {
+        println!("--- Run Requires Action");
+      },
+      RunStatus::InProgress => {
+        println!("--- Waiting for response...");
+      }
+    }
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+  };
+
+  client.assistants().delete(assistant_id).await?;
+  client.threads().delete(&thread.id).await?;
+
+  result
 }
