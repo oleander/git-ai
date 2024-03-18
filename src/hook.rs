@@ -34,6 +34,16 @@ impl FilePath for PathBuf {
   }
 }
 
+trait DiffDeltaPath {
+  fn path(&self) -> PathBuf;
+}
+
+impl DiffDeltaPath for git2::DiffDelta<'_> {
+  fn path(&self) -> PathBuf {
+    self.new_file().path().or_else(|| self.old_file().path()).map(PathBuf::from).unwrap_or_default()
+  }
+}
+
 pub trait Utf8String {
   fn to_utf8(&self) -> String;
 }
@@ -63,23 +73,12 @@ impl PatchDiff for Diff<'_> {
     let mut patch_acc = Vec::new();
 
     for delta in self.deltas() {
-      let path = delta
-        .new_file()
-        .path()
-        .or_else(|| delta.old_file().path())
-        .map_or_else(|| PathBuf::from("unknown file"), PathBuf::from);
-
-      token_table.insert(path, 0);
+      token_table.insert(delta.path(), 0);
     }
 
     #[rustfmt::skip]
     self.print(DiffFormat::Patch, |diff, _hunk, line| {
-      let path = diff
-        .new_file()
-        .path()
-        .or_else(|| diff.old_file().path())
-        .map_or_else(|| PathBuf::from("unknown file"), PathBuf::from);
-
+      let path = diff.path();
       let Some(tokens) = token_table.get_mut(&path) else {
         return true;
       };
