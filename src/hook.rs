@@ -56,10 +56,21 @@ pub trait PatchDiff {
 
 impl PatchDiff for Diff<'_> {
   fn to_patch(&self, max_token_count: usize) -> Result<String> {
+    let truncated_message = "<truncated>";
     let number_of_files = self.deltas().len();
-    let tokens_per_file = max_token_count / number_of_files.max(1);
+    let tokens_per_file = (max_token_count / number_of_files.max(1)) - truncated_message.len();
     let mut token_table: HashMap<PathBuf, usize> = HashMap::new();
     let mut patch_acc = Vec::new();
+
+    for delta in self.deltas() {
+      let path = delta
+        .new_file()
+        .path()
+        .or_else(|| delta.old_file().path())
+        .map_or_else(|| PathBuf::from("unknown file"), PathBuf::from);
+
+      token_table.insert(path, 0);
+    }
 
     #[rustfmt::skip]
     self.print(DiffFormat::Patch, |diff, _hunk, line| {
@@ -69,15 +80,17 @@ impl PatchDiff for Diff<'_> {
         .or_else(|| diff.old_file().path())
         .map_or_else(|| PathBuf::from("unknown file"), PathBuf::from);
 
-      let curr_tokens = token_table.entry(path).or_insert(0);
-      if *curr_tokens >= tokens_per_file {
+      let Some(tokens) = token_table.get_mut(&path) else {
         return true;
-      }
+      };
 
       let content = line.content();
-      if *curr_tokens + content.len() <= tokens_per_file {
+      if *tokens + content.len() <= tokens_per_file {
         patch_acc.extend_from_slice(content);
-        *curr_tokens += content.len();
+        *tokens += content.len();
+      } else {
+        patch_acc.extend_from_slice(truncated_message.as_bytes());
+        token_table.remove(&path);
       }
 
       true
