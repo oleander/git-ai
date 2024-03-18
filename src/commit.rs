@@ -8,7 +8,6 @@ use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
 use thiserror::Error;
 use anyhow::Context;
-use anyhow::Result;
 
 use crate::config;
 
@@ -53,7 +52,7 @@ fn user_prompt(diff: String) -> String {
   format!("Staged changes: {diff}").split_whitespace().collect::<Vec<&str>>().join(" ")
 }
 
-fn client() -> Result<Client<OpenAIConfig>> {
+fn client() -> Result<Client<OpenAIConfig>, ChatError> {
   let api_key = config::APP
     .openai_api_key
     .clone()
@@ -99,36 +98,34 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {
         let message_id = response.data.get(0).unwrap().id.clone();
         let message = client.threads().messages(&thread.id).retrieve(&message_id).await?;
         let content = message.content.get(0).unwrap();
-        let text = match content {
-          MessageContent::Text(text) => text.text.value.clone(),
-          MessageContent::ImageFile(_) => {
-            panic!("imaged are not supported in the terminal")
-          }
+
+        let MessageContent::Text(text) = &content else {
+          break Err(ChatError::OpenAIError("Message content is not text".to_string()));
         };
 
-        break Ok(text);
+        break Ok(text.text.value.clone());
       },
       RunStatus::Failed => {
         println!("--- Run Failed: {:#?}", run);
         break Err(ChatError::OpenAIError("Run failed".to_string()));
       },
-      RunStatus::Queued => {
-        println!("--- Run Queued");
-      },
-      RunStatus::Cancelling => {
-        println!("--- Run Cancelling");
-      },
       RunStatus::Cancelled => {
-        println!("--- Run Cancelled");
+        break Err(ChatError::OpenAIError("Run cancelled".to_string()));
       },
       RunStatus::Expired => {
-        println!("--- Run Expired");
+        break Err(ChatError::OpenAIError("Run expired".to_string()));
       },
       RunStatus::RequiresAction => {
-        println!("--- Run Requires Action");
+        break Err(ChatError::OpenAIError("Run requires action".to_string()));
       },
       RunStatus::InProgress => {
-        println!("--- Waiting for response...");
+        log::debug!("--- Run InProgress");
+      },
+      RunStatus::Queued => {
+        log::debug!("--- Run Queued");
+      },
+      RunStatus::Cancelling => {
+        log::debug!("--- Run Cancelling");
       }
     }
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
