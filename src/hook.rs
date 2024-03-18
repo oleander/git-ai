@@ -103,7 +103,7 @@ impl PatchDiff for Diff<'_> {
       }
 
       true
-    }).unwrap();
+    }).context("Failed to print diff")?;
 
     Ok(patch_acc.to_utf8())
   }
