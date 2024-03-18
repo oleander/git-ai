@@ -1,7 +1,7 @@
 use std::{io, str};
 
 use async_openai::types::{
-  ChatCompletionNamedToolChoice, ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageArgs, ChatCompletionTool, ChatCompletionToolArgs, ChatCompletionToolChoiceOption, ChatCompletionToolType, CreateAssistantRequestArgs, CreateChatCompletionRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus
+  CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus
 };
 use async_openai::Client;
 use async_openai::config::OpenAIConfig;
