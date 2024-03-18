@@ -87,12 +87,10 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {
 
   let run = client.threads().runs(&thread.id).create(run_request).await?;
 
-  let mut awaiting_response = true;
   let result = loop {
     let run = client.threads().runs(&thread.id).retrieve(&run.id).await?;
     match run.status {
       RunStatus::Completed => {
-        awaiting_response = false;
         let response = client.threads().messages(&thread.id).list(&query).await?;
         let message_id = response.data.get(0).unwrap().id.clone();
         let message = client.threads().messages(&thread.id).retrieve(&message_id).await?;
@@ -107,8 +105,8 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {
         break Ok(text);
       },
       RunStatus::Failed => {
-        break Err(ChatError::OpenAIError("Run failed".to_string()));
         println!("--- Run Failed: {:#?}", run);
+        break Err(ChatError::OpenAIError("Run failed".to_string()));
       },
       RunStatus::Queued => {
         println!("--- Run Queued");
