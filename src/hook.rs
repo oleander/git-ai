@@ -1,8 +1,9 @@
+use std::fmt::{self, Display, Formatter};
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::fs::File;
 
-use git2::{DiffFormat, DiffOptions, Repository, Tree};
+use git2::{Delta, DiffFormat, DiffOptions, Repository, Tree};
 use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use dotenv_codegen::dotenv;
@@ -58,14 +59,12 @@ pub trait PatchDiff {
 impl PatchDiff for git2::Diff<'_> {
   fn to_patch(&self, max_token_count: usize) -> Result<String> {
     let mut acc = Vec::new();
-    let mut length = 0;
+    let length = 0;
 
     #[rustfmt::skip]
     self.print(DiffFormat::Patch, |_, _, line| {
       let content = line.content();
       acc.extend_from_slice(content);
-      let str = content.to_utf8();
-      length += str.len();
       length <= max_token_count
     }).ok();
 
@@ -78,15 +77,94 @@ pub trait PatchRepository {
   fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>>;
 }
 
-impl PatchRepository for Repository {
-  fn to_patch(&self, tree: Option<Tree<'_>>, max_token_count: usize) -> Result<String> {
+#[derive(Debug, Error)]
+enum PatchError {
+  #[error("Error accessing repository: {0}")]
+  RepositoryAccessError(String),
+  #[error("Error calculating diff: {0}")]
+  DiffCalculationError(String)
+}
+
+#[derive(Debug, Clone)]
+enum DeltaStatus {
+  Added(PathBuf),
+  Modified(PathBuf),
+  Deleted(PathBuf),
+  Renamed(PathBuf, PathBuf),
+  Ignored
+}
+
+impl DeltaStatus {
+  fn from(delta: &git2::DiffDelta) -> Result<DeltaStatus> {
+    let path = delta.new_file().path().or(delta.old_file().path()).ok_or_else(|| {
+      PatchError::DiffCalculationError("Failed to retrieve path for delta".to_string())
+    })?;
+
+    let owned_path = path.to_path_buf();
+
+    let r = match delta.status() {
+      Delta::Added => DeltaStatus::Added(owned_path),
+      Delta::Modified => DeltaStatus::Modified(owned_path),
+      Delta::Deleted => DeltaStatus::Deleted(owned_path),
+      _ => DeltaStatus::Ignored
+    };
+
+    Ok(r)
+  }
+}
+
+impl Display for DeltaStatus {
+  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    match self {
+      DeltaStatus::Added(path) => {
+        write!(f, "A {}", path.to_string_lossy())?;
+        Ok(())
+      },
+      DeltaStatus::Modified(path) => {
+        write!(f, "M {}", path.to_string_lossy())?;
+        Ok(())
+      },
+      DeltaStatus::Deleted(path) => {
+        write!(f, "D {}", path.to_string_lossy())?;
+        Ok(())
+      },
+      DeltaStatus::Renamed(old, new) => {
+        write!(f, "R {} {}", old.to_string_lossy(), new.to_string_lossy())?;
+        Ok(())
+      },
+      DeltaStatus::Ignored => {
+        write!(f, "")?;
+        Ok(())
+      }
+    }
+  }
+}
+
+#[derive(Debug)]
+struct PatchSummary(Vec<DeltaStatus>);
+
+impl PatchSummary {
+  fn to_patch(&self, max_token_count: usize) -> Result<String> {
+    let tokens_per_delta = max_token_count / self.0.len();
+    let res = self.0.iter().collect::<Vec<_>>();
+    let lines: Vec<_> = res
+      .iter()
+      .map(|delta| delta.to_string().chars().take(tokens_per_delta).collect::<String>())
+      .collect();
+    let r = Ok(lines.join("\n"));
+    println!("{:?}", r);
+    r
+  }
+}
+
+impl<'a> PatchRepository for Repository {
+  fn to_patch(&self, tree: Option<Tree>, max_token_count: usize) -> Result<String> {
     self.to_diff(tree)?.to_patch(max_token_count)
   }
 
   fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>> {
     let mut opts = DiffOptions::new();
     opts
-      .enable_fast_untracked_dirs(true)
       .ignore_whitespace_change(true)
       .recurse_untracked_dirs(false)
       .recurse_ignored_dirs(false)
@@ -141,8 +219,4 @@ pub enum HookError {
   // ChatError
   #[error(transparent)]
   Chat(#[from] ChatError)
-}
-
-lazy_static! {
-  pub static ref MAX_DIFF_TOKENS: usize = dotenv!("MAX_DIFF_TOKENS").parse::<usize>().unwrap();
 }

@@ -61,12 +61,10 @@ async fn main() -> Result<()> {
   pb.enable_steady_tick(Duration::from_millis(150));
 
   let tree = match args.sha1.as_deref() {
-    // git commit --amend
-    Some("HEAD") => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
+    // git commit --amend or git commit -c
+    Some("HEAD") | None => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
     // git ???
-    Some(sha1) => repo.find_object(Oid::from_str(sha1)?, None).ok().and_then(|obj| obj.peel_to_tree().ok()),
-    // git commit
-    None => repo.head().ok().and_then(|head| head.peel_to_tree().ok())
+    Some(sha1) => repo.find_object(Oid::from_str(sha1)?, None).ok().and_then(|obj| obj.peel_to_tree().ok())
   };
 
   let patch = repo.to_patch(tree, max_tokens).context("Failed to get patch")?;
@@ -76,7 +74,9 @@ async fn main() -> Result<()> {
   }
 
   let process: tokio::task::JoinHandle<Result<(), anyhow::Error>> = tokio::spawn(async move {
-    let commit_message = commit::generate(patch.to_string()).await.context("Failed to generate commit message")?;
+    let str = patch.to_string();
+    println!("Patch: {}", str);
+    let commit_message = commit::generate(str).await.context("Failed to generate commit message")?;
 
     args
       .commit_msg_file
