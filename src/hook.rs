@@ -1,7 +1,9 @@
-use std::io::{Read, Write}; use std::path::PathBuf;
+use std::collections::HashMap;
+use std::io::{Read, Write};
+use std::path::PathBuf;
 use std::fs::File;
 
-use git2::{DiffFormat, DiffOptions, Repository, Tree};
+use git2::{Diff, DiffFormat, DiffOptions, Repository, Tree};
 use anyhow::{Context, Result};
 use thiserror::Error;
 use clap::Parser;
@@ -52,19 +54,36 @@ pub trait PatchDiff {
   fn to_patch(&self, max_token_count: usize) -> Result<String>;
 }
 
-impl PatchDiff for git2::Diff<'_> {
+impl PatchDiff for Diff<'_> {
   fn to_patch(&self, max_token_count: usize) -> Result<String> {
-    let mut acc = Vec::new();
-    let length = 0;
+    let number_of_files = self.deltas().len();
+    let tokens_per_file = max_token_count / number_of_files.max(1);
+    let mut token_table: HashMap<PathBuf, usize> = HashMap::new();
+    let mut patch_acc = Vec::new();
 
     #[rustfmt::skip]
-    self.print(DiffFormat::Patch, |_, _, line| {
-      let content = line.content();
-      acc.extend_from_slice(content);
-      length <= max_token_count
-    }).ok();
+    self.print(DiffFormat::Patch, |diff, _hunk, line| {
+      let path = diff
+        .new_file()
+        .path()
+        .or_else(|| diff.old_file().path())
+        .map_or_else(|| PathBuf::from("unknown file"), PathBuf::from);
 
-    Ok(acc.to_utf8())
+      let curr_tokens = token_table.entry(path).or_insert(0);
+      if *curr_tokens >= tokens_per_file {
+        return true;
+      }
+
+      let content = line.content();
+      if *curr_tokens + content.len() <= tokens_per_file {
+        patch_acc.extend_from_slice(content);
+        *curr_tokens += content.len();
+      }
+
+      true
+    }).unwrap();
+
+    Ok(patch_acc.to_utf8())
   }
 }
 
