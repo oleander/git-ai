@@ -140,23 +140,6 @@ impl Display for DeltaStatus {
   }
 }
 
-#[derive(Debug)]
-struct PatchSummary(Vec<DeltaStatus>);
-
-impl PatchSummary {
-  fn to_patch(&self, max_token_count: usize) -> Result<String> {
-    let tokens_per_delta = max_token_count / self.0.len();
-    let res = self.0.iter().collect::<Vec<_>>();
-    let lines: Vec<_> = res
-      .iter()
-      .map(|delta| delta.to_string().chars().take(tokens_per_delta).collect::<String>())
-      .collect();
-    let r = Ok(lines.join("\n"));
-    println!("{:?}", r);
-    r
-  }
-}
-
 impl<'a> PatchRepository for Repository {
   fn to_patch(&self, tree: Option<Tree>, max_token_count: usize) -> Result<String> {
     self.to_diff(tree)?.to_patch(max_token_count)
