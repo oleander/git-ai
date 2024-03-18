@@ -1,13 +1,14 @@
 use std::{io, str};
 
 use async_openai::types::{
-  CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus
+  AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus
 };
 use async_openai::Client;
 use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
 use thiserror::Error;
 use anyhow::Context;
+use anyhow::Result;
 
 use crate::config;
 
@@ -52,39 +53,42 @@ fn user_prompt(diff: String) -> String {
   format!("Staged changes: {diff}").split_whitespace().collect::<Vec<&str>>().join(" ")
 }
 
-// Generate a commit message using OpenAI's API using the provided git diff
-pub async fn generate(diff: String) -> Result<String, ChatError> {
-  log::debug!("Generating commit message using config: {:?}", config::APP);
-
+fn client() -> Result<Client<OpenAIConfig>> {
   let api_key = config::APP
     .openai_api_key
     .clone()
     .context("Failed to get OpenAI API key, please run `git-ai config set openapi-api-key <api-key>`")?;
-  let max_length_of_commit = config::APP.max_length;
-  let language = config::APP.language.clone();
-  let model = config::APP.model.clone();
 
   let config = OpenAIConfig::new().with_api_key(api_key);
-  let client = Client::with_config(config);
+  Ok(Client::with_config(config))
+}
+// Generate a commit message using OpenAI's API using the provided git diff
+pub async fn generate(diff: String) -> Result<String, ChatError> {
+  let language = config::APP.language.clone();
+  let max_length_of_commit = config::APP.max_length;
+  let model = config::APP.model.clone();
   let query = [("limit", "1")];
   let thread_request = CreateThreadRequestArgs::default().build()?;
+  let client = client()?;
   let thread = client.threads().create(thread_request.clone()).await?;
   let instruction = instruction(language, max_length_of_commit);
+
+  let tools = vec![AssistantTools::Code(AssistantToolsCode {
+    r#type: "code_interpreter".to_string()
+  })];
+
   let assistant_request = CreateAssistantRequestArgs::default()
     .name("Git Commit Assistant")
     .instructions(&instruction)
+    .tools(tools)
     .model(model)
     .build()?;
 
   let assistant = client.assistants().create(assistant_request).await?;
   let assistant_id = &assistant.id;
   let message = CreateMessageRequestArgs::default().role("user").content(user_prompt(diff)).build()?;
-
-  //attach message to the thread
   let _message_obj = client.threads().messages(&thread.id).create(message).await?;
-
   let run_request = CreateRunRequestArgs::default().assistant_id(assistant_id).build()?;
-
   let run = client.threads().runs(&thread.id).create(run_request).await?;
 
   let result = loop {
