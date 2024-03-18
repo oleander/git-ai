@@ -40,7 +40,12 @@ trait DiffDeltaPath {
 
 impl DiffDeltaPath for git2::DiffDelta<'_> {
   fn path(&self) -> PathBuf {
-    self.new_file().path().or_else(|| self.old_file().path()).map(PathBuf::from).unwrap_or_default()
+    self
+      .new_file()
+      .path()
+      .or_else(|| self.old_file().path())
+      .map(PathBuf::from)
+      .unwrap_or_default()
   }
 }
 
@@ -78,8 +83,8 @@ impl PatchDiff for Diff<'_> {
 
     #[rustfmt::skip]
     self.print(DiffFormat::Patch, |diff, _hunk, line| {
-      let path = diff.path();
-      let Some(tokens) = token_table.get_mut(&path) else {
+      let diff_path = diff.path();
+      let Some(tokens) = token_table.get_mut(&diff_path) else {
         return true;
       };
 
@@ -89,7 +94,7 @@ impl PatchDiff for Diff<'_> {
         *tokens += content.len();
       } else {
         patch_acc.extend_from_slice(truncated_message.as_bytes());
-        token_table.remove(&path);
+        token_table.remove(&diff_path);
       }
 
       true
