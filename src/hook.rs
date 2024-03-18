@@ -73,7 +73,12 @@ impl PatchDiff for Diff<'_> {
   fn to_patch(&self, max_token_count: usize) -> Result<String> {
     let truncated_message = "<truncated>";
     let number_of_files = self.deltas().len();
-    let tokens_per_file = (max_token_count / number_of_files.max(1)) - truncated_message.len();
+
+    if number_of_files == 0 {
+      return Err(HookError::EmptyDiffOutput.into());
+    }
+
+    let tokens_per_file = (max_token_count / number_of_files) - truncated_message.len();
     let mut token_table: HashMap<PathBuf, usize> = HashMap::new();
     let mut patch_acc = Vec::new();
 
