@@ -17,6 +17,8 @@ use ai::hook::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+  env_logger::init();
+
   let args = Args::parse();
   let max_tokens = config::APP.max_diff_tokens;
   let pb = ProgressBar::new_spinner();
