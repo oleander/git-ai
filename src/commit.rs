@@ -61,17 +61,27 @@ fn client() -> Result<Client<OpenAIConfig>, ChatError> {
   let config = OpenAIConfig::new().with_api_key(api_key);
   Ok(Client::with_config(config))
 }
+
+pub struct OpenAIResponse {
+  pub thread_id: String,
+  pub response:  String
+}
+
 // Generate a commit message using OpenAI's API using the provided git diff
-pub async fn generate(diff: String) -> Result<String, ChatError> {
+pub async fn generate(diff: String, thread_id: Option<String>) -> Result<OpenAIResponse, ChatError> {
   let language = config::APP.language.clone();
   let max_length_of_commit = config::APP.max_length;
   let model = config::APP.model.clone();
   let query = [("limit", "1")];
   let thread_request = CreateThreadRequestArgs::default().build()?;
   let client = client()?;
-  let thread = client.threads().create(thread_request.clone()).await?;
-  let instruction = instruction(language, max_length_of_commit);
 
+  let thread = match thread_id {
+    Some(id) => client.threads().retrieve(&id).await?,
+    None => client.threads().create(thread_request.clone()).await?
+  };
+
+  let instruction = instruction(language, max_length_of_commit);
   let tools = vec![AssistantTools::Code(AssistantToolsCode {
     r#type: "code_interpreter".to_string()
   })];
@@ -130,8 +140,8 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
   };
 
-  client.assistants().delete(assistant_id).await?;
-  client.threads().delete(&thread.id).await?;
-
-  result
+  Ok(OpenAIResponse {
+    thread_id: thread.id,
+    response: result?
+  })
 }

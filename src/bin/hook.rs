@@ -52,7 +52,7 @@ async fn main() -> Result<()> {
   let process: tokio::task::JoinHandle<Result<(), anyhow::Error>> = tokio::spawn(async move {
     let str = patch.to_string();
     println!("Patch: {}", str);
-    let commit_message = commit::generate(str).await.context("Failed to generate commit message")?;
+    let commit_message = commit::generate(str, None).await.context("Failed to generate commit message")?.response;
 
     args
       .commit_msg_file
