@@ -7,6 +7,7 @@ use git2::{Diff, DiffFormat, DiffOptions, Repository, Tree};
 use anyhow::{Context, Result};
 use thiserror::Error;
 use clap::Parser;
+use tokio::io::AsyncReadExt;
 
 use crate::commit::ChatError;
 
@@ -96,7 +97,7 @@ impl PatchDiff for Diff<'_> {
       let content = line.content();
       if *tokens + content.len() <= tokens_per_file {
         patch_acc.extend_from_slice(content);
-        *tokens += content.len();
+        *tokens += content.to_utf8().split_whitespace().count();
       } else {
         patch_acc.extend_from_slice(truncated_message.as_bytes());
         token_table.remove(&diff_path);
