@@ -52,6 +52,13 @@ async fn main() -> Result<()> {
     Err(HookError::EmptyDiffOutput)?;
   }
 
+  let pb_clone = pb.clone();
+  ctrlc::set_handler(move || {
+    pb_clone.finish_and_clear();
+    console::Term::stdout().show_cursor().expect("Failed to show cursor");
+    std::process::exit(1);
+  })?;
+
   let session = Session::load_from_repo(&repo).await.unwrap();
   let respomse = commit::generate(patch.to_string(), session.into(), pb.clone().into()).await?;
   let commit = respomse.response.trim();
@@ -61,28 +68,4 @@ async fn main() -> Result<()> {
   pb.finish_and_clear();
 
   Ok(())
-}
-
-async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
-  let _stdout = std::io::stdout().into_raw_mode().unwrap();
-  let mut stdin = termion::async_stdin().keys();
-
-  loop {
-    match stdin.next() {
-      // Ctrl+C pressed: exit the program
-      Some(Ok(Key::Ctrl('c'))) => {
-        return Ok(1);
-      },
-
-      // Enter pressed: render empty line before progress bar
-      Some(Ok(Key::Char('\n'))) => {
-        pb.println("");
-      },
-
-      // Any other key pressed
-      _ => {
-        sleep(Duration::from_millis(50)).await;
-      }
-    }
-  }
 }
