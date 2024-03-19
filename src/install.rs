@@ -41,6 +41,7 @@ pub fn run() -> Result<(), InstallError> {
   let exec_path = curr_bin.parent().context("Failed to get parent directory")?;
   let hook_bin = exec_path.join("git-ai-hook");
 
+  // Check if the hook binary exists
   if !hook_bin.exists() {
     return Err(InstallError::HookBinNotFound(hook_bin));
   }
