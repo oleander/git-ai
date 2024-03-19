@@ -88,6 +88,7 @@ impl Session {
     }
   }
 
+  // Save the session to the repository
   pub async fn save_to_repo(&self, repo: &Repository) -> anyhow::Result<()> {
     log::debug!("Saving session to repo");
     let mut config = repo.config().context("Failed to load config")?;
