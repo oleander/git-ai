@@ -7,6 +7,7 @@ use async_openai::types::{
 use async_openai::Client;
 use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
+use indicatif::ProgressBar;
 use thiserror::Error;
 use anyhow::Context;
 use tokio::time::sleep;
@@ -48,10 +49,6 @@ fn instruction(language: String, max_length_of_commit: usize) -> String {
   .split_whitespace()
   .collect::<Vec<&str>>()
   .join(" ")
-}
-
-fn user_prompt(diff: String) -> String {
-  format!("Staged changes: {diff}").split_whitespace().collect::<Vec<&str>>().join(" ")
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -181,9 +178,13 @@ impl Run {
   }
 }
 
-pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIResponse, ChatError> {
+pub async fn generate(
+  diff: String, session: Option<Session>, progressbar: Option<ProgressBar>
+) -> Result<OpenAIResponse, ChatError> {
+  progressbar.clone().map(|pb| pb.set_message("Creating connection..."));
+
   let connection = Connection::new(session).await?;
-  connection.create_message(&user_prompt(diff)).await?;
+  connection.create_message(&diff).await?;
   let run = connection.create_run().await?;
 
   let result = loop {
@@ -204,13 +205,13 @@ pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIRe
         break Err(ChatError::OpenAIError("Run requires action".to_string()));
       },
       RunStatus::InProgress => {
-        log::debug!("--- Run InProgress");
+        progressbar.clone().map(|pb| pb.set_message("In progress..."));
       },
       RunStatus::Queued => {
-        log::debug!("--- Run Queued");
+        progressbar.clone().map(|pb| pb.set_message("Queued..."));
       },
       RunStatus::Cancelling => {
-        log::debug!("--- Run Cancelling");
+        progressbar.clone().map(|pb| pb.set_message("Cancelling..."));
       }
     }
 

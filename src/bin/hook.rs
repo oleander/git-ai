@@ -49,15 +49,10 @@ async fn main() -> Result<()> {
     Err(HookError::EmptyDiffOutput)?;
   }
 
+  let pb1 = pb.clone();
   let process: tokio::task::JoinHandle<Result<(), anyhow::Error>> = tokio::spawn(async move {
-    let str = patch.to_string();
-    println!("Patch: {}", str);
-    let commit_message = commit::generate(str, None).await.context("Failed to generate commit message")?.response;
-
-    args
-      .commit_msg_file
-      .write(commit_message.trim().to_string())
-      .context("Failed to write commit message")?;
+    let commit = commit::generate(patch.to_string(), None, pb1.into()).await?.response;
+    args.commit_msg_file.write(commit.trim().to_string()).unwrap();
 
     Ok(())
   });
