@@ -19,12 +19,7 @@ impl RepositoryExt for Repository {
   fn get_last_n_commits(&self, max_commits: usize) -> Result<Vec<git2::Commit>, git2::Error> {
     let mut revwalk = self.revwalk()?;
     revwalk.push_head()?;
-    Ok(
-      revwalk
-        .take(max_commits)
-        .map(move |id| self.find_commit(id.unwrap()).expect("Failed to find commit"))
-        .collect()
-    )
+    Ok(revwalk.take(max_commits).map(move |id| self.find_commit(id.unwrap()).expect("Failed to find commit")).collect())
   }
 }
 

@@ -94,7 +94,6 @@ fn main() -> Result<()> {
     result.push(message);
   }
 
-
   let train_result = result[..(result.len() / 2)].to_vec();
   for (i, message) in train_result.iter().enumerate() {
     let content = serde_json::to_string(&message)?;
@@ -111,7 +110,6 @@ fn main() -> Result<()> {
       validate_file.write_all(b"\n").context("Failed to write to file")?;
     }
     validate_file.write_all(content.as_bytes()).context("Failed to write to file")?;
-
   }
 
   log::info!("Wrote {} commits to train file and {} commits to validate file", commit_count / 2, commit_count / 2);

@@ -41,12 +41,7 @@ trait DiffDeltaPath {
 
 impl DiffDeltaPath for git2::DiffDelta<'_> {
   fn path(&self) -> PathBuf {
-    self
-      .new_file()
-      .path()
-      .or_else(|| self.old_file().path())
-      .map(PathBuf::from)
-      .unwrap_or_default()
+    self.new_file().path().or_else(|| self.old_file().path()).map(PathBuf::from).unwrap_or_default()
   }
 }
 
@@ -138,9 +133,7 @@ impl<'a> PatchRepository for Repository {
       .patience(true)
       .minimal(true);
 
-    self
-      .diff_tree_to_index(tree.as_ref(), None, Some(&mut opts))
-      .context("Failed to get diff")
+    self.diff_tree_to_index(tree.as_ref(), None, Some(&mut opts)).context("Failed to get diff")
   }
 }
 
