@@ -135,15 +135,17 @@ impl Connection {
     Ok(Run { id: run.id, connection: self.clone() })
   }
 
-  async fn run_status(&self, run_id: &str) -> Result<RunStatus, ChatError> {
-    Ok(self.client.threads().runs(&self.session.thread_id).retrieve(run_id).await?.status)
-  }
-
-  async fn run_message(&self) -> Result<MessageObject, ChatError> {
+  async fn last_message(&self) -> Result<String, ChatError> {
     let query = [("limit", "1")];
     let response = self.client.threads().messages(&self.session.thread_id).list(&query).await?;
     let message_id = response.data.get(0).unwrap().id.clone();
-    Ok(self.client.threads().messages(&self.session.thread_id).retrieve(&message_id).await?)
+    let message = self.client.threads().messages(&self.session.thread_id).retrieve(&message_id).await?;
+    let content = message.content.get(0).unwrap();
+    let MessageContent::Text(text) = &content else {
+      return Err(ChatError::OpenAIError("Message content is not text".to_string()));
+    };
+
+    Ok(text.text.value.clone())
   }
 
   async fn post_message(&self, message: &str) -> Result<(), ChatError> {
@@ -190,14 +192,7 @@ pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIRe
   let result = loop {
     match run.status().await? {
       RunStatus::Completed => {
-        let message = connection.run_message().await?;
-        let content = message.content.get(0).unwrap();
-
-        let MessageContent::Text(text) = &content else {
-          break Err(ChatError::OpenAIError("Message content is not text".to_string()));
-        };
-
-        break Ok(text.text.value.clone());
+        break connection.last_message().await;
       },
       RunStatus::Failed => {
         break Err(ChatError::OpenAIError("Run failed".to_string()));
