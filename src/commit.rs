@@ -53,7 +53,8 @@ impl Session {
     let thread = client.threads().create(thread_request).await?;
 
     Ok(Session {
-      thread_id: thread.id, assistant_id: assistant.id
+      thread_id:    thread.id,
+      assistant_id: assistant.id
     })
   }
 
@@ -162,7 +163,8 @@ impl Connection {
       .create(request)
       .await?;
     Ok(Run {
-      id: run.id, connection: self.clone()
+      id:         run.id,
+      connection: self.clone()
     })
   }
 
@@ -207,7 +209,8 @@ impl Connection {
   async fn into_response(&self) -> Result<OpenAIResponse, ChatError> {
     let message = self.last_message().await?;
     let response = OpenAIResponse {
-      response: message, session: self.session.clone()
+      response: message,
+      session:  self.session.clone()
     };
     Ok(response)
   }
