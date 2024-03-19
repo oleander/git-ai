@@ -6,6 +6,7 @@ use async_openai::types::{
 };
 use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
+use git2::Repository;
 use indicatif::ProgressBar;
 use async_openai::Client;
 use tokio::time::sleep;
@@ -59,6 +60,7 @@ pub struct Session {
 
 impl Session {
   pub async fn new_from_client(client: &Client<OpenAIConfig>) -> Result<Self, ChatError> {
+    log::debug!("Creating new session from client");
     let assistant = create_assistant(client).await?;
     let thread_request = CreateThreadRequestArgs::default().build()?;
     let thread = client.threads().create(thread_request).await?;
@@ -66,6 +68,34 @@ impl Session {
     Ok(Session {
       thread_id: thread.id, assistant_id: assistant.id
     })
+  }
+
+  pub async fn load_from_repo(repo: &Repository) -> anyhow::Result<Option<Self>> {
+    log::debug!("Loading session from repo");
+    let config = repo.config().context("Failed to load config")?;
+    let thread_id = config.get_string("ai.thread-id").ok();
+    let assistant_id = config.get_string("ai.assistant-id").ok();
+    log::debug!("Loaded session from repo: thread_id: {:?}, assistant_id: {:?}", thread_id, assistant_id);
+
+    match (thread_id, assistant_id) {
+      (Some(thread_id), Some(assistant_id)) => {
+        Ok(Some(Session {
+          thread_id,
+          assistant_id
+        }))
+      },
+      _ => Ok(None)
+    }
+  }
+
+  pub async fn save_to_repo(&self, repo: &Repository) -> anyhow::Result<()> {
+    log::debug!("Saving session to repo");
+    let mut config = repo.config().context("Failed to load config")?;
+
+    config.set_str("ai.thread-id", self.thread_id.as_str())?;
+    config.set_str("ai.assistant-id", self.assistant_id.as_str())?;
+    config.snapshot().context("Failed to save config")?;
+    Ok(())
   }
 }
 

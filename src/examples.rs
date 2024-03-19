@@ -72,7 +72,9 @@ pub async fn run(_args: &clap::ArgMatches) -> Result<()> {
 
   for (index, commit) in commits.iter().enumerate() {
     pb.set_message(format!("Loading commit #{} ...\n", index + 1));
-    let commit_message = commit::generate(commit.show(&repo, max_tokens)?, None, None).await?.response;
+    let response = commit::generate(commit.show(&repo, max_tokens)?, None, None).await?;
+
+    let commit_message = response.response.trim();
     pb.println(format!("Commit #{}:", index + 1));
     pb.println(format!("\tOriginal: {}", commit.message().unwrap_or_default().trim().italic()));
     pb.println(format!("\tGenerated: {}", commit_message.italic()));

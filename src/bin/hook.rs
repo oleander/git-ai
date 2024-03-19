@@ -2,6 +2,7 @@
 
 use std::time::Duration;
 
+use ai::commit::Session;
 use termion::event::Key;
 use git2::{Oid, Repository};
 use anyhow::{Context, Result};
@@ -49,26 +50,21 @@ async fn main() -> Result<()> {
     Err(HookError::EmptyDiffOutput)?;
   }
 
+  let session = Session::load_from_repo(&repo).await.unwrap();
+  let respomse = commit::generate(patch.to_string(), session.into(), pb.clone().into()).await?;
+  let commit = respomse.response.trim();
+  args.commit_msg_file.write(commit.trim().to_string()).unwrap();
+  respomse.session.save_to_repo(&repo).await.unwrap();
+
   let pb1 = pb.clone();
-  let process: tokio::task::JoinHandle<Result<(), anyhow::Error>> = tokio::spawn(async move {
-    let commit = commit::generate(patch.to_string(), None, pb1.into()).await?.response;
-    args.commit_msg_file.write(commit.trim().to_string()).unwrap();
-
-    Ok(())
-  });
-
   tokio::select! {
     _ = signal::ctrl_c() => {
       console::Term::stdout().show_cursor().expect("Failed to show cursor");
       std::process::exit(1);
     }
 
-    _ = process => {
-      pb.finish_and_clear();
-    }
-
-    _ = read_input(pb.clone()) => {
-      pb.finish_and_clear();
+    _ = read_input(pb1.clone()) => {
+      pb1.finish_and_clear();
     }
   }
 
