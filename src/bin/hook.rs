@@ -38,7 +38,9 @@ async fn main() -> Result<()> {
     // git commit --amend or git commit -c
     Some("HEAD") | None => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
     // git rebase
-    Some(sha1) => repo.find_object(Oid::from_str(sha1)?, None).ok().and_then(|obj| obj.peel_to_tree().ok())
+    Some(sha1) => {
+      repo.find_object(Oid::from_str(sha1)?, None).ok().and_then(|obj| obj.peel_to_tree().ok())
+    },
   };
 
   let patch = repo.to_patch(tree, max_tokens).context("Failed to get patch")?;

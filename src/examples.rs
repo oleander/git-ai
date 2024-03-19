@@ -19,7 +19,12 @@ impl RepositoryExt for Repository {
   fn get_last_n_commits(&self, max_commits: usize) -> Result<Vec<git2::Commit>, git2::Error> {
     let mut revwalk = self.revwalk()?;
     revwalk.push_head()?;
-    Ok(revwalk.take(max_commits).map(move |id| self.find_commit(id.unwrap()).expect("Failed to find commit")).collect())
+    Ok(
+      revwalk
+        .take(max_commits)
+        .map(move |id| self.find_commit(id.unwrap()).expect("Failed to find commit"))
+        .collect()
+    )
   }
 }
 
@@ -55,7 +60,8 @@ pub async fn run(_args: &clap::ArgMatches) -> Result<()> {
 
   let current_dir = std::env::current_dir().context("Failed to get current directory")?;
   let repo = Repository::open_ext(&current_dir, RepositoryOpenFlags::empty(), Vec::<&Path>::new())?;
-  let commits = repo.get_last_n_commits(MAX_NUMBER_OF_COMMITS).context("Failed to get last commits")?;
+  let commits =
+    repo.get_last_n_commits(MAX_NUMBER_OF_COMMITS).context("Failed to get last commits")?;
 
   // Create and configure the progress bar
   let spinner_style = ProgressStyle::default_spinner()

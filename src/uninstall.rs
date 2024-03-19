@@ -22,7 +22,8 @@ const EMOJI: Emoji<'_, '_> = Emoji("🔗", "");
 
 pub fn run() -> Result<()> {
   let current_dir = env::current_dir().context(InstallError::CurrentDir)?;
-  let repo = Repository::open_ext(current_dir, Flags::empty(), Vec::<&Path>::new()).context(InstallError::OpenRepo)?;
+  let repo = Repository::open_ext(current_dir, Flags::empty(), Vec::<&Path>::new())
+    .context(InstallError::OpenRepo)?;
 
   let hook_dir = PathBuf::from(repo.path()).join("hooks");
   let hook_file = hook_dir.join("prepare-commit-msg");

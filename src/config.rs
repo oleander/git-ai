@@ -38,7 +38,8 @@ impl App {
     dotenv::dotenv().ok();
 
     if !CONFIG_DIR.exists() {
-      std::fs::create_dir_all(CONFIG_DIR.to_str().unwrap()).context("Failed to create config directory")?;
+      std::fs::create_dir_all(CONFIG_DIR.to_str().unwrap())
+        .context("Failed to create config directory")?;
       File::create(CONFIG_PATH.to_str().unwrap()).context("Failed to create config file")?;
     } else if !CONFIG_PATH.exists() {
       File::create(CONFIG_PATH.to_str().unwrap()).context("Failed to create config file")?;
@@ -58,8 +59,10 @@ impl App {
   }
 
   pub fn save(&self) -> Result<()> {
-    let contents = serde_ini::to_string(&self).context(format!("Failed to serialize config: {:?}", self))?;
-    let mut file = File::create(CONFIG_PATH.to_str().unwrap()).context("Failed to create config file")?;
+    let contents =
+      serde_ini::to_string(&self).context(format!("Failed to serialize config: {:?}", self))?;
+    let mut file =
+      File::create(CONFIG_PATH.to_str().unwrap()).context("Failed to create config file")?;
     file.write_all(contents.as_bytes()).context("Failed to write config file")
   }
 }
@@ -74,13 +77,15 @@ pub fn run(args: &ArgMatches) -> Result<()> {
       app.language = args.get_one::<String>("<VALUE>").context("Failed to parse language")?.clone();
     },
     Some(("max-diff-tokens", args)) => {
-      app.max_diff_tokens = *args.get_one("max-diff-tokens").context("Failed to parse max-diff-tokens")?;
+      app.max_diff_tokens =
+        *args.get_one("max-diff-tokens").context("Failed to parse max-diff-tokens")?;
     },
     Some(("max-length", args)) => {
       app.max_length = *args.get_one("max-length").context("Failed to parse max-length")?;
     },
     Some(("openai-api-key", args)) => {
-      app.openai_api_key = args.get_one::<String>("<VALUE>").context("Failed to parse openai-api-key")?.clone().into();
+      app.openai_api_key =
+        args.get_one::<String>("<VALUE>").context("Failed to parse openai-api-key")?.clone().into();
     },
     _ => unreachable!()
   }

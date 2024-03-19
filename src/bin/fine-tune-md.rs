@@ -22,7 +22,9 @@ fn main() -> Result<()> {
   let mut revwalk = repo.revwalk().context("Failed to create Revwalk")?;
   let mut file = File::create(file_name).context("Failed to create file")?;
 
-  file.write_all(b"# Examples\n\nExamples of best practices for writing git commit messages:\n\n").context("Failed to write to file")?;
+  file
+    .write_all(b"# Examples\n\nExamples of best practices for writing git commit messages:\n\n")
+    .context("Failed to write to file")?;
 
   revwalk.push_head().expect("Failed to push head");
 
@@ -74,7 +76,10 @@ fn main() -> Result<()> {
       continue;
     }
 
-    let message = format!("## Example {}\n\n### GIT DIFF:\n\n{}\n### COMMIT MESSAGE:\n\n{}\n", commit_count, content, commit);
+    let message = format!(
+      "## Example {}\n\n### GIT DIFF:\n\n{}\n### COMMIT MESSAGE:\n\n{}\n",
+      commit_count, content, commit
+    );
 
     curr_size += message.split_whitespace().count();
 
@@ -94,7 +99,11 @@ fn main() -> Result<()> {
     file.write_all(message.as_bytes()).context("Failed to write to file")?;
   }
 
-  log::info!("Wrote {} commits to train file and {} commits to validate file", commit_count / 2, commit_count / 2);
+  log::info!(
+    "Wrote {} commits to train file and {} commits to validate file",
+    commit_count / 2,
+    commit_count / 2
+  );
 
   Ok(())
 }
@@ -107,10 +116,12 @@ fn should_exclude_path(file_path: &str) -> bool {
     "/config/", "/settings/", "/initializers/", // Configuration files
     "/vendor/", "/third-party/", "/external/",   // Third-party and vendor code
     "/submodules/", // Git submodules
-    "/.github/", "/.gitignore", "/.gitmodules", "/.gitattributes", // Git and GitHub specific files
+    "/.github/", "/.gitignore", "/.gitmodules",
+    "/.gitattributes", // Git and GitHub specific files
     "/.gitlab-ci.yml", "/.travis.yml", "/appveyor.yml", // CI/CD configuration files
     "/Dockerfile", "/docker-compose.yml", "/.dockerignore", // Docker files
-    "/.editorconfig", "/.rubocop.yml", "/.eslintignore", "/.eslintrc", // Linter and editor configuration
+    "/.editorconfig", "/.rubocop.yml", "/.eslintignore",
+    "/.eslintrc", // Linter and editor configuration
     "/test/", "/spec/", "/tests/", "/specs/", // Test files and directories
     "/locales/", "/i18n/", // Localization files
     "/logs/", "/tmp/",    // Logs and temporary files
@@ -146,7 +157,9 @@ fn generate_commit_diff(repo: &Repository, commit: &Commit) -> Result<Option<Str
     .patience(true)
     .minimal(true);
 
-  let diff = repo.diff_tree_to_tree(Some(&parent_tree), Some(&tree), Some(&mut opts)).context("Failed to get diff")?;
+  let diff = repo
+    .diff_tree_to_tree(Some(&parent_tree), Some(&tree), Some(&mut opts))
+    .context("Failed to get diff")?;
 
   let mut patch: Vec<u8> = Vec::new();
 
