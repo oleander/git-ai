@@ -18,8 +18,8 @@ fn main() -> Result<()> {
   log::info!("Creating fine-tune file with {} commits and {} tokens", max_commits, max_tokens);
 
   let repo = Repository::open(".").context("Failed to open git repository")?;
-  let config = repo.config().context("Couldn't access repository config")?;
-  let user_email = config.get_string("user.email").context("Couldn't get user email")?;
+  // let config = repo.config().context("Couldn't access repository config")?;
+  // let user_email = config.get_string("user.email").context("Couldn't get user email")?;
   let mut revwalk = repo.revwalk().context("Failed to create Revwalk")?;
   let mut validate_file = File::create(validate_file_name).context("Failed to create file")?;
   let mut train_file = File::create(train_file_name).context("Failed to create file")?;
