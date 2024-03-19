@@ -4,13 +4,13 @@ use std::{io, str};
 use async_openai::types::{
   AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus
 };
-use async_openai::Client;
 use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
 use indicatif::ProgressBar;
+use async_openai::Client;
+use tokio::time::sleep;
 use thiserror::Error;
 use anyhow::Context;
-use tokio::time::sleep;
 
 use crate::config;
 
