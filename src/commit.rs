@@ -5,7 +5,7 @@ use async_openai::types::{
   AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus
 };
 use async_openai::config::OpenAIConfig;
-use git2::{Config, Repository};
+use git2::Repository;
 use async_openai::error::OpenAIError;
 use indicatif::ProgressBar;
 use async_openai::Client;
@@ -75,7 +75,7 @@ impl Session {
     let mut config = repo.config().context("Failed to load config")?;
     let thread_id = config.get_string("ai.thread-id").ok();
 
-    let mut global_config = config.open_global().context("Failed to open global config")?;
+    let global_config = config.open_global().context("Failed to open global config")?;
     let assistant_id = global_config.get_string("ai.assistant-id").ok();
     log::debug!(
       "Loaded session from repo: thread_id: {:?}, assistant_id: {:?}",

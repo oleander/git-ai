@@ -5,8 +5,6 @@ use git2::{Commit, DiffFormat, DiffOptions, Repository};
 use anyhow::{Context, Result};
 use serde_json::json;
 
-static PROMPT: &str = "Your role is to create concise git commit messages based on user-provided git diffs. When crafting these messages: - Focus on detailing the changes and reasons behind them, ensuring clarity and relevance. - Avoid including irrelevant or unnecessary details, such as translations, to maintain focus on the core changes. Your responses should be direct and immediately usable in a git commit, crafted in present tense to fit git conventions. You work primarily with git diffs, interpreting them to generate meaningful commit messages that succinctly summarize the changes.";
-
 fn main() -> Result<()> {
   env_logger::init();
 
