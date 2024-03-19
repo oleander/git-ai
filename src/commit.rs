@@ -1,7 +1,7 @@
 use std::{io, str};
 
 use async_openai::types::{
-  AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus
+  AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus
 };
 use async_openai::Client;
 use async_openai::config::OpenAIConfig;
@@ -62,26 +62,23 @@ fn client() -> Result<Client<OpenAIConfig>, ChatError> {
   Ok(Client::with_config(config))
 }
 
-pub struct OpenAIResponse {
-  pub thread_id: String,
-  pub response:  String
+#[derive(Debug, Clone, PartialEq)]
+pub struct Session {
+  pub thread_id:    String,
+  pub assistant_id: String
 }
 
-// Generate a commit message using OpenAI's API using the provided git diff
-pub async fn generate(diff: String, thread_id: Option<String>) -> Result<OpenAIResponse, ChatError> {
+pub struct OpenAIResponse {
+  pub session:  Session,
+  pub response: String
+}
+
+async fn create_assistant(client: &Client<OpenAIConfig>) -> Result<AssistantObject, ChatError> {
   let language = config::APP.language.clone();
   let max_length_of_commit = config::APP.max_length;
   let model = config::APP.model.clone();
-  let query = [("limit", "1")];
-  let thread_request = CreateThreadRequestArgs::default().build()?;
-  let client = client()?;
-
-  let thread = match thread_id {
-    Some(id) => client.threads().retrieve(&id).await?,
-    None => client.threads().create(thread_request.clone()).await?
-  };
-
   let instruction = instruction(language, max_length_of_commit);
+
   let tools = vec![AssistantTools::Code(AssistantToolsCode {
     r#type: "code_interpreter".to_string()
   })];
@@ -93,20 +90,44 @@ pub async fn generate(diff: String, thread_id: Option<String>) -> Result<OpenAIR
     .model(model)
     .build()?;
 
-  let assistant = client.assistants().create(assistant_request).await?;
-  let assistant_id = &assistant.id;
+  Ok(client.assistants().create(assistant_request).await?)
+}
+
+// Generate a commit message using OpenAI's API using the provided git diff
+pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIResponse, ChatError> {
+  let query = [("limit", "1")];
+  let client = client()?;
+
+  let session = match session {
+    Some(session) => session,
+    None => {
+      let assistant = create_assistant(&client).await?;
+      let thread_request = CreateThreadRequestArgs::default().build()?;
+      let thread = client.threads().create(thread_request).await?;
+
+      Session {
+        thread_id: thread.id, assistant_id: assistant.id
+      }
+    }
+  };
+
+  let thread_id = session.clone().thread_id;
+  let assistant_id = session.clone().assistant_id;
+
   let message = CreateMessageRequestArgs::default().role("user").content(user_prompt(diff)).build()?;
-  let _message_obj = client.threads().messages(&thread.id).create(message).await?;
+
+  client.threads().messages(&thread_id).create(message).await?;
+
   let run_request = CreateRunRequestArgs::default().assistant_id(assistant_id).build()?;
-  let run = client.threads().runs(&thread.id).create(run_request).await?;
+  let run = client.threads().runs(&thread_id).create(run_request).await?;
 
   let result = loop {
-    let run = client.threads().runs(&thread.id).retrieve(&run.id).await?;
+    let run = client.threads().runs(&thread_id).retrieve(&run.id).await?;
     match run.status {
       RunStatus::Completed => {
-        let response = client.threads().messages(&thread.id).list(&query).await?;
+        let response = client.threads().messages(&thread_id).list(&query).await?;
         let message_id = response.data.get(0).unwrap().id.clone();
-        let message = client.threads().messages(&thread.id).retrieve(&message_id).await?;
+        let message = client.threads().messages(&thread_id).retrieve(&message_id).await?;
         let content = message.content.get(0).unwrap();
 
         let MessageContent::Text(text) = &content else {
@@ -141,7 +162,7 @@ pub async fn generate(diff: String, thread_id: Option<String>) -> Result<OpenAIR
   };
 
   Ok(OpenAIResponse {
-    thread_id: thread.id,
-    response: result?
+    response: result?,
+    session
   })
 }
