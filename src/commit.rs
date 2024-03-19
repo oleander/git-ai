@@ -5,6 +5,7 @@ use async_openai::types::{
   AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus
 };
 use async_openai::config::OpenAIConfig;
+use git2::Config;
 use async_openai::error::OpenAIError;
 use git2::Repository;
 use indicatif::ProgressBar;
@@ -73,9 +74,11 @@ impl Session {
   // Load the session from the repository
   pub async fn load_from_repo(repo: &Repository) -> anyhow::Result<Option<Self>> {
     log::debug!("Loading session from repo");
-    let config = repo.config().context("Failed to load config")?;
+    let mut config = repo.config().context("Failed to load config")?;
     let thread_id = config.get_string("ai.thread-id").ok();
-    let assistant_id = config.get_string("ai.assistant-id").ok();
+
+    let mut global_config = config.open_global().context("Failed to open global config")?;
+    let assistant_id = global_config.get_string("ai.assistant-id").ok();
     log::debug!(
       "Loaded session from repo: thread_id: {:?}, assistant_id: {:?}",
       thread_id,
@@ -97,10 +100,12 @@ impl Session {
   pub async fn save_to_repo(&self, repo: &Repository) -> anyhow::Result<()> {
     log::debug!("Saving session to repo");
     let mut config = repo.config().context("Failed to load config")?;
-
     config.set_str("ai.thread-id", self.thread_id.as_str())?;
-    config.set_str("ai.assistant-id", self.assistant_id.as_str())?;
     config.snapshot().context("Failed to save config")?;
+
+    let mut global_config = config.open_global().context("Failed to open global config")?;
+    global_config.set_str("ai.assistant-id", self.assistant_id.as_str())?;
+    global_config.snapshot().context("Failed to save global config")?;
     Ok(())
   }
 }
@@ -123,7 +128,7 @@ async fn create_assistant(client: &Client<OpenAIConfig>) -> Result<AssistantObje
   })];
 
   let assistant_request = CreateAssistantRequestArgs::default()
-    .name("Git Commit Assistant 2")
+    .name("Git Commit Assistant 3")
     .instructions(&instruction)
     .tools(tools)
     .model(model)
