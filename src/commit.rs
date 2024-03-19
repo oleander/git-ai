@@ -36,19 +36,7 @@ pub enum ChatError {
 }
 
 fn instruction() -> String {
-  let language = &config::APP.language;
-  let max_length = config::APP.max_length;
-
-  format!("Create concise and meaningful git commit messages based on diffs, incorporating these practices:
-
-  - Language: {language}.
-  - Maximum Length: {max_length} characters for the summary.
-  - Structure: Begin with a clear summary. Use present tense.
-  - Clarity and Relevance: Focus on detailing the changes and their reasons. Exclude irrelevant details.
-  - Consistency: Maintain a consistent style of tense, punctuation, and capitalization.
-  - Review: Ensure the commit message accurately reflects the changes made and their purpose without leaving the description blank.
-
-  Refer to examples.jsonl for examples of how commit messages can be mapped to git diffs")
+  include_str!("../resources/prompt.md").to_string()
 }
 
 #[derive(Debug, Clone, PartialEq)]
