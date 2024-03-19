@@ -2,7 +2,7 @@ use std::time::Duration;
 use std::{io, str};
 
 use async_openai::types::{
-  AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunObject, RunStatus
+  AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, MessageObject, RunObject, RunStatus
 };
 use async_openai::Client;
 use async_openai::config::OpenAIConfig;
@@ -119,7 +119,9 @@ struct Connection {
 
 impl Connection {
   pub fn new(session: Session) -> Result<Self, ChatError> {
-    let api_key = config::APP.openai_api_key.clone().context("Failed to get OpenAI API key, please run `git-ai config set openapi-api")?;
+    let api_key = config::APP.openai_api_key.clone().context(
+      "Failed to get OpenAI API key, please run `git-ai config set openapi-api"
+    )?;
     let config = OpenAIConfig::new().with_api_key(api_key);
     let client = Client::with_config(config);
 
@@ -137,14 +139,36 @@ impl Connection {
   }
 
   async fn run_status(&self, run_id: &str) -> Result<RunStatus, ChatError> {
-    Ok(self.client.threads().runs(&self.session.thread_id).retrieve(run_id).await?.status)
+    Ok(
+      self
+        .client
+        .threads()
+        .runs(&self.session.thread_id)
+        .retrieve(run_id)
+        .await?
+        .status
+    )
+  }
+
+  async fn run_message(&self, run_id: &str) -> Result<MessageObject, ChatError> {
+    let query = [("limit", "1")];
+    let response =
+      self.client.threads().messages(&self.session.thread_id).list(&query).await?;
+    let message_id = response.data.get(0).unwrap().id.clone();
+    Ok(
+      self
+        .client
+        .threads()
+        .messages(&self.session.thread_id)
+        .retrieve(&message_id)
+        .await?
+    )
   }
 }
 
 pub async fn generate(
   diff: String, session: Option<Session>
 ) -> Result<OpenAIResponse, ChatError> {
-  let query = [("limit", "1")];
   let client = client()?;
 
   let session = match session {
@@ -167,9 +191,7 @@ pub async fn generate(
   let result = loop {
     match connection.run_status(&run.id).await? {
       RunStatus::Completed => {
-        let response = client.threads().messages(&thread_id).list(&query).await?;
-        let message_id = response.data.get(0).unwrap().id.clone();
-        let message = client.threads().messages(&thread_id).retrieve(&message_id).await?;
+        let message = connection.run_message(&run.id).await?;
         let content = message.content.get(0).unwrap();
 
         let MessageContent::Text(text) = &content else {
