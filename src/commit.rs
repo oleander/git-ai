@@ -148,7 +148,7 @@ impl Connection {
     Ok(text.text.value.clone())
   }
 
-  async fn post_message(&self, message: &str) -> Result<(), ChatError> {
+  async fn create_message(&self, message: &str) -> Result<(), ChatError> {
     let message = CreateMessageRequestArgs::default().role("user").content(message).build()?;
     self.client.threads().messages(&self.session.thread_id).create(message).await?;
     Ok(())
@@ -184,9 +184,8 @@ pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIRe
     None => Session::new_from_client(&client).await?
   };
 
-  let message = user_prompt(diff);
   let connection = Connection::new(session.clone())?;
-  connection.post_message(&message).await?;
+  connection.create_message(&user_prompt(diff)).await?;
   let run = connection.create_run().await?;
 
   let result = loop {
