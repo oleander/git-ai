@@ -46,25 +46,26 @@ fn main() -> Result<()> {
       continue;
     };
 
+    let Some(commit) = commit.message() else {
+      continue;
+    };
+
     let message = json!({
       "messages": [
-        { "role": "user", "content": generate_commit_diff(&repo, &commit)? },
-        { "role": "assistant", "content": commit.message().unwrap_or_default() },
+        { "role": "assistant", "content": commit },
+        { "role": "user", "content": content },
         { "role": "system", "content": PROMPT }
       ]
     });
 
     let content = serde_json::to_string_pretty(&message)?;
-
-
     curr_size += content.split_whitespace().count();
-    log::info!("Current size: {}", curr_size);
+
     if curr_size > max_tokens {
-      log::info!("Max tokens reached: {}", max_tokens);
+      log::warn!("Max tokens reached: {}", max_tokens);
       break;
     }
 
-    log::info!("Commit: {}", commit.id());
     commit_count += 1;
     file.write_all(content.as_bytes()).context("Failed to write to file")?;
   }
