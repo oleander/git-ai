@@ -106,7 +106,6 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {
         break Ok(text.text.value.clone());
       },
       RunStatus::Failed => {
-        println!("--- Run Failed: {:#?}", run);
         break Err(ChatError::OpenAIError("Run failed".to_string()));
       },
       RunStatus::Cancelled => {
