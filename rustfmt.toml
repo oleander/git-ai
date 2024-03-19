@@ -28,3 +28,4 @@ attr_fn_like_width = 120
 match_block_trailing_comma = false
 where_single_line = false
 chain_width = 60
+edition = "2021"
