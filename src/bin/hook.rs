@@ -1,10 +1,11 @@
 // Hook: prepare-commit-msg
 
+use std::time::Duration;
+
 use indicatif::{ProgressBar, ProgressStyle};
 use anyhow::{Context, Result};
 use git2::{Oid, Repository};
 use ai::{commit, config};
-use std::time::Duration;
 use ai::commit::Session;
 use clap::Parser;
 use ai::hook::*;
