@@ -4,6 +4,7 @@ use std::{io, str};
 use async_openai::types::{
   AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus
 };
+
 use async_openai::config::OpenAIConfig;
 use git2::Repository;
 use async_openai::error::OpenAIError;
