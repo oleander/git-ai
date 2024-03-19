@@ -57,7 +57,7 @@ async fn main() -> Result<()> {
   let commit = respomse.response.trim();
   args.commit_msg_file.write(commit.trim().to_string()).unwrap();
   respomse.session.save_to_repo(&repo).await.unwrap();
-
+  log::debug!("Commit message generated successfully");
   let pb1 = pb.clone();
   tokio::select! {
     _ = signal::ctrl_c() => {
