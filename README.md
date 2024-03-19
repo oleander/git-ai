@@ -1,6 +1,10 @@
 # git-ai [![Rust](https://github.com/oleander/git-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/oleander/git-ai/actions/workflows/ci.yml) [![Crates.io](https://img.shields.io/crates/v/git-ai.svg)](https://crates.io/crates/git-ai) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Git AI uses ChatGPT and git hook to generate commit messages based on the staged files. Leave the commit message empty and let Git AI do the work for you!
+Git AI leverages ChatGPT alongside git hooks to automate the generation of commit messages from staged files. Simply stage your files and leave the commit message blank — Git AI will handle the rest.
+
+- Uses OpenAI's Assistant API which has been specifically fine-tuned to transform git diffs into descriptive commit messages.
+- Maintains a unique thread for each project where git-ai is utilized, ensuring the assistant retains context and improves based on previous commits.
+- Creates a single assistant instance for your computer, allowing for cross-project learning and more insightful commit messages from your local machine's activities.
 
 <table>
   <tr>

@@ -106,7 +106,7 @@ pub struct OpenAIResponse {
 async fn create_assistant(client: &Client<OpenAIConfig>) -> Result<AssistantObject, ChatError> {
   let model = config::APP.model.clone();
   let instruction = instruction();
-  let example_jsonl_id = "file-a8ghhy1FbWtBKEadAj5OHJWz";
+  // let example_jsonl_id = "file-a8ghhy1FbWtBKEadAj5OHJWz";
 
   let tools = vec![AssistantTools::Code(AssistantToolsCode {
     r#type: "code_interpreter".to_string()
@@ -115,7 +115,6 @@ async fn create_assistant(client: &Client<OpenAIConfig>) -> Result<AssistantObje
   let assistant_request = CreateAssistantRequestArgs::default()
     .name("Git Commit Assistant")
     .instructions(&instruction)
-    .file_ids(vec![example_jsonl_id.to_string()])
     .tools(tools)
     .model(model)
     .build()?;
