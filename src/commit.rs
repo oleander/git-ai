@@ -4,7 +4,6 @@ use std::{io, str};
 use async_openai::types::{
   AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus
 };
-
 use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
 use indicatif::ProgressBar;
@@ -217,7 +216,7 @@ impl Run {
 pub async fn generate(
   diff: String, session: Option<Session>, progressbar: Option<ProgressBar>
 ) -> Result<OpenAIResponse, ChatError> {
-  progressbar.clone().map(|pb| pb.set_message("Creating connection..."));
+  progressbar.clone().map(|pb| pb.set_message("Generating commit message..."));
 
   let connection = Connection::new(session).await?;
   connection.create_message(&diff).await?;
@@ -241,13 +240,16 @@ pub async fn generate(
         break Err(ChatError::OpenAIError("Run requires action".to_string()));
       },
       RunStatus::InProgress => {
-        progressbar.clone().map(|pb| pb.set_message("In progress..."));
+        log::debug!("Run is in progress");
+        // progressbar.clone().map(|pb| pb.set_message("In progress..."));
       },
       RunStatus::Queued => {
-        progressbar.clone().map(|pb| pb.set_message("Queued..."));
+        log::debug!("Run is queued");
+        // progressbar.clone().map(|pb| pb.set_message("Queued..."));
       },
       RunStatus::Cancelling => {
-        progressbar.clone().map(|pb| pb.set_message("Cancelling..."));
+        log::debug!("Run is cancelling");
+        // progressbar.clone().map(|pb| pb.set_message("Cancelling..."));
       }
     }
 
