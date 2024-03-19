@@ -77,28 +77,28 @@ pub fn run(args: &ArgMatches) -> Result<()> {
         .get_one::<String>("<VALUE>")
         .context("Failed to parse model")?
         .clone();
-    },
+    }
     Some(("language", args)) => {
       app.language = args
         .get_one::<String>("<VALUE>")
         .context("Failed to parse language")?
         .clone();
-    },
+    }
     Some(("max-diff-tokens", args)) => {
       app.max_diff_tokens = *args
         .get_one("max-diff-tokens")
         .context("Failed to parse max-diff-tokens")?;
-    },
+    }
     Some(("max-length", args)) => {
       app.max_length = *args.get_one("max-length").context("Failed to parse max-length")?;
-    },
+    }
     Some(("openai-api-key", args)) => {
       app.openai_api_key = args
         .get_one::<String>("<VALUE>")
         .context("Failed to parse openai-api-key")?
         .clone()
         .into();
-    },
+    }
     _ => unreachable!()
   }
 

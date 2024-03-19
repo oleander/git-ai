@@ -1,7 +1,6 @@
 short_array_element_width_threshold = 50
 single_line_let_else_max_width = 0
 group_imports = "StdExternalCrate"
-match_block_trailing_comma = true
 enum_discrim_align_threshold = 40
 struct_field_align_threshold = 40
 fn_params_layout = "Compressed"
@@ -27,3 +26,5 @@ version = "Two"
 max_width = 100
 tab_spaces = 2
 
+attr_fn_like_width = 100
+match_block_trailing_comma = false

@@ -85,24 +85,24 @@ async fn main() -> Result<()> {
       match sub.subcommand() {
         Some(("install", _)) => {
           install::run()?;
-        },
+        }
         Some(("uninstall", _)) => {
           uninstall::run()?;
-        },
+        }
         _ => unreachable!()
       }
-    },
+    }
     Some(("config", args)) => {
       match args.subcommand() {
         Some(("set", args)) => {
           config::run(args)?;
-        },
+        }
         _ => unreachable!()
       }
-    },
+    }
     Some(("examples", args)) => {
       examples::run(args).await?;
-    },
+    }
     _ => unreachable!()
   }
 

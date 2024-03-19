@@ -77,7 +77,7 @@ impl Session {
           thread_id,
           assistant_id
         }))
-      },
+      }
       _ => Ok(None)
     }
   }
@@ -247,27 +247,27 @@ pub async fn generate(
     match run.pull_status().await? {
       RunStatus::Completed => {
         break connection.into_response().await;
-      },
+      }
       RunStatus::Failed => {
         break Err(ChatError::OpenAIError("Run failed".to_string()));
-      },
+      }
       RunStatus::Cancelled => {
         break Err(ChatError::OpenAIError("Run cancelled".to_string()));
-      },
+      }
       RunStatus::Expired => {
         break Err(ChatError::OpenAIError("Run expired".to_string()));
-      },
+      }
       RunStatus::RequiresAction => {
         break Err(ChatError::OpenAIError("Run requires action".to_string()));
-      },
+      }
       RunStatus::InProgress => {
         log::debug!("Run is in progress");
         // progressbar.clone().map(|pb| pb.set_message("In progress..."));
-      },
+      }
       RunStatus::Queued => {
         log::debug!("Run is queued");
         // progressbar.clone().map(|pb| pb.set_message("Queued..."));
-      },
+      }
       RunStatus::Cancelling => {
         log::debug!("Run is cancelling");
         // progressbar.clone().map(|pb| pb.set_message("Cancelling..."));

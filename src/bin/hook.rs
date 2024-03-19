@@ -43,7 +43,7 @@ async fn main() -> Result<()> {
         .find_object(Oid::from_str(sha1)?, None)
         .ok()
         .and_then(|obj| obj.peel_to_tree().ok())
-    },
+    }
   };
 
   let patch = repo.to_patch(tree, max_tokens).context("Failed to get patch")?;
