@@ -54,16 +54,6 @@ fn user_prompt(diff: String) -> String {
   format!("Staged changes: {diff}").split_whitespace().collect::<Vec<&str>>().join(" ")
 }
 
-fn client() -> Result<Client<OpenAIConfig>, ChatError> {
-  let api_key = config::APP
-    .openai_api_key
-    .clone()
-    .context("Failed to get OpenAI API key, please run `git-ai config set openapi-api-key <api-key>`")?;
-
-  let config = OpenAIConfig::new().with_api_key(api_key);
-  Ok(Client::with_config(config))
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Session {
   pub thread_id:    String,
@@ -115,13 +105,18 @@ struct Connection {
 }
 
 impl Connection {
-  pub fn new(session: Session) -> Result<Self, ChatError> {
+  pub async fn new(session: Option<Session>) -> Result<Self, ChatError> {
     let api_key = config::APP
       .openai_api_key
       .clone()
       .context("Failed to get OpenAI API key, please run `git-ai config set openapi-api")?;
     let config = OpenAIConfig::new().with_api_key(api_key);
     let client = Client::with_config(config);
+
+    let session = match session {
+      Some(session) => session,
+      None => Session::new_from_client(&client).await?
+    };
 
     Ok(Connection {
       client,
@@ -132,7 +127,9 @@ impl Connection {
   async fn create_run(&self) -> Result<Run, ChatError> {
     let request = CreateRunRequestArgs::default().assistant_id(self.session.clone().assistant_id).build()?;
     let run = self.client.threads().runs(&self.session.thread_id).create(request).await?;
-    Ok(Run { id: run.id, connection: self.clone() })
+    Ok(Run {
+      id: run.id, connection: self.clone()
+    })
   }
 
   async fn last_message(&self) -> Result<String, ChatError> {
@@ -152,6 +149,14 @@ impl Connection {
     let message = CreateMessageRequestArgs::default().role("user").content(message).build()?;
     self.client.threads().messages(&self.session.thread_id).create(message).await?;
     Ok(())
+  }
+
+  async fn into_response(&self) -> Result<OpenAIResponse, ChatError> {
+    let message = self.last_message().await?;
+    let response = OpenAIResponse {
+      response: message, session: self.session.clone()
+    };
+    Ok(response)
   }
 }
 
@@ -177,21 +182,14 @@ impl Run {
 }
 
 pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIResponse, ChatError> {
-  let client = client()?;
-
-  let session = match session {
-    Some(session) => session,
-    None => Session::new_from_client(&client).await?
-  };
-
-  let connection = Connection::new(session.clone())?;
+  let connection = Connection::new(session).await?;
   connection.create_message(&user_prompt(diff)).await?;
   let run = connection.create_run().await?;
 
   let result = loop {
     match run.status().await? {
       RunStatus::Completed => {
-        break connection.last_message().await;
+        break connection.into_response().await;
       },
       RunStatus::Failed => {
         break Err(ChatError::OpenAIError("Run failed".to_string()));
@@ -219,8 +217,5 @@ pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIRe
     sleep(Duration::from_millis(300)).await;
   };
 
-  Ok(OpenAIResponse {
-    response: result?,
-    session
-  })
+  result
 }
