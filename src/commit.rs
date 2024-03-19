@@ -135,6 +135,10 @@ impl Connection {
       .build()?;
     Ok(self.client.threads().runs(&self.session.thread_id).create(request).await?)
   }
+
+  async fn run_status(&self, run_id: &str) -> Result<RunStatus, ChatError> {
+    Ok(self.client.threads().runs(&self.session.thread_id).retrieve(run_id).await?.status)
+  }
 }
 
 pub async fn generate(
@@ -161,7 +165,7 @@ pub async fn generate(
   let run = connection.create_run().await?;
 
   let result = loop {
-    match client.threads().runs(&thread_id).retrieve(&run.id).await?.status {
+    match connection.run_status(&run.id).await? {
       RunStatus::Completed => {
         let response = client.threads().messages(&thread_id).list(&query).await?;
         let message_id = response.data.get(0).unwrap().id.clone();
