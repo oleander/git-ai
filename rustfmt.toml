@@ -14,7 +14,6 @@ use_small_heuristics = "Max"
 normalize_comments = false
 reorder_impl_items = true
 imports_indent = "Block"
-where_single_line = true
 trailing_comma = "Never"
 reorder_imports = false
 reorder_modules = false
@@ -28,3 +27,4 @@ tab_spaces = 2
 
 attr_fn_like_width = 100
 match_block_trailing_comma = false
+where_single_line = false
