@@ -2,7 +2,7 @@ cargo-features = ["edition2024"]
 
 [package]
 name = "git-ai"
-version = "0.1.20"
+version = "0.1.21"
 edition = "2024"
 description = "Git AI: Automates commit messages using ChatGPT. Stage your files, and Git AI generates the messages."
 license = "MIT"
