@@ -63,7 +63,9 @@ impl App {
       serde_ini::to_string(&self).context(format!("Failed to serialize config: {:?}", self))?;
     let mut file =
       File::create(CONFIG_PATH.to_str().unwrap()).context("Failed to create config file")?;
-    file.write_all(contents.as_bytes()).context("Failed to write config file")
+    file
+      .write_all(contents.as_bytes())
+      .context("Failed to write config file")
   }
 }
 
@@ -71,14 +73,21 @@ pub fn run(args: &ArgMatches) -> Result<()> {
   let mut app = App::new()?;
   match args.subcommand() {
     Some(("model", args)) => {
-      app.model = args.get_one::<String>("<VALUE>").context("Failed to parse model")?.clone();
+      app.model = args
+        .get_one::<String>("<VALUE>")
+        .context("Failed to parse model")?
+        .clone();
     },
     Some(("language", args)) => {
-      app.language = args.get_one::<String>("<VALUE>").context("Failed to parse language")?.clone();
+      app.language = args
+        .get_one::<String>("<VALUE>")
+        .context("Failed to parse language")?
+        .clone();
     },
     Some(("max-diff-tokens", args)) => {
-      app.max_diff_tokens =
-        *args.get_one("max-diff-tokens").context("Failed to parse max-diff-tokens")?;
+      app.max_diff_tokens = *args
+        .get_one("max-diff-tokens")
+        .context("Failed to parse max-diff-tokens")?;
     },
     Some(("max-length", args)) => {
       app.max_length = *args.get_one("max-length").context("Failed to parse max-length")?;

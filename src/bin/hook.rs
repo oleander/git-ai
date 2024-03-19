@@ -66,7 +66,10 @@ async fn main() -> Result<()> {
   let response = commit::generate(patch.to_string(), session.into(), pb.clone().into()).await?;
 
   // Write the response to the commit message file
-  args.commit_msg_file.write(response.response.trim().to_string()).unwrap();
+  args
+    .commit_msg_file
+    .write(response.response.trim().to_string())
+    .unwrap();
 
   // Save the session to the repository
   response.session.save_to_repo(&repo).await.unwrap();

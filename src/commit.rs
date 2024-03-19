@@ -153,7 +153,12 @@ impl Connection {
     let request = CreateRunRequestArgs::default()
       .assistant_id(self.session.clone().assistant_id)
       .build()?;
-    let run = self.client.threads().runs(&self.session.thread_id).create(request).await?;
+    let run = self
+      .client
+      .threads()
+      .runs(&self.session.thread_id)
+      .create(request)
+      .await?;
     Ok(Run {
       id: run.id, connection: self.clone()
     })
@@ -162,7 +167,12 @@ impl Connection {
   // Get the last message from the thread
   async fn last_message(&self) -> Result<String, ChatError> {
     let query = [("limit", "1")];
-    let response = self.client.threads().messages(&self.session.thread_id).list(&query).await?;
+    let response = self
+      .client
+      .threads()
+      .messages(&self.session.thread_id)
+      .list(&query)
+      .await?;
     let message_id = response.data.get(0).unwrap().id.clone();
     let message = self
       .client
@@ -179,8 +189,16 @@ impl Connection {
   }
 
   async fn create_message(&self, message: &str) -> Result<(), ChatError> {
-    let message = CreateMessageRequestArgs::default().role("user").content(message).build()?;
-    self.client.threads().messages(&self.session.thread_id).create(message).await?;
+    let message = CreateMessageRequestArgs::default()
+      .role("user")
+      .content(message)
+      .build()?;
+    self
+      .client
+      .threads()
+      .messages(&self.session.thread_id)
+      .create(message)
+      .await?;
     Ok(())
   }
 
@@ -217,7 +235,9 @@ impl Run {
 pub async fn generate(
   diff: String, session: Option<Session>, progressbar: Option<ProgressBar>
 ) -> Result<OpenAIResponse, ChatError> {
-  progressbar.clone().map(|pb| pb.set_message("Generating commit message..."));
+  progressbar
+    .clone()
+    .map(|pb| pb.set_message("Generating commit message..."));
 
   let connection = Connection::new(session).await?;
   connection.create_message(&diff).await?;
