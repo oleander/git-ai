@@ -2,7 +2,7 @@ use std::time::Duration;
 use std::{io, str};
 
 use async_openai::types::{
-  AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, MessageObject, RunObject, RunStatus
+  AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus
 };
 use async_openai::Client;
 use async_openai::config::OpenAIConfig;
