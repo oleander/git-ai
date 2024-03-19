@@ -164,6 +164,13 @@ impl Connection {
         .await?
     )
   }
+
+  async fn post_message(&self, message: &str) -> Result<(), ChatError> {
+    let message =
+      CreateMessageRequestArgs::default().role("user").content(message).build()?;
+    self.client.threads().messages(&self.session.thread_id).create(message).await?;
+    Ok(())
+  }
 }
 
 pub async fn generate(
@@ -178,14 +185,9 @@ pub async fn generate(
 
   let thread_id = session.clone().thread_id;
 
-  let message = CreateMessageRequestArgs::default()
-    .role("user")
-    .content(user_prompt(diff))
-    .build()?;
-
-  client.threads().messages(&thread_id).create(message).await?;
-
+  let message = user_prompt(diff);
   let connection = Connection::new(session.clone())?;
+  connection.post_message(&thread_id, &message).await?;
   let run = connection.create_run().await?;
 
   let result = loop {
