@@ -33,12 +33,14 @@ fn cli() -> Command {
               )
             )
             .subcommand(
-              Command::new("language").about("Sets the language to use").arg(
-                Arg::new("<VALUE>")
-                  .required(true)
-                  .index(1)
-                  .value_parser(clap::builder::NonEmptyStringValueParser::new())
-              )
+              Command::new("language")
+                .about("Sets the language to use")
+                .arg(
+                  Arg::new("<VALUE>")
+                    .required(true)
+                    .index(1)
+                    .value_parser(clap::builder::NonEmptyStringValueParser::new())
+                )
             )
             .subcommand(
               Command::new("max-diff-tokens")
@@ -61,12 +63,14 @@ fn cli() -> Command {
                 )
             )
             .subcommand(
-              Command::new("openai-api-key").about("Sets the OpenAI API key").arg(
-                Arg::new("<VALUE>")
-                  .required(true)
-                  .index(1)
-                  .value_parser(clap::builder::NonEmptyStringValueParser::new())
-              )
+              Command::new("openai-api-key")
+                .about("Sets the OpenAI API key")
+                .arg(
+                  Arg::new("<VALUE>")
+                    .required(true)
+                    .index(1)
+                    .value_parser(clap::builder::NonEmptyStringValueParser::new())
+                )
             )
         )
     )

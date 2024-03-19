@@ -20,11 +20,11 @@ reorder_modules = false
 newline_style = "Auto"
 fn_call_width = 90
 hard_tabs = false
-chain_width = 72
 version = "Two"
-max_width = 100
+max_width = 120
 tab_spaces = 2
 
-attr_fn_like_width = 100
+attr_fn_like_width = 120
 match_block_trailing_comma = false
 where_single_line = false
+chain_width = 60

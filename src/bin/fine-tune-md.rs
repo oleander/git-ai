@@ -93,7 +93,9 @@ fn main() -> Result<()> {
       break;
     }
 
-    file.write_all(message.as_bytes()).context("Failed to write to file")?;
+    file
+      .write_all(message.as_bytes())
+      .context("Failed to write to file")?;
   }
 
   log::info!(
@@ -113,12 +115,10 @@ fn should_exclude_path(file_path: &str) -> bool {
     "/config/", "/settings/", "/initializers/", // Configuration files
     "/vendor/", "/third-party/", "/external/",   // Third-party and vendor code
     "/submodules/", // Git submodules
-    "/.github/", "/.gitignore", "/.gitmodules",
-    "/.gitattributes", // Git and GitHub specific files
+    "/.github/", "/.gitignore", "/.gitmodules", "/.gitattributes", // Git and GitHub specific files
     "/.gitlab-ci.yml", "/.travis.yml", "/appveyor.yml", // CI/CD configuration files
     "/Dockerfile", "/docker-compose.yml", "/.dockerignore", // Docker files
-    "/.editorconfig", "/.rubocop.yml", "/.eslintignore",
-    "/.eslintrc", // Linter and editor configuration
+    "/.editorconfig", "/.rubocop.yml", "/.eslintignore", "/.eslintrc", // Linter and editor configuration
     "/test/", "/spec/", "/tests/", "/specs/", // Test files and directories
     "/locales/", "/i18n/", // Localization files
     "/logs/", "/tmp/",    // Logs and temporary files
@@ -130,7 +130,9 @@ fn should_exclude_path(file_path: &str) -> bool {
     "/CHANGELOG", "/LICENSE", "/README.md", // Project meta-files
   ];
 
-  exclude_patterns.iter().any(|pattern| file_path.contains(pattern))
+  exclude_patterns
+    .iter()
+    .any(|pattern| file_path.contains(pattern))
 }
 
 fn generate_commit_diff(repo: &Repository, commit: &Commit) -> Result<Option<String>> {

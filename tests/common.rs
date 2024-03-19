@@ -70,9 +70,7 @@ impl GitFile {
       Ok(parent_commit) => {
         self
           .repo
-          .commit(Some("HEAD"), &signature, &signature, "Commit message", &tree, &[
-            &parent_commit
-          ])?;
+          .commit(Some("HEAD"), &signature, &signature, "Commit message", &tree, &[&parent_commit])?;
       }
       Err(_) => {
         self

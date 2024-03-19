@@ -46,7 +46,9 @@ async fn main() -> Result<()> {
     }
   };
 
-  let patch = repo.to_patch(tree, max_tokens).context("Failed to get patch")?;
+  let patch = repo
+    .to_patch(tree, max_tokens)
+    .context("Failed to get patch")?;
 
   if patch.is_empty() {
     Err(HookError::EmptyDiffOutput)?;
@@ -55,7 +57,9 @@ async fn main() -> Result<()> {
   let pb_clone = pb.clone();
   ctrlc::set_handler(move || {
     pb_clone.finish_and_clear();
-    console::Term::stdout().show_cursor().expect("Failed to show cursor");
+    console::Term::stdout()
+      .show_cursor()
+      .expect("Failed to show cursor");
     std::process::exit(1);
   })?;
 

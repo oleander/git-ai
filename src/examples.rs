@@ -22,7 +22,11 @@ impl RepositoryExt for Repository {
     Ok(
       revwalk
         .take(max_commits)
-        .map(move |id| self.find_commit(id.unwrap()).expect("Failed to find commit"))
+        .map(move |id| {
+          self
+            .find_commit(id.unwrap())
+            .expect("Failed to find commit")
+        })
         .collect()
     )
   }
@@ -38,7 +42,12 @@ impl CommitExt for git2::Commit<'_> {
     let mut commit_info = "".to_string();
     let mut opts = DiffOptions::new();
     let tree = self.tree()?;
-    let parent_tree = self.parent(0).ok().as_ref().map(|c| c.tree().ok()).flatten();
+    let parent_tree = self
+      .parent(0)
+      .ok()
+      .as_ref()
+      .map(|c| c.tree().ok())
+      .flatten();
     let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut opts))?;
 
     _ = diff

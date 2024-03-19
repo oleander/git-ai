@@ -31,14 +31,19 @@ pub enum InstallError {
 const EMOJI: Emoji<'_, '_> = Emoji("🔗", "");
 
 fn can_override_hook() -> bool {
-  std::env::args().collect::<Vec<String>>().iter().any(|arg| arg == "-f")
+  std::env::args()
+    .collect::<Vec<String>>()
+    .iter()
+    .any(|arg| arg == "-f")
 }
 
 // Git hook: prepare-commit-msg
 // Crates an executable git hook (prepare-commit-msg) in the .git/hooks directory
 pub fn run() -> Result<(), InstallError> {
   let curr_bin = env::current_exe()?;
-  let exec_path = curr_bin.parent().context("Failed to get parent directory")?;
+  let exec_path = curr_bin
+    .parent()
+    .context("Failed to get parent directory")?;
   let hook_bin = exec_path.join("git-ai-hook");
 
   // Check if the hook binary exists
@@ -48,7 +53,10 @@ pub fn run() -> Result<(), InstallError> {
 
   let current_dir = env::current_dir()?;
   let repo = Repository::open_ext(&current_dir, Flags::empty(), Vec::<&Path>::new())?;
-  let repo_path = repo.path().parent().context("Failed to get parent directory")?;
+  let repo_path = repo
+    .path()
+    .parent()
+    .context("Failed to get parent directory")?;
   let git_path = match repo_path.file_name() {
     Some(name) if name == ".git" => repo_path.to_path_buf(),
     Some(_) => repo_path.join(".git"),

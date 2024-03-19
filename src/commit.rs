@@ -63,13 +63,11 @@ impl Session {
     let mut config = repo.config().context("Failed to load config")?;
     let thread_id = config.get_string("ai.thread-id").ok();
 
-    let global_config = config.open_global().context("Failed to open global config")?;
+    let global_config = config
+      .open_global()
+      .context("Failed to open global config")?;
     let assistant_id = global_config.get_string("ai.assistant-id").ok();
-    log::debug!(
-      "Loaded session from repo: thread_id: {:?}, assistant_id: {:?}",
-      thread_id,
-      assistant_id
-    );
+    log::debug!("Loaded session from repo: thread_id: {:?}, assistant_id: {:?}", thread_id, assistant_id);
 
     match (thread_id, assistant_id) {
       (Some(thread_id), Some(assistant_id)) => {
@@ -89,9 +87,13 @@ impl Session {
     config.set_str("ai.thread-id", self.thread_id.as_str())?;
     config.snapshot().context("Failed to save config")?;
 
-    let mut global_config = config.open_global().context("Failed to open global config")?;
+    let mut global_config = config
+      .open_global()
+      .context("Failed to open global config")?;
     global_config.set_str("ai.assistant-id", self.assistant_id.as_str())?;
-    global_config.snapshot().context("Failed to save global config")?;
+    global_config
+      .snapshot()
+      .context("Failed to save global config")?;
     Ok(())
   }
 }
