@@ -112,7 +112,6 @@ async fn create_assistant(
   Ok(client.assistants().create(assistant_request).await?)
 }
 
-// Generate a commit message using OpenAI's API using the provided git diff
 pub async fn generate(
   diff: String, session: Option<Session>
 ) -> Result<OpenAIResponse, ChatError> {
@@ -134,12 +133,11 @@ pub async fn generate(
 
   client.threads().messages(&thread_id).create(message).await?;
 
-  let run_request = CreateRunRequestArgs::default().assistant_id(assistant_id).build()?;
-  let run = client.threads().runs(&thread_id).create(run_request).await?;
+  let request = CreateRunRequestArgs::default().assistant_id(assistant_id).build()?;
+  let run = client.threads().runs(&thread_id).create(request).await?;
 
   let result = loop {
-    let run = client.threads().runs(&thread_id).retrieve(&run.id).await?;
-    match run.status {
+    match client.threads().runs(&thread_id).retrieve(&run.id).await?.status {
       RunStatus::Completed => {
         let response = client.threads().messages(&thread_id).list(&query).await?;
         let message_id = response.data.get(0).unwrap().id.clone();
