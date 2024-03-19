@@ -222,7 +222,7 @@ pub async fn generate(
   connection.create_message(&diff).await?;
   let run = connection.create_run().await?;
 
-  let result = loop {
+  return loop {
     match run.pull_status().await? {
       RunStatus::Completed => {
         break connection.into_response().await;
@@ -255,6 +255,4 @@ pub async fn generate(
 
     sleep(Duration::from_millis(300)).await;
   };
-
-  result
 }
