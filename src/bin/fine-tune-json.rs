@@ -175,5 +175,9 @@ fn generate_commit_diff(repo: &Repository, commit: &Commit) -> Result<Option<Str
   }).context("Failed to print diff")?;
 
   let content = String::from_utf8(patch).context("Failed to convert patch to string")?;
-  if content.split_whitespace().count() > 600 { Ok(None) } else { Ok(Some(content)) }
+  if content.split_whitespace().count() > 600 {
+    Ok(None)
+  } else {
+    Ok(Some(content))
+  }
 }
