@@ -12,7 +12,7 @@ fn main() -> Result<()> {
 
   let max_tokens = 16385;
   let file_name = "file-tune.json";
-  let max_commits = 100;
+  let max_commits = 10;
 
   log::info!("Creating fine-tune file with {} commits and {} tokens", max_commits, max_tokens);
 
@@ -29,18 +29,23 @@ fn main() -> Result<()> {
   let mut curr_size = 0;
   let mut commit_count = 0;
 
-  for oid in revwalk.take(max_commits) {
+  for oid in revwalk {
     let oid = oid.context("Failed to get oid")?;
     let commit = repo.find_commit(oid).context("Couldn't find commit")?;
-    let commit = if commit.author().email() == Some(&user_email) {
-      commit
-    } else if commit.committer().email() == Some(&user_email) {
-      commit
-    } else {
+
+    if commit.parent_count() > 1 {
       continue;
+    }
+
+    let weight = if commit.author().email() == Some(&user_email) {
+      1.0
+    } else if commit.committer().email() == Some(&user_email) {
+      1.0
+    } else {
+      0.5
     };
 
-    let Some(content) = generate_commit_diff(&repo, &commit)? else {
+    let Ok(Some(content)) = generate_commit_diff(&repo, &commit) else {
       continue;
     };
 
@@ -48,10 +53,23 @@ fn main() -> Result<()> {
       continue;
     };
 
+    if commit.starts_with("Merge") {
+      continue;
+    }
+
+    if commit.len() > 80 {
+      continue;
+    }
+
+    // Check if it contains a new line
+    if commit.trim().contains("\n") {
+      continue;
+    }
+
     let message = json!({
       "messages": [
-        { "role": "assistant", "content": commit },
-        { "role": "user", "content": content },
+        { "role": "assistant", "content": commit, "weight": weight },
+        { "role": "user", "content": content.trim() },
         { "role": "system", "content": PROMPT }
       ]
     });
@@ -71,6 +89,32 @@ fn main() -> Result<()> {
   log::info!("File {} created with {} commits", file_name, commit_count);
 
   Ok(())
+}
+
+fn should_exclude_path(file_path: &str) -> bool {
+  let exclude_patterns = vec![
+    "/docs/", "/documentation/", "/guides/", // Documentation
+    "/assets/", "/images/", "/graphics/", "/designs/", // Assets and design-related files
+    "Gemfile", "Gemfile.lock", // Dependency files
+    "/config/", "/settings/", "/initializers/", // Configuration files
+    "/vendor/", "/third-party/", "/external/",   // Third-party and vendor code
+    "/submodules/", // Git submodules
+    "/.github/", "/.gitignore", "/.gitmodules", "/.gitattributes", // Git and GitHub specific files
+    "/.gitlab-ci.yml", "/.travis.yml", "/appveyor.yml", // CI/CD configuration files
+    "/Dockerfile", "/docker-compose.yml", "/.dockerignore", // Docker files
+    "/.editorconfig", "/.rubocop.yml", "/.eslintignore", "/.eslintrc", // Linter and editor configuration
+    "/test/", "/spec/", "/tests/", "/specs/", // Test files and directories
+    "/locales/", "/i18n/", // Localization files
+    "/logs/", "/tmp/",    // Logs and temporary files
+    "/public/", // Public assets
+    "/node_modules/", "/package.json", "/yarn.lock", // Node.js specific files
+    "/.env", "/.env.example", // Environment files
+    "/db/schema.rb", "/db/migrate/", // Database schema and migrations
+    "/scripts/", "/tools/", // Utility scripts and tools
+    "/CHANGELOG", "/LICENSE", "/README.md", // Project meta-files
+  ];
+
+  exclude_patterns.iter().any(|pattern| file_path.contains(pattern))
 }
 
 fn generate_commit_diff(repo: &Repository, commit: &Commit) -> Result<Option<String>> {
@@ -99,12 +143,24 @@ fn generate_commit_diff(repo: &Repository, commit: &Commit) -> Result<Option<Str
   let mut patch: Vec<u8> = Vec::new();
 
   #[rustfmt::skip]
-  diff.print(DiffFormat::Patch, |_, _, line| {
+  diff.print(DiffFormat::Patch, |delta, _, line| {
+    // Ignore if line is a binary file
+    if line.origin() == 'B' {
+      return false;
+    }
+
+    let file_path = delta.new_file().path().unwrap_or_else(|| delta.old_file().path().unwrap());
+
+    if should_exclude_path(file_path.to_str().unwrap()) {
+      return false;
+    }
+
     let content = line.content();
     patch.extend_from_slice(content);
+
     true
   }).context("Failed to print diff")?;
 
   let content = String::from_utf8(patch).context("Failed to convert patch to string")?;
-  if content.split_whitespace().count() > 500 { Ok(None) } else { Ok(Some(content)) }
+  if content.split_whitespace().count() > 600 { Ok(None) } else { Ok(Some(content)) }
 }
