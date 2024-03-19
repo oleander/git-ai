@@ -73,6 +73,18 @@ pub struct Session {
   pub assistant_id: String
 }
 
+impl Session {
+  pub async fn new_from_client(client: &Client<OpenAIConfig>) -> Result<Self, ChatError> {
+    let assistant = create_assistant(client).await?;
+    let thread_request = CreateThreadRequestArgs::default().build()?;
+    let thread = client.threads().create(thread_request).await?;
+
+    Ok(Session {
+      thread_id: thread.id, assistant_id: assistant.id
+    })
+  }
+}
+
 pub struct OpenAIResponse {
   pub session:  Session,
   pub response: String
@@ -109,15 +121,7 @@ pub async fn generate(
 
   let session = match session {
     Some(session) => session,
-    None => {
-      let assistant = create_assistant(&client).await?;
-      let thread_request = CreateThreadRequestArgs::default().build()?;
-      let thread = client.threads().create(thread_request).await?;
-
-      Session {
-        thread_id: thread.id, assistant_id: assistant.id
-      }
-    }
+    None => Session::new_from_client(&client).await?
   };
 
   let thread_id = session.clone().thread_id;
