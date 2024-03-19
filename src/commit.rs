@@ -1,3 +1,4 @@
+use std::time::Duration;
 use std::{io, str};
 
 use async_openai::types::{
@@ -8,6 +9,7 @@ use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
 use thiserror::Error;
 use anyhow::Context;
+use tokio::time::sleep;
 
 use crate::config;
 
@@ -49,7 +51,10 @@ fn instruction(language: String, max_length_of_commit: usize) -> String {
 }
 
 fn user_prompt(diff: String) -> String {
-  format!("Staged changes: {diff}").split_whitespace().collect::<Vec<&str>>().join(" ")
+  format!("Staged changes: {diff}")
+    .split_whitespace()
+    .collect::<Vec<&str>>()
+    .join(" ")
 }
 
 fn client() -> Result<Client<OpenAIConfig>, ChatError> {
@@ -73,7 +78,9 @@ pub struct OpenAIResponse {
   pub response: String
 }
 
-async fn create_assistant(client: &Client<OpenAIConfig>) -> Result<AssistantObject, ChatError> {
+async fn create_assistant(
+  client: &Client<OpenAIConfig>
+) -> Result<AssistantObject, ChatError> {
   let language = config::APP.language.clone();
   let max_length_of_commit = config::APP.max_length;
   let model = config::APP.model.clone();
@@ -94,7 +101,9 @@ async fn create_assistant(client: &Client<OpenAIConfig>) -> Result<AssistantObje
 }
 
 // Generate a commit message using OpenAI's API using the provided git diff
-pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIResponse, ChatError> {
+pub async fn generate(
+  diff: String, session: Option<Session>
+) -> Result<OpenAIResponse, ChatError> {
   let query = [("limit", "1")];
   let client = client()?;
 
@@ -114,7 +123,10 @@ pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIRe
   let thread_id = session.clone().thread_id;
   let assistant_id = session.clone().assistant_id;
 
-  let message = CreateMessageRequestArgs::default().role("user").content(user_prompt(diff)).build()?;
+  let message = CreateMessageRequestArgs::default()
+    .role("user")
+    .content(user_prompt(diff))
+    .build()?;
 
   client.threads().messages(&thread_id).create(message).await?;
 
@@ -158,7 +170,8 @@ pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIRe
         log::debug!("--- Run Cancelling");
       }
     }
-    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+    sleep(Duration::from_millis(300)).await;
   };
 
   Ok(OpenAIResponse {
