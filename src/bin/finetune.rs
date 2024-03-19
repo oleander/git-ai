@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::fs::File;
 
-use git2::{Commit, DiffOptions, Repository};
+use git2::{Commit, DiffFormat, DiffOptions, Repository};
 use anyhow::{Context, Result};
 use indicatif::ProgressBar;
 use ai::hook::PatchDiff;
@@ -10,13 +10,13 @@ use serde_json::json;
 static PROMPT: &str = "Your role is to create concise git commit messages based on user-provided git diffs. When crafting these messages: - Focus on detailing the changes and reasons behind them, ensuring clarity and relevance. - Avoid including irrelevant or unnecessary details, such as translations, to maintain focus on the core changes. Your responses should be direct and immediately usable in a git commit, crafted in present tense to fit git conventions. You work primarily with git diffs, interpreting them to generate meaningful commit messages that succinctly summarize the changes.";
 
 fn main() -> Result<()> {
-  let pb = ProgressBar::new_spinner();
-  let file_name = "file-tune.json";
-  let limit = 1000;
+  env_logger::init();
 
-  // set number of items in pb
-  pb.set_length(limit as u64);
-  log::info!("Creating fine-tune file with {} commits", limit);
+  let max_tokens = 16385;
+  let file_name = "file-tune.json";
+  let max_commits = 100;
+
+  log::info!("Creating fine-tune file with {} commits and {} tokens", max_commits, max_tokens);
 
   let repo = Repository::open(".").context("Failed to open git repository")?;
   let config = repo.config().context("Couldn't access repository config")?;
@@ -28,7 +28,10 @@ fn main() -> Result<()> {
 
   revwalk.push_head().expect("Failed to push head");
 
-  for oid in revwalk.take(limit) {
+  let mut curr_size = 0;
+  let mut commit_count = 0;
+
+  for oid in revwalk.take(max_commits) {
     let oid = oid.context("Failed to get oid")?;
     let commit = repo.find_commit(oid).context("Couldn't find commit")?;
     let commit = if commit.author().email() == Some(&user_email) {
@@ -39,26 +42,39 @@ fn main() -> Result<()> {
       continue;
     };
 
+    let Some(content) = generate_commit_diff(&repo, &commit)? else {
+      continue;
+    };
+
     let message = json!({
       "messages": [
-        { "role": "system", "content": PROMPT },
-        { "role": "user", "content": generate_commit_diff(&repo, &commit) },
-        { "role": "assistant", "content": commit.message().unwrap_or_default() }
+        { "role": "user", "content": generate_commit_diff(&repo, &commit)? },
+        { "role": "assistant", "content": commit.message().unwrap_or_default() },
+        { "role": "system", "content": PROMPT }
       ]
     });
 
-    file.write_all(serde_json::to_string_pretty(&message)?.as_bytes()).context("Failed to write to file")?;
-    pb.inc(1);
+    let content = serde_json::to_string_pretty(&message)?;
+
+
+    curr_size += content.split_whitespace().count();
+    log::info!("Current size: {}", curr_size);
+    if curr_size > max_tokens {
+      log::info!("Max tokens reached: {}", max_tokens);
+      break;
+    }
+
+    log::info!("Commit: {}", commit.id());
+    commit_count += 1;
+    file.write_all(content.as_bytes()).context("Failed to write to file")?;
   }
 
-  pb.finish_with_message("Done");
-
-  log::info!("File {} created with {} commits", file_name, limit);
+  log::info!("File {} created with {} commits", file_name, commit_count);
 
   Ok(())
 }
 
-fn generate_commit_diff(repo: &Repository, commit: &Commit) -> String {
+fn generate_commit_diff(repo: &Repository, commit: &Commit) -> Result<Option<String>> {
   let parent = commit.parents().next().unwrap_or_else(|| commit.clone());
   let tree = commit.tree().expect("Couldn't get commit tree");
   let parent_tree = parent.tree().expect("Couldn't get parent tree");
@@ -78,7 +94,23 @@ fn generate_commit_diff(repo: &Repository, commit: &Commit) -> String {
     .context_lines(0)
     .patience(true)
     .minimal(true);
-  let diff = repo.diff_tree_to_tree(Some(&parent_tree), Some(&tree), Some(&mut opts)).expect("Couldn't generate diff");
-  let patches = diff.to_patch(5000).expect("Couldn't generate patch");
-  String::from_utf8(patches.as_bytes().to_vec()).unwrap()
+
+  let diff = repo.diff_tree_to_tree(Some(&parent_tree), Some(&tree), Some(&mut opts)).context("Failed to get diff")?;
+
+  let mut patch: Vec<u8> = Vec::new();
+
+  #[rustfmt::skip]
+  diff.print(DiffFormat::Patch, |_, _, line| {
+    let content = line.content();
+    patch.extend_from_slice(content);
+    true
+  }).context("Failed to print diff")?;
+
+  let content = String::from_utf8(patch).context("Failed to convert patch to string")?;
+
+  if content.split_whitespace().count() > 500 {
+    Ok(None)
+  } else {
+    Ok(Some(content))
+  }
 }
