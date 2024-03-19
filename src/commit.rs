@@ -2,7 +2,7 @@ use std::time::Duration;
 use std::{io, str};
 
 use async_openai::types::{
-  AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus
+  AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunObject, RunStatus
 };
 use async_openai::Client;
 use async_openai::config::OpenAIConfig;
@@ -112,6 +112,31 @@ async fn create_assistant(
   Ok(client.assistants().create(assistant_request).await?)
 }
 
+struct Connection {
+  client:  Client<OpenAIConfig>,
+  session: Session
+}
+
+impl Connection {
+  pub fn new(session: Session) -> Result<Self, ChatError> {
+    let api_key = config::APP.openai_api_key.clone().context("Failed to get OpenAI API key, please run `git-ai config set openapi-api")?;
+    let config = OpenAIConfig::new().with_api_key(api_key);
+    let client = Client::with_config(config);
+
+    Ok(Connection {
+      client,
+      session
+    })
+  }
+
+  async fn create_run(&self) -> Result<RunObject, ChatError> {
+    let request = CreateRunRequestArgs::default()
+      .assistant_id(self.session.clone().assistant_id)
+      .build()?;
+    Ok(self.client.threads().runs(&self.session.thread_id).create(request).await?)
+  }
+}
+
 pub async fn generate(
   diff: String, session: Option<Session>
 ) -> Result<OpenAIResponse, ChatError> {
@@ -124,7 +149,6 @@ pub async fn generate(
   };
 
   let thread_id = session.clone().thread_id;
-  let assistant_id = session.clone().assistant_id;
 
   let message = CreateMessageRequestArgs::default()
     .role("user")
@@ -133,8 +157,8 @@ pub async fn generate(
 
   client.threads().messages(&thread_id).create(message).await?;
 
-  let request = CreateRunRequestArgs::default().assistant_id(assistant_id).build()?;
-  let run = client.threads().runs(&thread_id).create(request).await?;
+  let connection = Connection::new(session.clone())?;
+  let run = connection.create_run().await?;
 
   let result = loop {
     match client.threads().runs(&thread_id).retrieve(&run.id).await?.status {
