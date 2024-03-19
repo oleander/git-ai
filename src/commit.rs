@@ -149,6 +149,7 @@ impl Connection {
     })
   }
 
+  // Create a new run
   async fn create_run(&self) -> Result<Run, ChatError> {
     let request = CreateRunRequestArgs::default()
       .assistant_id(self.session.clone().assistant_id)
@@ -159,6 +160,7 @@ impl Connection {
     })
   }
 
+  // Get the last message from the thread
   async fn last_message(&self) -> Result<String, ChatError> {
     let query = [("limit", "1")];
     let response = self.client.threads().messages(&self.session.thread_id).list(&query).await?;
