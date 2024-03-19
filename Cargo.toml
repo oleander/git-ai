@@ -26,11 +26,11 @@ path = "src/bin/clear.rs"
 [dependencies.clap]
 features = ["derive", "wrap_help"]
 default-features = true
-version = "4.5.2"
+version = "4.5.3"
 
 [dependencies]
 tokio = { version = "1.36.0", features = ["full"] }
-reqwest = { version = "0.11.24", features = ["json"] }
+reqwest = { version = "0.11.26", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 dotenv_codegen = "0.15.0"
 serde_derive = "1.0.197"
@@ -38,15 +38,15 @@ async-openai = "0.18.3"
 serde_json = "1.0.114"
 env_logger = "0.10.2"
 lazy_static = "1.4.0"
-thiserror = "1.0.57"
+thiserror = "1.0.58"
 indicatif = "0.17.8"
 serde_ini = "0.2.0"
 console = "0.15.8"
-anyhow = "1.0.80"
+anyhow = "1.0.81"
 dotenv = "0.15.0"
 config = "0.13.4"
 colored = "2.1.0"
-ctrlc = "3.4.2"
+ctrlc = "3.4.4"
 log = "0.4.21"
 home = "0.5.9"
 indicatif-log-bridge = "0.2.2"
@@ -59,7 +59,7 @@ version = "0.18.2"
 
 [dev-dependencies]
 tempfile = "3.10.1"
-anyhow = "1.0.80"
+anyhow = "1.0.81"
 git2 = "0.18.2"
 rand = "0.8.5"
 
