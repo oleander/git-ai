@@ -19,6 +19,10 @@ path = "src/main.rs"
 name = "git-ai-hook"
 path = "src/bin/hook.rs"
 
+[[bin]]
+name = "git-ai-clear"
+path = "src/bin/clear.rs"
+
 [dependencies.clap]
 features = ["derive", "wrap_help"]
 default-features = true
