@@ -6,11 +6,11 @@ use async_openai::types::{
 };
 
 use async_openai::config::OpenAIConfig;
-use git2::Repository;
 use async_openai::error::OpenAIError;
 use indicatif::ProgressBar;
 use async_openai::Client;
 use tokio::time::sleep;
+use git2::Repository;
 use thiserror::Error;
 use anyhow::Context;
 
