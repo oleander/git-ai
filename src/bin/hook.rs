@@ -1,18 +1,13 @@
 // Hook: prepare-commit-msg
 
+use indicatif::{ProgressBar, ProgressStyle};
+use anyhow::{Context, Result};
+use git2::{Oid, Repository};
+use ai::{commit, config};
 use std::time::Duration;
-
 use ai::commit::Session;
 use termion::event::Key;
-use git2::{Oid, Repository};
-use anyhow::{Context, Result};
 use clap::Parser;
-use indicatif::{ProgressBar, ProgressStyle};
-use termion::input::TermRead;
-use termion::raw::IntoRawMode;
-use tokio::time::sleep;
-use tokio::signal;
-use ai::{commit, config};
 use ai::hook::*;
 
 #[tokio::main]
@@ -42,7 +37,7 @@ async fn main() -> Result<()> {
   let tree = match args.sha1.as_deref() {
     // git commit --amend or git commit -c
     Some("HEAD") | None => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
-    // git ???
+    // git rebase
     Some(sha1) => repo.find_object(Oid::from_str(sha1)?, None).ok().and_then(|obj| obj.peel_to_tree().ok())
   };
 
@@ -59,11 +54,17 @@ async fn main() -> Result<()> {
     std::process::exit(1);
   })?;
 
+  // Create a new session from the client
   let session = Session::load_from_repo(&repo).await.unwrap();
-  let respomse = commit::generate(patch.to_string(), session.into(), pb.clone().into()).await?;
-  let commit = respomse.response.trim();
-  args.commit_msg_file.write(commit.trim().to_string()).unwrap();
-  respomse.session.save_to_repo(&repo).await.unwrap();
+
+  // If the user has a session, then we can use it to generate the commit message
+  let response = commit::generate(patch.to_string(), session.into(), pb.clone().into()).await?;
+
+  // Write the response to the commit message file
+  args.commit_msg_file.write(response.response.trim().to_string()).unwrap();
+
+  // Save the session to the repository
+  response.session.save_to_repo(&repo).await.unwrap();
 
   pb.finish_and_clear();
 
