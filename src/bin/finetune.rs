@@ -3,8 +3,6 @@ use std::fs::File;
 
 use git2::{Commit, DiffFormat, DiffOptions, Repository};
 use anyhow::{Context, Result};
-use indicatif::ProgressBar;
-use ai::hook::PatchDiff;
 use serde_json::json;
 
 static PROMPT: &str = "Your role is to create concise git commit messages based on user-provided git diffs. When crafting these messages: - Focus on detailing the changes and reasons behind them, ensuring clarity and relevance. - Avoid including irrelevant or unnecessary details, such as translations, to maintain focus on the core changes. Your responses should be direct and immediately usable in a git commit, crafted in present tense to fit git conventions. You work primarily with git diffs, interpreting them to generate meaningful commit messages that succinctly summarize the changes.";
@@ -108,10 +106,5 @@ fn generate_commit_diff(repo: &Repository, commit: &Commit) -> Result<Option<Str
   }).context("Failed to print diff")?;
 
   let content = String::from_utf8(patch).context("Failed to convert patch to string")?;
-
-  if content.split_whitespace().count() > 500 {
-    Ok(None)
-  } else {
-    Ok(Some(content))
-  }
+  if content.split_whitespace().count() > 500 { Ok(None) } else { Ok(Some(content)) }
 }
