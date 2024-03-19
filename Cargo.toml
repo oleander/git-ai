@@ -28,7 +28,7 @@ version = "4.5.3"
 
 [dependencies]
 tokio = { version = "1.36.0", features = ["full"] }
-reqwest = { version = "0.11.26", features = ["json"] }
+reqwest = { version = "0.11.27", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 serde_derive = "1.0.197"
 async-openai = "0.18.3"
@@ -49,12 +49,12 @@ home = "0.5.9"
 
 [dependencies.git2]
 default-features = false
-version = "0.18.2"
+version = "0.18.3"
 
 [dev-dependencies]
 tempfile = "3.10.1"
 anyhow = "1.0.81"
-git2 = "0.18.2"
+git2 = "0.18.3"
 rand = "0.8.5"
 
 [profile.release]
