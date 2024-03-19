@@ -90,9 +90,10 @@ impl PatchDiff for Diff<'_> {
       };
 
       let content = line.content();
-      if *tokens + content.len() <= tokens_per_file {
+      let curr_tokens = content.to_utf8().split_whitespace().count();
+      if *tokens + curr_tokens < tokens_per_file {
+        *tokens += curr_tokens;
         patch_acc.extend_from_slice(content);
-        *tokens += content.to_utf8().split_whitespace().count();
       } else {
         patch_acc.extend_from_slice(truncated_message.as_bytes());
         token_table.remove(&diff_path);
