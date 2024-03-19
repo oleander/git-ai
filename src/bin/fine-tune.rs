@@ -13,7 +13,7 @@ fn main() -> Result<()> {
   let max_tokens = 16385;
   let validate_file_name = "validate.jsonl";
   let train_file_name = "train.jsonl";
-  let max_commits = 10;
+  let max_commits = 20;
 
   log::info!("Creating fine-tune file with {} commits and {} tokens", max_commits, max_tokens);
 
@@ -91,7 +91,12 @@ fn main() -> Result<()> {
     }
 
     commit_count += 1;
+
     result.push(message);
+
+    if commit_count >= max_commits {
+      break;
+    }
   }
 
   let train_result = result[..(result.len() / 2)].to_vec();
