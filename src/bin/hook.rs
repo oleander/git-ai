@@ -2,20 +2,18 @@
 
 use std::time::Duration;
 
-use termion::event::Key;
-use git2::{Oid, Repository};
-use anyhow::{Context, Result};
-use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
-use termion::input::TermRead;
-use termion::raw::IntoRawMode;
-use tokio::time::sleep;
-use tokio::signal;
+use anyhow::{Context, Result};
+use git2::{Oid, Repository};
 use ai::{commit, config};
+use ai::commit::Session;
+use clap::Parser;
 use ai::hook::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+  env_logger::init();
+
   let args = Args::parse();
   let max_tokens = config::APP.max_diff_tokens;
   let pb = ProgressBar::new_spinner();
@@ -39,8 +37,10 @@ async fn main() -> Result<()> {
   let tree = match args.sha1.as_deref() {
     // git commit --amend or git commit -c
     Some("HEAD") | None => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
-    // git ???
-    Some(sha1) => repo.find_object(Oid::from_str(sha1)?, None).ok().and_then(|obj| obj.peel_to_tree().ok())
+    // git rebase
+    Some(sha1) => {
+      repo.find_object(Oid::from_str(sha1)?, None).ok().and_then(|obj| obj.peel_to_tree().ok())
+    },
   };
 
   let patch = repo.to_patch(tree, max_tokens).context("Failed to get patch")?;
@@ -49,57 +49,26 @@ async fn main() -> Result<()> {
     Err(HookError::EmptyDiffOutput)?;
   }
 
-  let process: tokio::task::JoinHandle<Result<(), anyhow::Error>> = tokio::spawn(async move {
-    let str = patch.to_string();
-    println!("Patch: {}", str);
-    let commit_message = commit::generate(str).await.context("Failed to generate commit message")?;
+  let pb_clone = pb.clone();
+  ctrlc::set_handler(move || {
+    pb_clone.finish_and_clear();
+    console::Term::stdout().show_cursor().expect("Failed to show cursor");
+    std::process::exit(1);
+  })?;
 
-    args
-      .commit_msg_file
-      .write(commit_message.trim().to_string())
-      .context("Failed to write commit message")?;
+  // Create a new session from the client
+  let session = Session::load_from_repo(&repo).await.unwrap();
 
-    Ok(())
-  });
+  // If the user has a session, then we can use it to generate the commit message
+  let response = commit::generate(patch.to_string(), session.into(), pb.clone().into()).await?;
 
-  tokio::select! {
-    _ = signal::ctrl_c() => {
-      console::Term::stdout().show_cursor().expect("Failed to show cursor");
-      std::process::exit(1);
-    }
+  // Write the response to the commit message file
+  args.commit_msg_file.write(response.response.trim().to_string()).unwrap();
 
-    _ = process => {
-      pb.finish_and_clear();
-    }
+  // Save the session to the repository
+  response.session.save_to_repo(&repo).await.unwrap();
 
-    _ = read_input(pb.clone()) => {
-      pb.finish_and_clear();
-    }
-  }
+  pb.finish_and_clear();
 
   Ok(())
-}
-
-async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {
-  let _stdout = std::io::stdout().into_raw_mode().unwrap();
-  let mut stdin = termion::async_stdin().keys();
-
-  loop {
-    match stdin.next() {
-      // Ctrl+C pressed: exit the program
-      Some(Ok(Key::Ctrl('c'))) => {
-        return Ok(1);
-      },
-
-      // Enter pressed: render empty line before progress bar
-      Some(Ok(Key::Char('\n'))) => {
-        pb.println("");
-      },
-
-      // Any other key pressed
-      _ => {
-        sleep(Duration::from_millis(50)).await;
-      }
-    }
-  }
 }

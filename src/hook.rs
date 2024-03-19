@@ -40,12 +40,7 @@ trait DiffDeltaPath {
 
 impl DiffDeltaPath for git2::DiffDelta<'_> {
   fn path(&self) -> PathBuf {
-    self
-      .new_file()
-      .path()
-      .or_else(|| self.old_file().path())
-      .map(PathBuf::from)
-      .unwrap_or_default()
+    self.new_file().path().or_else(|| self.old_file().path()).map(PathBuf::from).unwrap_or_default()
   }
 }
 
@@ -94,9 +89,10 @@ impl PatchDiff for Diff<'_> {
       };
 
       let content = line.content();
-      if *tokens + content.len() <= tokens_per_file {
+      let curr_tokens = content.to_utf8().split_whitespace().count();
+      if *tokens + curr_tokens < tokens_per_file {
+        *tokens += curr_tokens;
         patch_acc.extend_from_slice(content);
-        *tokens += content.len();
       } else {
         patch_acc.extend_from_slice(truncated_message.as_bytes());
         token_table.remove(&diff_path);
@@ -137,9 +133,7 @@ impl<'a> PatchRepository for Repository {
       .patience(true)
       .minimal(true);
 
-    self
-      .diff_tree_to_index(tree.as_ref(), None, Some(&mut opts))
-      .context("Failed to get diff")
+    self.diff_tree_to_index(tree.as_ref(), None, Some(&mut opts)).context("Failed to get diff")
   }
 }
 

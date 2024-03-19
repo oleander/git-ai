@@ -1,13 +1,17 @@
+use std::time::Duration;
 use std::{io, str};
 
-use async_openai::Client;
+use async_openai::types::{
+  AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus
+};
 use async_openai::config::OpenAIConfig;
+use git2::{Config, Repository};
 use async_openai::error::OpenAIError;
+use indicatif::ProgressBar;
+use async_openai::Client;
+use tokio::time::sleep;
 use thiserror::Error;
 use anyhow::Context;
-use async_openai::types::{
-  ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs
-};
 
 use crate::config;
 
@@ -31,63 +35,230 @@ pub enum ChatError {
   OpenAI(#[from] OpenAIError)
 }
 
-fn system_prompt(language: String, max_length_of_commit: usize) -> Result<ChatCompletionRequestSystemMessage, OpenAIError> {
-  let payload = format!(
-    "
-    Your role is to create concise git commit messages based on user-provided git diffs. When crafting these messages:
-    - Use {language}.
-    - - Maximum Length: {max_length_of_commit} characters.
-    - Focus on detailing the changes and reasons behind them, ensuring clarity and relevance.
-    - Avoid including irrelevant or unnecessary details, such as translations, to maintain focus on the core changes.
-    Your responses should be direct and immediately usable in a git commit, crafted in present tense to fit git conventions.
-    You work primarily with git diffs, interpreting them to generate meaningful commit messages that succinctly summarize the changes.
-  "
-  )
+fn instruction() -> String {
+  let language = &config::APP.language;
+  let max_length = config::APP.max_length;
 
-  .split_whitespace()
-  .collect::<Vec<&str>>()
-  .join(" ");
+  format!("Create concise and meaningful git commit messages based on diffs, incorporating these practices:
 
-  // TODO: Check out the options
-  ChatCompletionRequestSystemMessageArgs::default().content(payload).build()
+  - Language: {language}.
+  - Maximum Length: {max_length} characters for the summary.
+  - Structure: Begin with a clear summary. Use present tense.
+  - Clarity and Relevance: Focus on detailing the changes and their reasons. Exclude irrelevant details.
+  - Consistency: Maintain a consistent style of tense, punctuation, and capitalization.
+  - Review: Ensure the commit message accurately reflects the changes made and their purpose without leaving the description blank.
+
+  Refer to examples.jsonl for examples of how commit messages can be mapped to git diffs")
 }
 
-fn user_prompt(diff: String) -> Result<ChatCompletionRequestUserMessage, OpenAIError> {
-  let payload = format!("Staged changes: {diff}").split_whitespace().collect::<Vec<&str>>().join(" ");
-
-  ChatCompletionRequestUserMessageArgs::default().content(payload).build()
+#[derive(Debug, Clone, PartialEq)]
+pub struct Session {
+  pub thread_id:    String,
+  pub assistant_id: String
 }
 
-// Generate a commit message using OpenAI's API using the provided git diff
-pub async fn generate(diff: String) -> Result<String, ChatError> {
-  log::debug!("Generating commit message using config: {:?}", config::APP);
+impl Session {
+  pub async fn new_from_client(client: &Client<OpenAIConfig>) -> Result<Self, ChatError> {
+    log::debug!("Creating new session from client");
+    let assistant = create_assistant(client).await?;
+    let thread_request = CreateThreadRequestArgs::default().build()?;
+    let thread = client.threads().create(thread_request).await?;
 
-  let api_key = config::APP
-    .openai_api_key
-    .clone()
-    .context("Failed to get OpenAI API key, please run `git-ai config set openapi-api-key <api-key>`")?;
-  let max_length_of_commit = config::APP.max_length;
-  let language = config::APP.language.clone();
+    Ok(Session {
+      thread_id: thread.id, assistant_id: assistant.id
+    })
+  }
+
+  // Load the session from the repository
+  pub async fn load_from_repo(repo: &Repository) -> anyhow::Result<Option<Self>> {
+    log::debug!("Loading session from repo");
+    let mut config = repo.config().context("Failed to load config")?;
+    let thread_id = config.get_string("ai.thread-id").ok();
+
+    let mut global_config = config.open_global().context("Failed to open global config")?;
+    let assistant_id = global_config.get_string("ai.assistant-id").ok();
+    log::debug!(
+      "Loaded session from repo: thread_id: {:?}, assistant_id: {:?}",
+      thread_id,
+      assistant_id
+    );
+
+    match (thread_id, assistant_id) {
+      (Some(thread_id), Some(assistant_id)) => {
+        Ok(Some(Session {
+          thread_id,
+          assistant_id
+        }))
+      },
+      _ => Ok(None)
+    }
+  }
+
+  // Save the session to the repository
+  pub async fn save_to_repo(&self, repo: &Repository) -> anyhow::Result<()> {
+    log::debug!("Saving session to repo");
+    let mut config = repo.config().context("Failed to load config")?;
+    config.set_str("ai.thread-id", self.thread_id.as_str())?;
+    config.snapshot().context("Failed to save config")?;
+
+    let mut global_config = config.open_global().context("Failed to open global config")?;
+    global_config.set_str("ai.assistant-id", self.assistant_id.as_str())?;
+    global_config.snapshot().context("Failed to save global config")?;
+    Ok(())
+  }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct OpenAIResponse {
+  pub session:  Session,
+  pub response: String
+}
+
+// Create a new assistant
+async fn create_assistant(client: &Client<OpenAIConfig>) -> Result<AssistantObject, ChatError> {
   let model = config::APP.model.clone();
+  let instruction = instruction();
+  let example_jsonl_id = "file-a8ghhy1FbWtBKEadAj5OHJWz";
 
-  let messages: Vec<ChatCompletionRequestMessage> =
-    vec![system_prompt(language, max_length_of_commit)?.into(), user_prompt(diff)?.into()];
+  let tools = vec![AssistantTools::Code(AssistantToolsCode {
+    r#type: "code_interpreter".to_string()
+  })];
 
-  log::debug!("Sending request to OpenAI API: {:?}", messages);
+  let assistant_request = CreateAssistantRequestArgs::default()
+    .name("Git Commit Assistant")
+    .instructions(&instruction)
+    .file_ids(vec![example_jsonl_id.to_string()])
+    .tools(tools)
+    .model(model)
+    .build()?;
 
-  let config = OpenAIConfig::new().with_api_key(api_key);
-  let client = Client::with_config(config);
+  Ok(client.assistants().create(assistant_request).await?)
+}
 
-  log::debug!("Creating chat completion request");
-  let request = CreateChatCompletionRequestArgs::default().messages(messages).model(model).n(1).build()?;
+#[derive(Debug, Clone)]
+struct Connection {
+  client:  Client<OpenAIConfig>,
+  session: Session
+}
 
-  log::debug!("Sending request to OpenAI API");
-  client
-    .chat()
-    .create(request)
-    .await?
-    .choices
-    .first()
-    .and_then(|choice| choice.message.content.clone())
-    .ok_or_else(|| ChatError::OpenAIError("Failed to get response from OpenAI".to_string()))
+impl Connection {
+  pub async fn new(session: Option<Session>) -> Result<Self, ChatError> {
+    let api_key = config::APP
+      .openai_api_key
+      .clone()
+      .context("Failed to get OpenAI API key, please run `git-ai config set openapi-api")?;
+    let config = OpenAIConfig::new().with_api_key(api_key);
+    let client = Client::with_config(config);
+
+    let session = match session {
+      Some(session) => session,
+      None => Session::new_from_client(&client).await?
+    };
+
+    Ok(Connection {
+      client,
+      session
+    })
+  }
+
+  async fn create_run(&self) -> Result<Run, ChatError> {
+    let request =
+      CreateRunRequestArgs::default().assistant_id(self.session.clone().assistant_id).build()?;
+    let run = self.client.threads().runs(&self.session.thread_id).create(request).await?;
+    Ok(Run {
+      id: run.id, connection: self.clone()
+    })
+  }
+
+  async fn last_message(&self) -> Result<String, ChatError> {
+    let query = [("limit", "1")];
+    let response = self.client.threads().messages(&self.session.thread_id).list(&query).await?;
+    let message_id = response.data.get(0).unwrap().id.clone();
+    let message =
+      self.client.threads().messages(&self.session.thread_id).retrieve(&message_id).await?;
+    let content = message.content.get(0).unwrap();
+    let MessageContent::Text(text) = &content else {
+      return Err(ChatError::OpenAIError("Message content is not text".to_string()));
+    };
+
+    Ok(text.text.value.clone())
+  }
+
+  async fn create_message(&self, message: &str) -> Result<(), ChatError> {
+    let message = CreateMessageRequestArgs::default().role("user").content(message).build()?;
+    self.client.threads().messages(&self.session.thread_id).create(message).await?;
+    Ok(())
+  }
+
+  async fn into_response(&self) -> Result<OpenAIResponse, ChatError> {
+    let message = self.last_message().await?;
+    let response = OpenAIResponse {
+      response: message, session: self.session.clone()
+    };
+    Ok(response)
+  }
+}
+
+#[derive(Debug, Clone)]
+struct Run {
+  id:         String,
+  connection: Connection
+}
+
+impl Run {
+  pub async fn pull_status(&self) -> Result<RunStatus, ChatError> {
+    Ok(
+      self
+        .connection
+        .client
+        .threads()
+        .runs(&self.connection.session.thread_id)
+        .retrieve(self.id.as_str())
+        .await?
+        .status
+    )
+  }
+}
+
+pub async fn generate(
+  diff: String, session: Option<Session>, progressbar: Option<ProgressBar>
+) -> Result<OpenAIResponse, ChatError> {
+  progressbar.clone().map(|pb| pb.set_message("Creating connection..."));
+
+  let connection = Connection::new(session).await?;
+  connection.create_message(&diff).await?;
+  let run = connection.create_run().await?;
+
+  let result = loop {
+    match run.pull_status().await? {
+      RunStatus::Completed => {
+        break connection.into_response().await;
+      },
+      RunStatus::Failed => {
+        break Err(ChatError::OpenAIError("Run failed".to_string()));
+      },
+      RunStatus::Cancelled => {
+        break Err(ChatError::OpenAIError("Run cancelled".to_string()));
+      },
+      RunStatus::Expired => {
+        break Err(ChatError::OpenAIError("Run expired".to_string()));
+      },
+      RunStatus::RequiresAction => {
+        break Err(ChatError::OpenAIError("Run requires action".to_string()));
+      },
+      RunStatus::InProgress => {
+        progressbar.clone().map(|pb| pb.set_message("In progress..."));
+      },
+      RunStatus::Queued => {
+        progressbar.clone().map(|pb| pb.set_message("Queued..."));
+      },
+      RunStatus::Cancelling => {
+        progressbar.clone().map(|pb| pb.set_message("Cancelling..."));
+      }
+    }
+
+    sleep(Duration::from_millis(300)).await;
+  };
+
+  result
 }
