@@ -57,21 +57,8 @@ async fn main() -> Result<()> {
   let commit = respomse.response.trim();
   args.commit_msg_file.write(commit.trim().to_string()).unwrap();
   respomse.session.save_to_repo(&repo).await.unwrap();
-  log::debug!("Commit message generated successfully");
-  let pb1 = pb.clone();
-  tokio::select! {
-    _ = signal::ctrl_c() => {
-      console::Term::stdout().show_cursor().expect("Failed to show cursor");
-      std::process::exit(1);
-    }
 
-    _ = read_input(pb1.clone()) => {
-      pb1.finish_and_clear();
-    }
-  }
-
-  log::debug!("Commit message generated successfully");
-  pb1.finish_and_clear();
+  pb.finish_and_clear();
 
   Ok(())
 }
