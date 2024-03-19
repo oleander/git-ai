@@ -5,9 +5,8 @@ use async_openai::types::{
   AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus
 };
 use async_openai::config::OpenAIConfig;
-use git2::Config;
+use git2::{Config, Repository};
 use async_openai::error::OpenAIError;
-use git2::Repository;
 use indicatif::ProgressBar;
 use async_openai::Client;
 use tokio::time::sleep;
@@ -36,21 +35,20 @@ pub enum ChatError {
   OpenAI(#[from] OpenAIError)
 }
 
-fn instruction(language: String, max_length_of_commit: usize) -> String {
-  format!(
-    "
-    Your role is to create concise git commit messages based on user-provided git diffs. When crafting these messages:
-    - Use {language}.
-    - - Maximum Length: {max_length_of_commit} characters.
-    - Focus on detailing the changes and reasons behind them, ensuring clarity and relevance.
-    - Avoid including irrelevant or unnecessary details, such as translations, to maintain focus on the core changes.
-    Your responses should be direct and immediately usable in a git commit, crafted in present tense to fit git conventions.
-    You work primarily with git diffs, interpreting them to generate meaningful commit messages that succinctly summarize the changes.
-  "
-  )
-  .split_whitespace()
-  .collect::<Vec<&str>>()
-  .join(" ")
+fn instruction() -> String {
+  let language = &config::APP.language;
+  let max_length = config::APP.max_length;
+
+  format!("Create concise and meaningful git commit messages based on diffs, incorporating these practices:
+
+  - Language: {language}.
+  - Maximum Length: {max_length} characters for the summary.
+  - Structure: Begin with a clear summary. Use present tense.
+  - Clarity and Relevance: Focus on detailing the changes and their reasons. Exclude irrelevant details.
+  - Consistency: Maintain a consistent style of tense, punctuation, and capitalization.
+  - Review: Ensure the commit message accurately reflects the changes made and their purpose without leaving the description blank.
+
+  Refer to examples.jsonl for examples of how commit messages can be mapped to git diffs")
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -118,18 +116,18 @@ pub struct OpenAIResponse {
 
 // Create a new assistant
 async fn create_assistant(client: &Client<OpenAIConfig>) -> Result<AssistantObject, ChatError> {
-  let language = config::APP.language.clone();
-  let max_length_of_commit = config::APP.max_length;
   let model = config::APP.model.clone();
-  let instruction = instruction(language, max_length_of_commit);
+  let instruction = instruction();
+  let example_jsonl_id = "file-a8ghhy1FbWtBKEadAj5OHJWz";
 
   let tools = vec![AssistantTools::Code(AssistantToolsCode {
     r#type: "code_interpreter".to_string()
   })];
 
   let assistant_request = CreateAssistantRequestArgs::default()
-    .name("Git Commit Assistant 3")
+    .name("Git Commit Assistant")
     .instructions(&instruction)
+    .file_ids(vec![example_jsonl_id.to_string()])
     .tools(tools)
     .model(model)
     .build()?;
