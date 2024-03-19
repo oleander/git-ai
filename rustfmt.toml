@@ -23,8 +23,8 @@ reorder_modules = false
 newline_style = "Auto"
 group_imports = "StdExternalCrate"
 hard_tabs = false
-max_width = 90
-chain_width = 80
+max_width = 120
+chain_width = 120
 tab_spaces = 2
 
 
