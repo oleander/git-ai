@@ -41,13 +41,13 @@ fn main() -> Result<()> {
       continue;
     }
 
-    let weight = if commit.author().email() == Some(&user_email) {
-      1
-    } else if commit.committer().email() == Some(&user_email) {
-      1
-    } else {
-      0
-    };
+    // let weight = if commit.author().email() == Some(&user_email) {
+    //   1
+    // } else if commit.committer().email() == Some(&user_email) {
+    //   1
+    // } else {
+    //   0
+    // };
 
     let Ok(Some(content)) = generate_commit_diff(&repo, &commit) else {
       continue;

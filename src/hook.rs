@@ -7,7 +7,6 @@ use git2::{Diff, DiffFormat, DiffOptions, Repository, Tree};
 use anyhow::{Context, Result};
 use thiserror::Error;
 use clap::Parser;
-use tokio::io::AsyncReadExt;
 
 use crate::commit::ChatError;
 
