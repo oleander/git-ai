@@ -10,7 +10,9 @@ async fn main() -> Result<()> {
   config.remove("ai.thread-id").context("Failed to delete thread-id")?;
   config.snapshot().context("Failed to save config")?;
   let mut global_config = config.open_global().context("Failed to open global config")?;
-  global_config.remove("ai.assistant-id").context("Failed to delete assistant-id")?;
+  global_config
+    .remove("ai.assistant-id")
+    .context("Failed to delete assistant-id")?;
   global_config.snapshot().context("Failed to save global config")?;
   Ok(())
 }

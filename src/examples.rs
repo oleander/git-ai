@@ -60,8 +60,9 @@ pub async fn run(_args: &clap::ArgMatches) -> Result<()> {
 
   let current_dir = std::env::current_dir().context("Failed to get current directory")?;
   let repo = Repository::open_ext(&current_dir, RepositoryOpenFlags::empty(), Vec::<&Path>::new())?;
-  let commits =
-    repo.get_last_n_commits(MAX_NUMBER_OF_COMMITS).context("Failed to get last commits")?;
+  let commits = repo
+    .get_last_n_commits(MAX_NUMBER_OF_COMMITS)
+    .context("Failed to get last commits")?;
 
   // Create and configure the progress bar
   let spinner_style = ProgressStyle::default_spinner()

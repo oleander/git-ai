@@ -49,12 +49,14 @@ fn cli() -> Command {
               )
           )
           .subcommand(
-            Command::new("max-length").about("Sets the maximum length of the commit message").arg(
-              Arg::new("max-length")
-                .required(true)
-                .index(1)
-                .value_parser(clap::value_parser!(usize))
-            )
+            Command::new("max-length")
+              .about("Sets the maximum length of the commit message")
+              .arg(
+                Arg::new("max-length")
+                  .required(true)
+                  .index(1)
+                  .value_parser(clap::value_parser!(usize))
+              )
           )
           .subcommand(
             Command::new("openai-api-key").about("Sets the OpenAI API key").arg(

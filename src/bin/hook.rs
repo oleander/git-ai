@@ -39,7 +39,10 @@ async fn main() -> Result<()> {
     Some("HEAD") | None => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
     // git rebase
     Some(sha1) => {
-      repo.find_object(Oid::from_str(sha1)?, None).ok().and_then(|obj| obj.peel_to_tree().ok())
+      repo
+        .find_object(Oid::from_str(sha1)?, None)
+        .ok()
+        .and_then(|obj| obj.peel_to_tree().ok())
     },
   };
 

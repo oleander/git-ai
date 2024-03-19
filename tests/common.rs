@@ -68,12 +68,16 @@ impl GitFile {
 
     match self.find_last_commit() {
       Ok(parent_commit) => {
-        self.repo.commit(Some("HEAD"), &signature, &signature, "Commit message", &tree, &[
-          &parent_commit
-        ])?;
+        self
+          .repo
+          .commit(Some("HEAD"), &signature, &signature, "Commit message", &tree, &[
+            &parent_commit
+          ])?;
       },
       Err(_) => {
-        self.repo.commit(Some("HEAD"), &signature, &signature, "Initial commit", &tree, &[])?;
+        self
+          .repo
+          .commit(Some("HEAD"), &signature, &signature, "Initial commit", &tree, &[])?;
       }
     }
 
