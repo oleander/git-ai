@@ -30,3 +30,4 @@ where_single_line = false
 chain_width = 60
 edition = "2021"
 struct_lit_width = 0
+struct_variant_width = 0
