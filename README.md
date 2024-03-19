@@ -6,22 +6,30 @@ Git AI integrates ChatGPT with git hooks to automatically generate commit messag
 - Allocates a distinct thread for each project, enabling the assistant to remember context and enhance performance with each commit.
 - Establishes an isolated assistant instance on your computer, facilitating learning from all your projects and improving the quality of commit messages across your local development environment.
 
-```
+## TL;DR
+
+```bash
 # Install the binary
 cargo install git-ai
 
 # Configure the OpenAI API key
-git-ai config set openapi-api-key <your key>
+git-ai config set openai-api-key <your key>
 
 # While in a git repository, install the hook
 git-ai hook install
 
-# Stage your changes and commit
-git commit -A --no-edit
+# Stage your changes and commit & that's it!
+git commit --all --no-edit
 ```
 
-
 ## Installation
+
+### From Crates.io
+
+1. Ensure Rust and Cargo are installed on your system.
+2. `cargo install git-ai`
+3. `git-ai config set openapi-api-key <api-key>`
+4. `git-ai hook install`
 
 ### From Source
 
