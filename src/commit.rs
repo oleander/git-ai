@@ -133,7 +133,7 @@ impl Connection {
     let api_key = config::APP
       .openai_api_key
       .clone()
-      .context("Failed to get OpenAI API key, please run `git-ai config set openapi-api")?;
+      .context("Failed to get OpenAI API key, please run `git-ai config set openai-api")?;
     let config = OpenAIConfig::new().with_api_key(api_key);
     let client = Client::with_config(config);
 

@@ -28,7 +28,7 @@ git commit --all --no-edit
 
 1. Ensure Rust and Cargo are installed on your system.
 2. `cargo install git-ai`
-3. `git-ai config set openapi-api-key <api-key>`
+3. `git-ai config set openai-api-key <api-key>`
 4. `git-ai hook install`
 
 ### From Source
@@ -42,7 +42,7 @@ git commit --all --no-edit
 
 - Install the binary as per the instructions above.
 - Use `git ai hook install` to set up the Git hook.
-- Set the OpenAI API key with `git-ai config set openapi-api-key <api-key>`.
+- Set the OpenAI API key with `git-ai config set openai-api-key <api-key>`.
 - Use `git ai examples` to see some examples based on your previous commits. This does not change anything in your repository.
 
 ## CLI Options
