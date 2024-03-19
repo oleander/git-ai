@@ -1,29 +1,24 @@
 # git-ai [![Rust](https://github.com/oleander/git-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/oleander/git-ai/actions/workflows/ci.yml) [![Crates.io](https://img.shields.io/crates/v/git-ai.svg)](https://crates.io/crates/git-ai) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Git AI leverages ChatGPT alongside git hooks to automate the generation of commit messages from staged files. Simply stage your files and leave the commit message blank — Git AI will handle the rest.
+Git AI integrates ChatGPT with git hooks to automatically generate commit messages from your staged files. Leave your commit message blank, and Git AI will take it from there.
 
-- Uses OpenAI's Assistant API which has been specifically fine-tuned to transform git diffs into descriptive commit messages.
-- Maintains a unique thread for each project where git-ai is utilized, ensuring the assistant retains context and improves based on previous commits.
-- Creates a single assistant instance for your computer, allowing for cross-project learning and more insightful commit messages from your local machine's activities.
+- Utilizes the OpenAI Assistant API, fine-tuned to convert git diffs into comprehensive commit messages.
+- Allocates a distinct thread for each project, enabling the assistant to remember context and enhance performance with each commit.
+- Establishes an isolated assistant instance on your computer, facilitating learning from all your projects and improving the quality of commit messages across your local development environment.
 
-<table>
-  <tr>
-    <!-- This cell contains the GIF -->
-    <td style="width: 50%; text-align: center;">
-      <img src="resources/demo.gif" alt="demo" style="max-width: 100%;"/>
-    </td>
-    <td style="width: 50%; vertical-align: top;">
-      <pre><code>
+```
+# Install the binary
 cargo install git-ai
-git-ai config set openapi-api-key &lt;key&gt;
-cd &lt;your-git-repo&gt;
+
+# Configure the OpenAI API key
+git-ai config set openapi-api-key <your key>
+
+# While in a git repository, install the hook
 git-ai hook install
-git add .
-git commit --no-edit
-      </code></pre>
-    </td>
-  </tr>
-</table>
+
+# Stage your changes and commit
+git commit -A --no-edit
+```
 
 
 ## Installation
