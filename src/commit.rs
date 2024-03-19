@@ -167,7 +167,7 @@ struct Run {
 }
 
 impl Run {
-  pub async fn status(&self) -> Result<RunStatus, ChatError> {
+  pub async fn pull_status(&self) -> Result<RunStatus, ChatError> {
     Ok(
       self
         .connection
@@ -187,7 +187,7 @@ pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIRe
   let run = connection.create_run().await?;
 
   let result = loop {
-    match run.status().await? {
+    match run.pull_status().await? {
       RunStatus::Completed => {
         break connection.into_response().await;
       },
