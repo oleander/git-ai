@@ -70,6 +70,8 @@ async fn main() -> Result<()> {
     }
   }
 
+  pb1.finish_and_clear();
+
   Ok(())
 }
 
