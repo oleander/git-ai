@@ -70,6 +70,7 @@ async fn main() -> Result<()> {
     }
   }
 
+  log::debug!("Commit message generated successfully");
   pb1.finish_and_clear();
 
   Ok(())
