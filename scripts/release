@@ -1,21 +1,59 @@
-#!/bin/sh
+#!/usr/bin/env fish
 
-set -e
+# Fetch the current project version using cargo metadata and jq, then remove newline characters.
+set release (cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version' | tr -d '\n')
 
-VERSION=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version' | tr -d '\n')
-
-if [ -z "$VERSION" ]; then
-  echo "Failed to get version"
+if test -z "$release"
+  echo "=> Failed to get version from cargo metadata"
   exit 1
-fi
+end
 
-echo "Releasing $VERSION"
+echo "=> Running tests..."
+if not cargo test
+  echo "=> Tests has to pass before releasing"
+  exit 1
+end
 
-cargo update --aggressive
-git add Cargo.lock Cargo.toml
-git commit --no-edit
+# Attempt to update dependencies aggressively
+if not cargo update --aggressive
+  echo "=> Please bump the version in Cargo.toml before releasing"
+  exit 1
+end
 
-git tag -a v$VERSION -m "Release v$VERSION"
-git push origin v$VERSION
-git push origin main
-git push --tags
+# Add changes to git, auto-commit, and tag the release
+if not git add Cargo.lock Cargo.toml
+  echo "=> Could not add Cargo.lock and Cargo.toml to git"
+  echo "=> Make sure to bump the version in Cargo.toml before releasing"
+  exit 1
+end
+
+if not git commit -m "Update dependencies for version $release"
+  echo "=> Nothing to commit"
+  echo "=> Make sure to bump the version in Cargo.toml before releasing"
+  exit 1
+end
+
+# Create an annotated tag for the release
+if not git tag -a "v$release" -m "Release v$release"
+  echo "=> Could not create tag: v$release"
+  echo "=> Make sure to bump the version in Cargo.toml before releasing"
+  exit 1
+end
+
+# Push the changes and tags to the main branch
+if not git push origin "v$release"
+  echo "=> Git push failed for tag: v$release"
+  exit 1
+end
+
+if not git push origin main
+  echo "=> Git push failed for main branch"
+  exit 1
+end
+
+if not git push --tags
+  echo "=> Git push failed for tags"
+  exit 1
+end
+
+echo "=> Successfully released version $release!"
