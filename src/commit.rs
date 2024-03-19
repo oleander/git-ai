@@ -70,6 +70,7 @@ impl Session {
     })
   }
 
+  // Load the session from the repository
   pub async fn load_from_repo(repo: &Repository) -> anyhow::Result<Option<Self>> {
     log::debug!("Loading session from repo");
     let config = repo.config().context("Failed to load config")?;
