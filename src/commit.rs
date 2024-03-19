@@ -118,7 +118,7 @@ async fn create_assistant(client: &Client<OpenAIConfig>) -> Result<AssistantObje
   })];
 
   let assistant_request = CreateAssistantRequestArgs::default()
-    .name("Git Commit Assistant")
+    .name("Git Commit Assistant 2")
     .instructions(&instruction)
     .tools(tools)
     .model(model)
