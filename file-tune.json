@@ -1,8 +1,25 @@
 {
   "messages": [
     {
+      "content": "Clean up",
+      "role": "assistant",
+      "weight": 1.0
+    },
+    {
+      "content": "diff --git c/src/bin/finetune.rs c/src/bin/finetune.rs\nnew file mode 100644\nindex 0000000..7c7213c\n--- /dev/null\n+++ c/src/bin/finetune.rs\n@@ -0,0 +1,111 @@\nuse std::io::Write;\nuse std::fs::File;\n\nuse git2::{Commit, DiffFormat, DiffOptions, Repository};\nuse anyhow::{Context, Result};\nuse serde_json::json;\n\nstatic PROMPT: &str = \"Your role is to create concise git commit messages based on user-provided git diffs. When crafting these messages: - Focus on detailing the changes and reasons behind them, ensuring clarity and relevance. - Avoid including irrelevant or unnecessary details, such as translations, to maintain focus on the core changes. Your responses should be direct and immediately usable in a git commit, crafted in present tense to fit git conventions. You work primarily with git diffs, interpreting them to generate meaningful commit messages that succinctly summarize the changes.\";\n\nfn main() -> Result<()> {\n  env_logger::init();\n\n  let max_tokens = 16385;\n  let file_name = \"file-tune.json\";\n  let max_commits = 100;\n\n  let mut opts = DiffOptions::new();\n  opts\n    .ignore_whitespace_change(true)\n    .recurse_untracked_dirs(false)\n    .recurse_ignored_dirs(false)\n    .ignore_whitespace_eol(true)\n    .ignore_blank_lines(true)\n    .include_untracked(false)\n    .ignore_whitespace(true)\n    .indent_heuristic(false)\n    .ignore_submodules(true)\n    .include_ignored(false)\n    .interhunk_lines(0)\n    .context_lines(0)\n    .patience(true)\n    .minimal(true);\n\n  log::info!(\"Creating fine-tune file with {} commits and {} tokens\", max_commits, max_tokens);\n\n  let repo = Repository::open(\".\").context(\"Failed to open git repository\")?;\n  let config = repo.config().context(\"Couldn't access repository config\")?;\n  let user_email = config.get_string(\"user.email\").context(\"Couldn't get user email\")?;\n  let mut revwalk = repo.revwalk().context(\"Failed to create Revwalk\")?;\n  let mut file = File::create(file_name).context(\"Failed to create file\")?;\n\n  file.write_all(b\"\").context(\"Failed to write to file\")?;\n\n  revwalk.push_head().expect(\"Failed to push head\");\n\n  let mut curr_size = 0;\n  let mut commit_count = 0;\n\n  for oid in revwalk.take(max_commits) {\n    let oid = oid.context(\"Failed to get oid\")?;\n    let commit = repo.find_commit(oid).context(\"Couldn't find commit\")?;\n    let commit = if commit.author().email() == Some(&user_email) {\n      commit\n    } else if commit.committer().email() == Some(&user_email) {\n      commit\n    } else {\n      continue;\n    };\n\n    let Some(content) = generate_commit_diff(&repo, &commit, &opts) else {\n      continue;\n    };\n\n    let Some(commit) = commit.message() else {\n      continue;\n    };\n\n    let message = json!({\n      \"messages\": [\n        { \"role\": \"assistant\", \"content\": commit },\n        { \"role\": \"user\", \"content\": content },\n        { \"role\": \"system\", \"content\": PROMPT }\n      ]\n    });\n\n    let content = serde_json::to_string_pretty(&message)?;\n    curr_size += content.split_whitespace().count();\n\n    if curr_size > max_tokens {\n      log::warn!(\"Max tokens reached: {}\", max_tokens);\n      break;\n    }\n\n    commit_count += 1;\n    file.write_all(content.as_bytes()).context(\"Failed to write to file\")?;\n  }\n\n  log::info!(\"File {} created with {} commits\", file_name, commit_count);\n\n  Ok(())\n}\n\nfn generate_commit_diff(repo: &Repository, commit: &Commit, opts: &DiffOptions) -> Result<Option<String>> {\n  let parent = commit.parents().next().unwrap_or_else(|| commit.clone());\n  let tree = commit.tree().expect(\"Couldn't get commit tree\");\n  let parent_tree = parent.tree().expect(\"Couldn't get parent tree\");\n\n  let diff = repo.diff_tree_to_tree(Some(&parent_tree), Some(&tree), Some(&mut opts)).context(\"Failed to get diff\")?;\n\n  let mut patch: Vec<u8> = Vec::new();\n\n  #[rustfmt::skip]\n  diff.print(DiffFormat::Patch, |_, _, line| {\n    let content = line.content();\n    patch.extend_from_slice(content);\n    true\n  }).context(\"Failed to print diff\")?;\n\n  let content = String::from_utf8(patch).context(\"Failed to convert patch to string\")?;\n  if content.split_whitespace().count() > 500 { Ok(None) } else { Ok(Some(content)) }\n}\n",
+      "role": "user"
+    },
+    {
+      "content": "Your role is to create concise git commit messages based on user-provided git diffs. When crafting these messages: - Focus on detailing the changes and reasons behind them, ensuring clarity and relevance. - Avoid including irrelevant or unnecessary details, such as translations, to maintain focus on the core changes. Your responses should be direct and immediately usable in a git commit, crafted in present tense to fit git conventions. You work primarily with git diffs, interpreting them to generate meaningful commit messages that succinctly summarize the changes.",
+      "role": "system"
+    }
+  ]
+}{
+  "messages": [
+    {
       "content": "More clean up",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/bin/finetune.rs c/src/bin/finetune.rs\nindex 36e1601..f1071d3 100644\n--- c/src/bin/finetune.rs\n+++ c/src/bin/finetune.rs\n@@ -48,0 +49,4 @@ fn main() -> Result<()> {\n    let Some(commit) = commit.message() else {\n      continue;\n    };\n\n@@ -51,2 +55,2 @@ fn main() -> Result<()> {\n        { \"role\": \"user\", \"content\": generate_commit_diff(&repo, &commit)? },\n        { \"role\": \"assistant\", \"content\": commit.message().unwrap_or_default() },\n        { \"role\": \"assistant\", \"content\": commit },\n        { \"role\": \"user\", \"content\": content },\n@@ -61 +63 @@ fn main() -> Result<()> {\n    log::info!(\"Current size: {}\", curr_size);\n\n@@ -63 +65 @@ fn main() -> Result<()> {\n      log::info!(\"Max tokens reached: {}\", max_tokens);\n      log::warn!(\"Max tokens reached: {}\", max_tokens);\n@@ -67 +68,0 @@ fn main() -> Result<()> {\n    log::info!(\"Commit: {}\", commit.id());\n",
@@ -17,7 +34,8 @@
   "messages": [
     {
       "content": "Pass progressbar",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/bin/hook.rs c/src/bin/hook.rs\nindex da104d3..6c07a40 100644\n--- c/src/bin/hook.rs\n+++ c/src/bin/hook.rs\n@@ -51,0 +52 @@ async fn main() -> Result<()> {\n  let pb1 = pb.clone();\n@@ -53,8 +54,2 @@ async fn main() -> Result<()> {\n    let str = patch.to_string();\n    println!(\"Patch: {}\", str);\n    let commit_message = commit::generate(str, None).await.context(\"Failed to generate commit message\")?.response;\n\n    args\n      .commit_msg_file\n      .write(commit_message.trim().to_string())\n      .context(\"Failed to write commit message\")?;\n    let commit = commit::generate(patch.to_string(), None, pb1.into()).await?.response;\n    args.commit_msg_file.write(commit.trim().to_string()).unwrap();\ndiff --git c/src/commit.rs c/src/commit.rs\nindex 3ccae5f..a65f269 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -9,0 +10 @@ use async_openai::error::OpenAIError;\nuse indicatif::ProgressBar;\n@@ -53,4 +53,0 @@ fn instruction(language: String, max_length_of_commit: usize) -> String {\nfn user_prompt(diff: String) -> String {\n  format!(\"Staged changes: {diff}\").split_whitespace().collect::<Vec<&str>>().join(\" \")\n}\n\n@@ -184 +181,5 @@ impl Run {\npub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIResponse, ChatError> {\npub async fn generate(\n  diff: String, session: Option<Session>, progressbar: Option<ProgressBar>\n) -> Result<OpenAIResponse, ChatError> {\n  progressbar.clone().map(|pb| pb.set_message(\"Creating connection...\"));\n\n@@ -186 +187 @@ pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIRe\n  connection.create_message(&user_prompt(diff)).await?;\n  connection.create_message(&diff).await?;\n@@ -207 +208 @@ pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIRe\n        log::debug!(\"--- Run InProgress\");\n        progressbar.clone().map(|pb| pb.set_message(\"In progress...\"));\n@@ -210 +211 @@ pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIRe\n        log::debug!(\"--- Run Queued\");\n        progressbar.clone().map(|pb| pb.set_message(\"Queued...\"));\n@@ -213 +214 @@ pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIRe\n        log::debug!(\"--- Run Cancelling\");\n        progressbar.clone().map(|pb| pb.set_message(\"Cancelling...\"));\ndiff --git c/src/examples.rs c/src/examples.rs\nindex d9984b6..f7b0f52 100644\n--- c/src/examples.rs\n+++ c/src/examples.rs\n@@ -80 +80 @@ pub async fn run(_args: &clap::ArgMatches) -> Result<()> {\n    let commit_message = commit::generate(commit.show(&repo, max_tokens)?, None).await?.response;\n    let commit_message = commit::generate(commit.show(&repo, max_tokens)?, None, None).await?.response;\n",
@@ -32,7 +50,8 @@
   "messages": [
     {
       "content": "Clean up",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/commit.rs c/src/commit.rs\nindex 11bceaa..3ccae5f 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -170 +170 @@ impl Run {\n  pub async fn status(&self) -> Result<RunStatus, ChatError> {\n  pub async fn pull_status(&self) -> Result<RunStatus, ChatError> {\n@@ -190 +190 @@ pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIRe\n    match run.status().await? {\n    match run.pull_status().await? {\n",
@@ -47,7 +66,8 @@
   "messages": [
     {
       "content": "Clean up",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/commit.rs c/src/commit.rs\nindex c466fd4..11bceaa 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -57,10 +56,0 @@ fn user_prompt(diff: String) -> String {\nfn client() -> Result<Client<OpenAIConfig>, ChatError> {\n  let api_key = config::APP\n    .openai_api_key\n    .clone()\n    .context(\"Failed to get OpenAI API key, please run `git-ai config set openapi-api-key <api-key>`\")?;\n\n  let config = OpenAIConfig::new().with_api_key(api_key);\n  Ok(Client::with_config(config))\n}\n\n@@ -118 +108 @@ impl Connection {\n  pub fn new(session: Session) -> Result<Self, ChatError> {\n  pub async fn new(session: Option<Session>) -> Result<Self, ChatError> {\n@@ -125,0 +116,5 @@ impl Connection {\n    let session = match session {\n      Some(session) => session,\n      None => Session::new_from_client(&client).await?\n    };\n\n@@ -135 +130,3 @@ impl Connection {\n    Ok(Run { id: run.id, connection: self.clone() })\n    Ok(Run {\n      id: run.id, connection: self.clone()\n    })\n@@ -155,0 +153,8 @@ impl Connection {\n\n  async fn into_response(&self) -> Result<OpenAIResponse, ChatError> {\n    let message = self.last_message().await?;\n    let response = OpenAIResponse {\n      response: message, session: self.session.clone()\n    };\n    Ok(response)\n  }\n@@ -180,8 +185 @@ pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIRe\n  let client = client()?;\n\n  let session = match session {\n    Some(session) => session,\n    None => Session::new_from_client(&client).await?\n  };\n\n  let connection = Connection::new(session.clone())?;\n  let connection = Connection::new(session).await?;\n@@ -194 +192 @@ pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIRe\n        break connection.last_message().await;\n        break connection.into_response().await;\n@@ -222,4 +220 @@ pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIRe\n  Ok(OpenAIResponse {\n    response: result?,\n    session\n  })\n  result\n",
@@ -62,7 +82,8 @@
   "messages": [
     {
       "content": "Clean up",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/commit.rs c/src/commit.rs\nindex b39c89c..c466fd4 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -151 +151 @@ impl Connection {\n  async fn post_message(&self, message: &str) -> Result<(), ChatError> {\n  async fn create_message(&self, message: &str) -> Result<(), ChatError> {\n@@ -187 +186,0 @@ pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIRe\n  let message = user_prompt(diff);\n@@ -189 +188 @@ pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIRe\n  connection.post_message(&message).await?;\n  connection.create_message(&user_prompt(diff)).await?;\n",
@@ -77,7 +98,8 @@
   "messages": [
     {
       "content": "Clean up",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/commit.rs c/src/commit.rs\nindex e83623c..b39c89c 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -5 +5 @@ use async_openai::types::{\n  AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, MessageObject, RunObject, RunStatus\n  AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus\n",
@@ -92,7 +114,8 @@
   "messages": [
     {
       "content": "Innr messages",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/commit.rs c/src/commit.rs\nindex edba80a..e83623c 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -138,5 +138 @@ impl Connection {\n  async fn run_status(&self, run_id: &str) -> Result<RunStatus, ChatError> {\n    Ok(self.client.threads().runs(&self.session.thread_id).retrieve(run_id).await?.status)\n  }\n\n  async fn run_message(&self) -> Result<MessageObject, ChatError> {\n  async fn last_message(&self) -> Result<String, ChatError> {\n@@ -146 +142,7 @@ impl Connection {\n    Ok(self.client.threads().messages(&self.session.thread_id).retrieve(&message_id).await?)\n    let message = self.client.threads().messages(&self.session.thread_id).retrieve(&message_id).await?;\n    let content = message.content.get(0).unwrap();\n    let MessageContent::Text(text) = &content else {\n      return Err(ChatError::OpenAIError(\"Message content is not text\".to_string()));\n    };\n\n    Ok(text.text.value.clone())\n@@ -193,8 +195 @@ pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIRe\n        let message = connection.run_message().await?;\n        let content = message.content.get(0).unwrap();\n\n        let MessageContent::Text(text) = &content else {\n          break Err(ChatError::OpenAIError(\"Message content is not text\".to_string()));\n        };\n\n        break Ok(text.text.value.clone());\n        break connection.last_message().await;\n",
@@ -107,7 +130,8 @@
   "messages": [
     {
       "content": "Add run struct",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/rustfmt.toml c/rustfmt.toml\nindex 7f8709c..0586687 100644\n--- c/rustfmt.toml\n+++ c/rustfmt.toml\n@@ -26,2 +26,2 @@ hard_tabs = false\nmax_width = 90\nchain_width = 80\nmax_width = 120\nchain_width = 120\ndiff --git c/src/commit.rs c/src/commit.rs\nindex 1900345..edba80a 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -54,4 +54 @@ fn user_prompt(diff: String) -> String {\n  format!(\"Staged changes: {diff}\")\n    .split_whitespace()\n    .collect::<Vec<&str>>()\n    .join(\" \")\n  format!(\"Staged changes: {diff}\").split_whitespace().collect::<Vec<&str>>().join(\" \")\n@@ -87,0 +85 @@ impl Session {\n#[derive(Debug, Clone, PartialEq)]\n@@ -93,3 +91 @@ pub struct OpenAIResponse {\nasync fn create_assistant(\n  client: &Client<OpenAIConfig>\n) -> Result<AssistantObject, ChatError> {\nasync fn create_assistant(client: &Client<OpenAIConfig>) -> Result<AssistantObject, ChatError> {\n@@ -114,0 +111 @@ async fn create_assistant(\n#[derive(Debug, Clone)]\n@@ -122,3 +119,4 @@ impl Connection {\n    let api_key = config::APP.openai_api_key.clone().context(\n      \"Failed to get OpenAI API key, please run `git-ai config set openapi-api\"\n    )?;\n    let api_key = config::APP\n      .openai_api_key\n      .clone()\n      .context(\"Failed to get OpenAI API key, please run `git-ai config set openapi-api\")?;\n@@ -134,5 +132,4 @@ impl Connection {\n  async fn create_run(&self) -> Result<RunObject, ChatError> {\n    let request = CreateRunRequestArgs::default()\n      .assistant_id(self.session.clone().assistant_id)\n      .build()?;\n    Ok(self.client.threads().runs(&self.session.thread_id).create(request).await?)\n  async fn create_run(&self) -> Result<Run, ChatError> {\n    let request = CreateRunRequestArgs::default().assistant_id(self.session.clone().assistant_id).build()?;\n    let run = self.client.threads().runs(&self.session.thread_id).create(request).await?;\n    Ok(Run { id: run.id, connection: self.clone() })\n@@ -142,9 +139 @@ impl Connection {\n    Ok(\n      self\n        .client\n        .threads()\n        .runs(&self.session.thread_id)\n        .retrieve(run_id)\n        .await?\n        .status\n    )\n    Ok(self.client.threads().runs(&self.session.thread_id).retrieve(run_id).await?.status)\n@@ -153 +142 @@ impl Connection {\n  async fn run_message(&self, run_id: &str) -> Result<MessageObject, ChatError> {\n  async fn run_message(&self) -> Result<MessageObject, ChatError> {\n@@ -155,2 +144 @@ impl Connection {\n    let response =\n      self.client.threads().messages(&self.session.thread_id).list(&query).await?;\n    let response = self.client.threads().messages(&self.session.thread_id).list(&query).await?;\n@@ -158,8 +146 @@ impl Connection {\n    Ok(\n      self\n        .client\n        .threads()\n        .messages(&self.session.thread_id)\n        .retrieve(&message_id)\n        .await?\n    )\n    Ok(self.client.threads().messages(&self.session.thread_id).retrieve(&message_id).await?)\n@@ -169,2 +150 @@ impl Connection {\n    let message =\n      CreateMessageRequestArgs::default().role(\"user\").content(message).build()?;\n    let message = CreateMessageRequestArgs::default().role(\"user\").content(message).build()?;\n@@ -176,3 +156,22 @@ impl Connection {\npub async fn generate(\n  diff: String, session: Option<Session>\n) -> Result<OpenAIResponse, ChatError> {\n#[derive(Debug, Clone)]\nstruct Run {\n  id:         String,\n  connection: Connection\n}\n\nimpl Run {\n  pub async fn status(&self) -> Result<RunStatus, ChatError> {\n    Ok(\n      self\n        .connection\n        .client\n        .threads()\n        .runs(&self.connection.session.thread_id)\n        .retrieve(self.id.as_str())\n        .await?\n        .status\n    )\n  }\n}\n\npub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIResponse, ChatError> {\n@@ -186,2 +184,0 @@ pub async fn generate(\n  let thread_id = session.clone().thread_id;\n\n@@ -190 +187 @@ pub async fn generate(\n  connection.post_message(&thread_id, &message).await?;\n  connection.post_message(&message).await?;\n@@ -194 +191 @@ pub async fn generate(\n    match connection.run_status(&run.id).await? {\n    match run.status().await? {\n@@ -196 +193 @@ pub async fn generate(\n        let message = connection.run_message(&run.id).await?;\n        let message = connection.run_message().await?;\n",
@@ -122,7 +146,8 @@
   "messages": [
     {
       "content": "Add run message",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/commit.rs c/src/commit.rs\nindex 8615369..1900345 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -166,0 +167,7 @@ impl Connection {\n\n  async fn post_message(&self, message: &str) -> Result<(), ChatError> {\n    let message =\n      CreateMessageRequestArgs::default().role(\"user\").content(message).build()?;\n    self.client.threads().messages(&self.session.thread_id).create(message).await?;\n    Ok(())\n  }\n@@ -181,7 +188 @@ pub async fn generate(\n  let message = CreateMessageRequestArgs::default()\n    .role(\"user\")\n    .content(user_prompt(diff))\n    .build()?;\n\n  client.threads().messages(&thread_id).create(message).await?;\n\n  let message = user_prompt(diff);\n@@ -188,0 +190 @@ pub async fn generate(\n  connection.post_message(&thread_id, &message).await?;\n",
@@ -137,7 +162,8 @@
   "messages": [
     {
       "content": "Add run message",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/commit.rs c/src/commit.rs\nindex 9b4cc5f..8615369 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -5 +5 @@ use async_openai::types::{\n  AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunObject, RunStatus\n  AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, MessageObject, RunObject, RunStatus\n@@ -122 +122,3 @@ impl Connection {\n    let api_key = config::APP.openai_api_key.clone().context(\"Failed to get OpenAI API key, please run `git-ai config set openapi-api\")?;\n    let api_key = config::APP.openai_api_key.clone().context(\n      \"Failed to get OpenAI API key, please run `git-ai config set openapi-api\"\n    )?;\n@@ -140 +142,24 @@ impl Connection {\n    Ok(self.client.threads().runs(&self.session.thread_id).retrieve(run_id).await?.status)\n    Ok(\n      self\n        .client\n        .threads()\n        .runs(&self.session.thread_id)\n        .retrieve(run_id)\n        .await?\n        .status\n    )\n  }\n\n  async fn run_message(&self, run_id: &str) -> Result<MessageObject, ChatError> {\n    let query = [(\"limit\", \"1\")];\n    let response =\n      self.client.threads().messages(&self.session.thread_id).list(&query).await?;\n    let message_id = response.data.get(0).unwrap().id.clone();\n    Ok(\n      self\n        .client\n        .threads()\n        .messages(&self.session.thread_id)\n        .retrieve(&message_id)\n        .await?\n    )\n@@ -147 +171,0 @@ pub async fn generate(\n  let query = [(\"limit\", \"1\")];\n@@ -170,3 +194 @@ pub async fn generate(\n        let response = client.threads().messages(&thread_id).list(&query).await?;\n        let message_id = response.data.get(0).unwrap().id.clone();\n        let message = client.threads().messages(&thread_id).retrieve(&message_id).await?;\n        let message = connection.run_message(&run.id).await?;\n",
@@ -152,7 +178,8 @@
   "messages": [
     {
       "content": "Add run status",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/commit.rs c/src/commit.rs\nindex 5149118..9b4cc5f 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -137,0 +138,4 @@ impl Connection {\n\n  async fn run_status(&self, run_id: &str) -> Result<RunStatus, ChatError> {\n    Ok(self.client.threads().runs(&self.session.thread_id).retrieve(run_id).await?.status)\n  }\n@@ -164 +168 @@ pub async fn generate(\n    match client.threads().runs(&thread_id).retrieve(&run.id).await?.status {\n    match connection.run_status(&run.id).await? {\n",
@@ -167,7 +194,8 @@
   "messages": [
     {
       "content": "Create connection",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/commit.rs c/src/commit.rs\nindex 58ff33b..5149118 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -5 +5 @@ use async_openai::types::{\n  AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus\n  AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunObject, RunStatus\n@@ -114,0 +115,25 @@ async fn create_assistant(\nstruct Connection {\n  client:  Client<OpenAIConfig>,\n  session: Session\n}\n\nimpl Connection {\n  pub fn new(session: Session) -> Result<Self, ChatError> {\n    let api_key = config::APP.openai_api_key.clone().context(\"Failed to get OpenAI API key, please run `git-ai config set openapi-api\")?;\n    let config = OpenAIConfig::new().with_api_key(api_key);\n    let client = Client::with_config(config);\n\n    Ok(Connection {\n      client,\n      session\n    })\n  }\n\n  async fn create_run(&self) -> Result<RunObject, ChatError> {\n    let request = CreateRunRequestArgs::default()\n      .assistant_id(self.session.clone().assistant_id)\n      .build()?;\n    Ok(self.client.threads().runs(&self.session.thread_id).create(request).await?)\n  }\n}\n\n@@ -127 +151,0 @@ pub async fn generate(\n  let assistant_id = session.clone().assistant_id;\n@@ -136,2 +160,2 @@ pub async fn generate(\n  let request = CreateRunRequestArgs::default().assistant_id(assistant_id).build()?;\n  let run = client.threads().runs(&thread_id).create(request).await?;\n  let connection = Connection::new(session.clone())?;\n  let run = connection.create_run().await?;\n",
@@ -182,7 +210,8 @@
   "messages": [
     {
       "content": "Clean up",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/commit.rs c/src/commit.rs\nindex 3cedfd0..58ff33b 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -115 +114,0 @@ async fn create_assistant(\n// Generate a commit message using OpenAI's API using the provided git diff\n@@ -137,2 +136,2 @@ pub async fn generate(\n  let run_request = CreateRunRequestArgs::default().assistant_id(assistant_id).build()?;\n  let run = client.threads().runs(&thread_id).create(run_request).await?;\n  let request = CreateRunRequestArgs::default().assistant_id(assistant_id).build()?;\n  let run = client.threads().runs(&thread_id).create(request).await?;\n@@ -141,2 +140 @@ pub async fn generate(\n    let run = client.threads().runs(&thread_id).retrieve(&run.id).await?;\n    match run.status {\n    match client.threads().runs(&thread_id).retrieve(&run.id).await?.status {\n",
@@ -197,7 +226,8 @@
   "messages": [
     {
       "content": "Refactor session",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/commit.rs c/src/commit.rs\nindex 5d3ade6..3cedfd0 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -75,0 +76,12 @@ pub struct Session {\nimpl Session {\n  pub async fn new_from_client(client: &Client<OpenAIConfig>) -> Result<Self, ChatError> {\n    let assistant = create_assistant(client).await?;\n    let thread_request = CreateThreadRequestArgs::default().build()?;\n    let thread = client.threads().create(thread_request).await?;\n\n    Ok(Session {\n      thread_id: thread.id, assistant_id: assistant.id\n    })\n  }\n}\n\n@@ -112,9 +124 @@ pub async fn generate(\n    None => {\n      let assistant = create_assistant(&client).await?;\n      let thread_request = CreateThreadRequestArgs::default().build()?;\n      let thread = client.threads().create(thread_request).await?;\n\n      Session {\n        thread_id: thread.id, assistant_id: assistant.id\n      }\n    }\n    None => Session::new_from_client(&client).await?\n",
@@ -212,7 +242,8 @@
   "messages": [
     {
       "content": "Clean up sleep",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/rustfmt.toml c/rustfmt.toml\nindex f6a957f..7f8709c 100644\n--- c/rustfmt.toml\n+++ c/rustfmt.toml\n@@ -26,2 +26,2 @@ hard_tabs = false\nmax_width = 130\nchain_width = 90\nmax_width = 90\nchain_width = 80\ndiff --git c/src/commit.rs c/src/commit.rs\nindex 12321ba..5d3ade6 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -0,0 +1 @@\nuse std::time::Duration;\n@@ -10,0 +12 @@ use anyhow::Context;\nuse tokio::time::sleep;\n@@ -52 +54,4 @@ fn user_prompt(diff: String) -> String {\n  format!(\"Staged changes: {diff}\").split_whitespace().collect::<Vec<&str>>().join(\" \")\n  format!(\"Staged changes: {diff}\")\n    .split_whitespace()\n    .collect::<Vec<&str>>()\n    .join(\" \")\n@@ -76 +81,3 @@ pub struct OpenAIResponse {\nasync fn create_assistant(client: &Client<OpenAIConfig>) -> Result<AssistantObject, ChatError> {\nasync fn create_assistant(\n  client: &Client<OpenAIConfig>\n) -> Result<AssistantObject, ChatError> {\n@@ -97 +104,3 @@ async fn create_assistant(client: &Client<OpenAIConfig>) -> Result<AssistantObje\npub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIResponse, ChatError> {\npub async fn generate(\n  diff: String, session: Option<Session>\n) -> Result<OpenAIResponse, ChatError> {\n@@ -117 +126,4 @@ pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIRe\n  let message = CreateMessageRequestArgs::default().role(\"user\").content(user_prompt(diff)).build()?;\n  let message = CreateMessageRequestArgs::default()\n    .role(\"user\")\n    .content(user_prompt(diff))\n    .build()?;\n@@ -161 +173,2 @@ pub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIRe\n    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;\n\n    sleep(Duration::from_millis(300)).await;\n",
@@ -227,7 +258,8 @@
   "messages": [
     {
       "content": "Use sessions",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/commit.rs c/src/commit.rs\nindex 27b2ed3..12321ba 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -4 +4 @@ use async_openai::types::{\n  AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus\n  AssistantObject, AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus\n@@ -65 +65,2 @@ fn client() -> Result<Client<OpenAIConfig>, ChatError> {\npub struct OpenAIResponse {\n#[derive(Debug, Clone, PartialEq)]\npub struct Session {\n@@ -66,0 +68,5 @@ pub struct OpenAIResponse {\n  pub assistant_id: String\n}\n\npub struct OpenAIResponse {\n  pub session:  Session,\n@@ -70,2 +76 @@ pub struct OpenAIResponse {\n// Generate a commit message using OpenAI's API using the provided git diff\npub async fn generate(diff: String, thread_id: Option<String>) -> Result<OpenAIResponse, ChatError> {\nasync fn create_assistant(client: &Client<OpenAIConfig>) -> Result<AssistantObject, ChatError> {\n@@ -75,9 +79,0 @@ pub async fn generate(diff: String, thread_id: Option<String>) -> Result<OpenAIR\n  let query = [(\"limit\", \"1\")];\n  let thread_request = CreateThreadRequestArgs::default().build()?;\n  let client = client()?;\n\n  let thread = match thread_id {\n    Some(id) => client.threads().retrieve(&id).await?,\n    None => client.threads().create(thread_request.clone()).await?\n  };\n\n@@ -96,2 +93,24 @@ pub async fn generate(diff: String, thread_id: Option<String>) -> Result<OpenAIR\n  let assistant = client.assistants().create(assistant_request).await?;\n  let assistant_id = &assistant.id;\n  Ok(client.assistants().create(assistant_request).await?)\n}\n\n// Generate a commit message using OpenAI's API using the provided git diff\npub async fn generate(diff: String, session: Option<Session>) -> Result<OpenAIResponse, ChatError> {\n  let query = [(\"limit\", \"1\")];\n  let client = client()?;\n\n  let session = match session {\n    Some(session) => session,\n    None => {\n      let assistant = create_assistant(&client).await?;\n      let thread_request = CreateThreadRequestArgs::default().build()?;\n      let thread = client.threads().create(thread_request).await?;\n\n      Session {\n        thread_id: thread.id, assistant_id: assistant.id\n      }\n    }\n  };\n\n  let thread_id = session.clone().thread_id;\n  let assistant_id = session.clone().assistant_id;\n\n@@ -99 +118,3 @@ pub async fn generate(diff: String, thread_id: Option<String>) -> Result<OpenAIR\n  let _message_obj = client.threads().messages(&thread.id).create(message).await?;\n\n  client.threads().messages(&thread_id).create(message).await?;\n\n@@ -101 +122 @@ pub async fn generate(diff: String, thread_id: Option<String>) -> Result<OpenAIR\n  let run = client.threads().runs(&thread.id).create(run_request).await?;\n  let run = client.threads().runs(&thread_id).create(run_request).await?;\n@@ -104 +125 @@ pub async fn generate(diff: String, thread_id: Option<String>) -> Result<OpenAIR\n    let run = client.threads().runs(&thread.id).retrieve(&run.id).await?;\n    let run = client.threads().runs(&thread_id).retrieve(&run.id).await?;\n@@ -107 +128 @@ pub async fn generate(diff: String, thread_id: Option<String>) -> Result<OpenAIR\n        let response = client.threads().messages(&thread.id).list(&query).await?;\n        let response = client.threads().messages(&thread_id).list(&query).await?;\n@@ -109 +130 @@ pub async fn generate(diff: String, thread_id: Option<String>) -> Result<OpenAIR\n        let message = client.threads().messages(&thread.id).retrieve(&message_id).await?;\n        let message = client.threads().messages(&thread_id).retrieve(&message_id).await?;\n@@ -144,2 +165,2 @@ pub async fn generate(diff: String, thread_id: Option<String>) -> Result<OpenAIR\n    thread_id: thread.id,\n    response: result?\n    response: result?,\n    session\n",
@@ -242,7 +274,8 @@
   "messages": [
     {
       "content": "Allow threads to be continued",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/bin/hook.rs c/src/bin/hook.rs\nindex 27556db..da104d3 100644\n--- c/src/bin/hook.rs\n+++ c/src/bin/hook.rs\n@@ -55 +55 @@ async fn main() -> Result<()> {\n    let commit_message = commit::generate(str).await.context(\"Failed to generate commit message\")?;\n    let commit_message = commit::generate(str, None).await.context(\"Failed to generate commit message\")?.response;\ndiff --git c/src/commit.rs c/src/commit.rs\nindex 25c6ca9..27b2ed3 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -63,0 +64,6 @@ fn client() -> Result<Client<OpenAIConfig>, ChatError> {\n\npub struct OpenAIResponse {\n  pub thread_id: String,\n  pub response:  String\n}\n\n@@ -65 +71 @@ fn client() -> Result<Client<OpenAIConfig>, ChatError> {\npub async fn generate(diff: String) -> Result<String, ChatError> {\npub async fn generate(diff: String, thread_id: Option<String>) -> Result<OpenAIResponse, ChatError> {\n@@ -72 +78,6 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n  let thread = client.threads().create(thread_request.clone()).await?;\n\n  let thread = match thread_id {\n    Some(id) => client.threads().retrieve(&id).await?,\n    None => client.threads().create(thread_request.clone()).await?\n  };\n\n@@ -133,4 +143,4 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n  client.assistants().delete(assistant_id).await?;\n  client.threads().delete(&thread.id).await?;\n\n  result\n  Ok(OpenAIResponse {\n    thread_id: thread.id,\n    response: result?\n  })\ndiff --git c/src/examples.rs c/src/examples.rs\nindex 7264d44..d9984b6 100644\n--- c/src/examples.rs\n+++ c/src/examples.rs\n@@ -80 +80 @@ pub async fn run(_args: &clap::ArgMatches) -> Result<()> {\n    let commit_message = commit::generate(commit.show(&repo, max_tokens)?).await?;\n    let commit_message = commit::generate(commit.show(&repo, max_tokens)?, None).await?.response;\n",
@@ -257,7 +290,8 @@
   "messages": [
     {
       "content": "Remove print statement",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/commit.rs c/src/commit.rs\nindex 190fdd1..25c6ca9 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -109 +108,0 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n        println!(\"--- Run Failed: {:#?}\", run);\n",
@@ -272,7 +306,8 @@
   "messages": [
     {
       "content": "Proper loop fetch",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/commit.rs c/src/commit.rs\nindex 6341436..190fdd1 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -11 +10,0 @@ use anyhow::Context;\nuse anyhow::Result;\n@@ -56 +55 @@ fn user_prompt(diff: String) -> String {\nfn client() -> Result<Client<OpenAIConfig>> {\nfn client() -> Result<Client<OpenAIConfig>, ChatError> {\n@@ -102,5 +101,3 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n        let text = match content {\n          MessageContent::Text(text) => text.text.value.clone(),\n          MessageContent::ImageFile(_) => {\n            panic!(\"imaged are not supported in the terminal\")\n          }\n\n        let MessageContent::Text(text) = &content else {\n          break Err(ChatError::OpenAIError(\"Message content is not text\".to_string()));\n@@ -109 +106 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n        break Ok(text);\n        break Ok(text.text.value.clone());\n@@ -115,6 +111,0 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n      RunStatus::Queued => {\n        println!(\"--- Run Queued\");\n      },\n      RunStatus::Cancelling => {\n        println!(\"--- Run Cancelling\");\n      },\n@@ -122 +113 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n        println!(\"--- Run Cancelled\");\n        break Err(ChatError::OpenAIError(\"Run cancelled\".to_string()));\n@@ -125 +116 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n        println!(\"--- Run Expired\");\n        break Err(ChatError::OpenAIError(\"Run expired\".to_string()));\n@@ -128 +119 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n        println!(\"--- Run Requires Action\");\n        break Err(ChatError::OpenAIError(\"Run requires action\".to_string()));\n@@ -131 +122,7 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n        println!(\"--- Waiting for response...\");\n        log::debug!(\"--- Run InProgress\");\n      },\n      RunStatus::Queued => {\n        log::debug!(\"--- Run Queued\");\n      },\n      RunStatus::Cancelling => {\n        log::debug!(\"--- Run Cancelling\");\n",
@@ -287,7 +322,8 @@
   "messages": [
     {
       "content": "Use anyhow",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/commit.rs c/src/commit.rs\nindex b472d45..6341436 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -4 +4 @@ use async_openai::types::{\n  CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus\n  AssistantTools, AssistantToolsCode, CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus\n@@ -10,0 +11 @@ use anyhow::Context;\nuse anyhow::Result;\n@@ -55,4 +56 @@ fn user_prompt(diff: String) -> String {\n// Generate a commit message using OpenAI's API using the provided git diff\npub async fn generate(diff: String) -> Result<String, ChatError> {\n  log::debug!(\"Generating commit message using config: {:?}\", config::APP);\n\nfn client() -> Result<Client<OpenAIConfig>> {\n@@ -63 +61,6 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n  let max_length_of_commit = config::APP.max_length;\n\n  let config = OpenAIConfig::new().with_api_key(api_key);\n  Ok(Client::with_config(config))\n}\n// Generate a commit message using OpenAI's API using the provided git diff\npub async fn generate(diff: String) -> Result<String, ChatError> {\n@@ -64,0 +68 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n  let max_length_of_commit = config::APP.max_length;\n@@ -66,3 +69,0 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n\n  let config = OpenAIConfig::new().with_api_key(api_key);\n  let client = Client::with_config(config);\n@@ -70,0 +72 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n  let client = client()?;\n@@ -72,0 +75,5 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n\n  let tools = vec![AssistantTools::Code(AssistantToolsCode {\n    r#type: \"code_interpreter\".to_string()\n  })];\n\n@@ -75,0 +83 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n    .tools(tools)\n@@ -82,2 +89,0 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n\n  //attach message to the thread\n",
@@ -302,7 +338,8 @@
   "messages": [
     {
       "content": "Fix lint errors",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/commit.rs c/src/commit.rs\nindex 8cd6023..b472d45 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -90 +89,0 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n  let mut awaiting_response = true;\n@@ -95 +93,0 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n        awaiting_response = false;\n@@ -110 +107,0 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n        break Err(ChatError::OpenAIError(\"Run failed\".to_string()));\n@@ -111,0 +109 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n        break Err(ChatError::OpenAIError(\"Run failed\".to_string()));\n",
@@ -317,7 +354,8 @@
   "messages": [
     {
       "content": "First version of assistant",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/commit.rs c/src/commit.rs\nindex dc2e2db..8cd6023 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -4 +4 @@ use async_openai::types::{\n  ChatCompletionNamedToolChoice, ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageArgs, ChatCompletionTool, ChatCompletionToolArgs, ChatCompletionToolChoiceOption, ChatCompletionToolType, CreateAssistantRequestArgs, CreateChatCompletionRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus\n  CreateAssistantRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus\n",
@@ -332,7 +370,8 @@
   "messages": [
     {
       "content": "First version of assistant",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/commit.rs c/src/commit.rs\nindex 7018e80..dc2e2db 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -2,0 +3,3 @@ use std::{io, str};\nuse async_openai::types::{\n  ChatCompletionNamedToolChoice, ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageArgs, ChatCompletionTool, ChatCompletionToolArgs, ChatCompletionToolChoiceOption, ChatCompletionToolType, CreateAssistantRequestArgs, CreateChatCompletionRequestArgs, CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, MessageContent, RunStatus\n};\n@@ -8,3 +10,0 @@ use anyhow::Context;\nuse async_openai::types::{\n  ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs\n};\n@@ -34,2 +34,2 @@ pub enum ChatError {\nfn system_prompt(language: String, max_length_of_commit: usize) -> Result<ChatCompletionRequestSystemMessage, OpenAIError> {\n  let payload = format!(\nfn instruction(language: String, max_length_of_commit: usize) -> String {\n  format!(\n@@ -49,4 +48 @@ fn system_prompt(language: String, max_length_of_commit: usize) -> Result<ChatCo\n  .join(\" \");\n\n  // TODO: Check out the options\n  ChatCompletionRequestSystemMessageArgs::default().content(payload).build()\n  .join(\" \")\n@@ -55,4 +51,2 @@ fn system_prompt(language: String, max_length_of_commit: usize) -> Result<ChatCo\nfn user_prompt(diff: String) -> Result<ChatCompletionRequestUserMessage, OpenAIError> {\n  let payload = format!(\"Staged changes: {diff}\").split_whitespace().collect::<Vec<&str>>().join(\" \");\n\n  ChatCompletionRequestUserMessageArgs::default().content(payload).build()\nfn user_prompt(diff: String) -> String {\n  format!(\"Staged changes: {diff}\").split_whitespace().collect::<Vec<&str>>().join(\" \")\n@@ -73,5 +66,0 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n  let messages: Vec<ChatCompletionRequestMessage> =\n    vec![system_prompt(language, max_length_of_commit)?.into(), user_prompt(diff)?.into()];\n\n  log::debug!(\"Sending request to OpenAI API: {:?}\", messages);\n\n@@ -79,0 +69,9 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n  let query = [(\"limit\", \"1\")];\n  let thread_request = CreateThreadRequestArgs::default().build()?;\n  let thread = client.threads().create(thread_request.clone()).await?;\n  let instruction = instruction(language, max_length_of_commit);\n  let assistant_request = CreateAssistantRequestArgs::default()\n    .name(\"Git Commit Assistant\")\n    .instructions(&instruction)\n    .model(model)\n    .build()?;\n@@ -81,12 +79,60 @@ pub async fn generate(diff: String) -> Result<String, ChatError> {\n  log::debug!(\"Creating chat completion request\");\n  let request = CreateChatCompletionRequestArgs::default().messages(messages).model(model).n(1).build()?;\n\n  log::debug!(\"Sending request to OpenAI API\");\n  client\n    .chat()\n    .create(request)\n    .await?\n    .choices\n    .first()\n    .and_then(|choice| choice.message.content.clone())\n    .ok_or_else(|| ChatError::OpenAIError(\"Failed to get response from OpenAI\".to_string()))\n  let assistant = client.assistants().create(assistant_request).await?;\n  let assistant_id = &assistant.id;\n  let message = CreateMessageRequestArgs::default().role(\"user\").content(user_prompt(diff)).build()?;\n\n  //attach message to the thread\n  let _message_obj = client.threads().messages(&thread.id).create(message).await?;\n\n  let run_request = CreateRunRequestArgs::default().assistant_id(assistant_id).build()?;\n\n  let run = client.threads().runs(&thread.id).create(run_request).await?;\n\n  let mut awaiting_response = true;\n  let result = loop {\n    let run = client.threads().runs(&thread.id).retrieve(&run.id).await?;\n    match run.status {\n      RunStatus::Completed => {\n        awaiting_response = false;\n        let response = client.threads().messages(&thread.id).list(&query).await?;\n        let message_id = response.data.get(0).unwrap().id.clone();\n        let message = client.threads().messages(&thread.id).retrieve(&message_id).await?;\n        let content = message.content.get(0).unwrap();\n        let text = match content {\n          MessageContent::Text(text) => text.text.value.clone(),\n          MessageContent::ImageFile(_) => {\n            panic!(\"imaged are not supported in the terminal\")\n          }\n        };\n\n        break Ok(text);\n      },\n      RunStatus::Failed => {\n        break Err(ChatError::OpenAIError(\"Run failed\".to_string()));\n        println!(\"--- Run Failed: {:#?}\", run);\n      },\n      RunStatus::Queued => {\n        println!(\"--- Run Queued\");\n      },\n      RunStatus::Cancelling => {\n        println!(\"--- Run Cancelling\");\n      },\n      RunStatus::Cancelled => {\n        println!(\"--- Run Cancelled\");\n      },\n      RunStatus::Expired => {\n        println!(\"--- Run Expired\");\n      },\n      RunStatus::RequiresAction => {\n        println!(\"--- Run Requires Action\");\n      },\n      RunStatus::InProgress => {\n        println!(\"--- Waiting for response...\");\n      }\n    }\n    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;\n  };\n\n  client.assistants().delete(assistant_id).await?;\n  client.threads().delete(&thread.id).await?;\n\n  result\n",
@@ -347,7 +386,8 @@
   "messages": [
     {
       "content": "Handle unwrap case",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/hook.rs c/src/hook.rs\nindex 041e4dd..68bddf0 100644\n--- c/src/hook.rs\n+++ c/src/hook.rs\n@@ -106 +106 @@ impl PatchDiff for Diff<'_> {\n    }).unwrap();\n    }).context(\"Failed to print diff\")?;\n",
@@ -362,7 +402,8 @@
   "messages": [
     {
       "content": "Fix edge case",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/Cargo.toml c/Cargo.toml\nindex deaa88a..363c4a3 100644\n--- c/Cargo.toml\n+++ c/Cargo.toml\n@@ -69,4 +68,0 @@ opt-level = 3\n\n[env]\nRUST_LOG = \"info\"\n\ndiff --git c/src/hook.rs c/src/hook.rs\nindex 04b1174..041e4dd 100644\n--- c/src/hook.rs\n+++ c/src/hook.rs\n@@ -76 +76,6 @@ impl PatchDiff for Diff<'_> {\n    let tokens_per_file = (max_token_count / number_of_files.max(1)) - truncated_message.len();\n\n    if number_of_files == 0 {\n      return Err(HookError::EmptyDiffOutput.into());\n    }\n\n    let tokens_per_file = (max_token_count / number_of_files) - truncated_message.len();\n",
@@ -377,7 +418,8 @@
   "messages": [
     {
       "content": "Clean up",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/hook.rs c/src/hook.rs\nindex e527000..04b1174 100644\n--- c/src/hook.rs\n+++ c/src/hook.rs\n@@ -43 +43,6 @@ impl DiffDeltaPath for git2::DiffDelta<'_> {\n    self.new_file().path().or_else(|| self.old_file().path()).map(PathBuf::from).unwrap_or_default()\n    self\n      .new_file()\n      .path()\n      .or_else(|| self.old_file().path())\n      .map(PathBuf::from)\n      .unwrap_or_default()\n@@ -81,2 +86,2 @@ impl PatchDiff for Diff<'_> {\n      let path = diff.path();\n      let Some(tokens) = token_table.get_mut(&path) else {\n      let diff_path = diff.path();\n      let Some(tokens) = token_table.get_mut(&diff_path) else {\n@@ -92 +97 @@ impl PatchDiff for Diff<'_> {\n        token_table.remove(&path);\n        token_table.remove(&diff_path);\n",
@@ -392,7 +434,8 @@
   "messages": [
     {
       "content": "Opt path locator",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/hook.rs c/src/hook.rs\nindex a086dfc..e527000 100644\n--- c/src/hook.rs\n+++ c/src/hook.rs\n@@ -36,0 +37,10 @@ impl FilePath for PathBuf {\ntrait DiffDeltaPath {\n  fn path(&self) -> PathBuf;\n}\n\nimpl DiffDeltaPath for git2::DiffDelta<'_> {\n  fn path(&self) -> PathBuf {\n    self.new_file().path().or_else(|| self.old_file().path()).map(PathBuf::from).unwrap_or_default()\n  }\n}\n\n@@ -66,7 +76 @@ impl PatchDiff for Diff<'_> {\n      let path = delta\n        .new_file()\n        .path()\n        .or_else(|| delta.old_file().path())\n        .map_or_else(|| PathBuf::from(\"unknown file\"), PathBuf::from);\n\n      token_table.insert(path, 0);\n      token_table.insert(delta.path(), 0);\n@@ -77,6 +81 @@ impl PatchDiff for Diff<'_> {\n      let path = diff\n        .new_file()\n        .path()\n        .or_else(|| diff.old_file().path())\n        .map_or_else(|| PathBuf::from(\"unknown file\"), PathBuf::from);\n\n      let path = diff.path();\n",
@@ -407,7 +450,8 @@
   "messages": [
     {
       "content": "Lint",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/bin/hook.rs c/src/bin/hook.rs\nindex 959423b..27556db 100644\n--- c/src/bin/hook.rs\n+++ c/src/bin/hook.rs\n",
@@ -422,7 +466,8 @@
   "messages": [
     {
       "content": "Allow for better file dist",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/config.rs c/src/config.rs\nindex 0e58578..3ebe375 100644\n--- c/src/config.rs\n+++ c/src/config.rs\n@@ -52,3 +52,3 @@ impl App {\n      .set_default(\"max_length\", 72)?\n      .set_default(\"max_diff_tokens\", 3500)?\n      .set_default(\"model\", \"gpt-4-1106-preview\")?\n      .set_default(\"max_length\", 80)?\n      .set_default(\"max_diff_tokens\", 1000)?\n      .set_default(\"model\", \"gpt-4-turbo-preview\")?\ndiff --git c/src/hook.rs c/src/hook.rs\nindex 0f0784a..a086dfc 100644\n--- c/src/hook.rs\n+++ c/src/hook.rs\n@@ -58,0 +59 @@ impl PatchDiff for Diff<'_> {\n    let truncated_message = \"<truncated>\";\n@@ -60 +61 @@ impl PatchDiff for Diff<'_> {\n    let tokens_per_file = max_token_count / number_of_files.max(1);\n    let tokens_per_file = (max_token_count / number_of_files.max(1)) - truncated_message.len();\n@@ -63,0 +65,10 @@ impl PatchDiff for Diff<'_> {\n    for delta in self.deltas() {\n      let path = delta\n        .new_file()\n        .path()\n        .or_else(|| delta.old_file().path())\n        .map_or_else(|| PathBuf::from(\"unknown file\"), PathBuf::from);\n\n      token_table.insert(path, 0);\n    }\n\n@@ -72,2 +83 @@ impl PatchDiff for Diff<'_> {\n      let curr_tokens = token_table.entry(path).or_insert(0);\n      if *curr_tokens >= tokens_per_file {\n      let Some(tokens) = token_table.get_mut(&path) else {\n@@ -75 +85 @@ impl PatchDiff for Diff<'_> {\n      }\n      };\n@@ -78 +88 @@ impl PatchDiff for Diff<'_> {\n      if *curr_tokens + content.len() <= tokens_per_file {\n      if *tokens + content.len() <= tokens_per_file {\n@@ -80 +90,4 @@ impl PatchDiff for Diff<'_> {\n        *curr_tokens += content.len();\n        *tokens += content.len();\n      } else {\n        patch_acc.extend_from_slice(truncated_message.as_bytes());\n        token_table.remove(&path);\n",
@@ -437,7 +482,8 @@
   "messages": [
     {
       "content": "Improve compression algorithm",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/bin/hook.rs c/src/bin/hook.rs\nindex f334288..959423b 100644\n--- c/src/bin/hook.rs\n+++ c/src/bin/hook.rs\n@@ -17,24 +16,0 @@ use ai::hook::*;\nasync fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {\n  let _stdout = std::io::stdout().into_raw_mode().unwrap();\n  let mut stdin = termion::async_stdin().keys();\n\n  loop {\n    match stdin.next() {\n      // Ctrl+C pressed: exit the program\n      Some(Ok(Key::Ctrl('c'))) => {\n        return Ok(1);\n      },\n\n      // Enter pressed: render empty line before progress bar\n      Some(Ok(Key::Char('\\n'))) => {\n        pb.println(\"\");\n      },\n\n      // Any other key pressed\n      _ => {\n        sleep(Duration::from_millis(50)).await;\n      }\n    }\n  }\n}\n\n@@ -105,0 +82,25 @@ async fn main() -> Result<()> {\n\nasync fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {\n  let _stdout = std::io::stdout().into_raw_mode().unwrap();\n  let mut stdin = termion::async_stdin().keys();\n\n  loop {\n    match stdin.next() {\n      // Ctrl+C pressed: exit the program\n      Some(Ok(Key::Ctrl('c'))) => {\n        return Ok(1);\n      },\n\n      // Enter pressed: render empty line before progress bar\n      Some(Ok(Key::Char('\\n'))) => {\n        pb.println(\"\");\n      },\n\n      // Any other key pressed\n      _ => {\n        sleep(Duration::from_millis(50)).await;\n      }\n    }\n  }\n}\n\ndiff --git c/src/hook.rs c/src/hook.rs\nindex efc0086..0f0784a 100644\n--- c/src/hook.rs\n+++ c/src/hook.rs\n@@ -1 +1,3 @@\nuse std::io::{Read, Write}; use std::path::PathBuf;\nuse std::collections::HashMap;\nuse std::io::{Read, Write};\nuse std::path::PathBuf;\n@@ -4 +6 @@ use std::fs::File;\nuse git2::{DiffFormat, DiffOptions, Repository, Tree};\nuse git2::{Diff, DiffFormat, DiffOptions, Repository, Tree};\n@@ -55 +57 @@ pub trait PatchDiff {\nimpl PatchDiff for git2::Diff<'_> {\nimpl PatchDiff for Diff<'_> {\n@@ -57,2 +59,4 @@ impl PatchDiff for git2::Diff<'_> {\n    let mut acc = Vec::new();\n    let length = 0;\n    let number_of_files = self.deltas().len();\n    let tokens_per_file = max_token_count / number_of_files.max(1);\n    let mut token_table: HashMap<PathBuf, usize> = HashMap::new();\n    let mut patch_acc = Vec::new();\n@@ -61 +65,12 @@ impl PatchDiff for git2::Diff<'_> {\n    self.print(DiffFormat::Patch, |_, _, line| {\n    self.print(DiffFormat::Patch, |diff, _hunk, line| {\n      let path = diff\n        .new_file()\n        .path()\n        .or_else(|| diff.old_file().path())\n        .map_or_else(|| PathBuf::from(\"unknown file\"), PathBuf::from);\n\n      let curr_tokens = token_table.entry(path).or_insert(0);\n      if *curr_tokens >= tokens_per_file {\n        return true;\n      }\n\n@@ -63,3 +78,4 @@ impl PatchDiff for git2::Diff<'_> {\n      acc.extend_from_slice(content);\n      length <= max_token_count\n    }).ok();\n      if *curr_tokens + content.len() <= tokens_per_file {\n        patch_acc.extend_from_slice(content);\n        *curr_tokens += content.len();\n      }\n@@ -67 +83,4 @@ impl PatchDiff for git2::Diff<'_> {\n    Ok(acc.to_utf8())\n      true\n    }).unwrap();\n\n    Ok(patch_acc.to_utf8())\n",
@@ -452,7 +498,8 @@
   "messages": [
     {
       "content": "More clean up",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/hook.rs c/src/hook.rs\nindex 0279bc7..efc0086 100644\n--- c/src/hook.rs\n+++ c/src/hook.rs\n@@ -1,3 +1 @@\nuse std::fmt::{self, Display, Formatter};\nuse std::io::{Read, Write};\nuse std::path::{Path, PathBuf};\nuse std::io::{Read, Write}; use std::path::PathBuf;\n@@ -6 +4 @@ use std::fs::File;\nuse git2::{Delta, DiffFormat, DiffOptions, Repository, Tree};\nuse git2::{DiffFormat, DiffOptions, Repository, Tree};\n@@ -8,2 +5,0 @@ use anyhow::{Context, Result};\nuse lazy_static::lazy_static;\nuse dotenv_codegen::dotenv;\n@@ -80,63 +75,0 @@ pub trait PatchRepository {\n#[derive(Debug, Error)]\nenum PatchError {\n  #[error(\"Error accessing repository: {0}\")]\n  RepositoryAccessError(String),\n  #[error(\"Error calculating diff: {0}\")]\n  DiffCalculationError(String)\n}\n\n#[derive(Debug, Clone)]\nenum DeltaStatus {\n  Added(PathBuf),\n  Modified(PathBuf),\n  Deleted(PathBuf),\n  Renamed(PathBuf, PathBuf),\n  Ignored\n}\n\nimpl DeltaStatus {\n  fn from(delta: &git2::DiffDelta) -> Result<DeltaStatus> {\n    let path = delta.new_file().path().or(delta.old_file().path()).ok_or_else(|| {\n      PatchError::DiffCalculationError(\"Failed to retrieve path for delta\".to_string())\n    })?;\n\n    let owned_path = path.to_path_buf();\n\n    let r = match delta.status() {\n      Delta::Added => DeltaStatus::Added(owned_path),\n      Delta::Modified => DeltaStatus::Modified(owned_path),\n      Delta::Deleted => DeltaStatus::Deleted(owned_path),\n      _ => DeltaStatus::Ignored\n    };\n\n    Ok(r)\n  }\n}\n\nimpl Display for DeltaStatus {\n  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {\n    match self {\n      DeltaStatus::Added(path) => {\n        write!(f, \"A {}\", path.to_string_lossy())?;\n        Ok(())\n      },\n      DeltaStatus::Modified(path) => {\n        write!(f, \"M {}\", path.to_string_lossy())?;\n        Ok(())\n      },\n      DeltaStatus::Deleted(path) => {\n        write!(f, \"D {}\", path.to_string_lossy())?;\n        Ok(())\n      },\n      DeltaStatus::Renamed(old, new) => {\n        write!(f, \"R {} {}\", old.to_string_lossy(), new.to_string_lossy())?;\n        Ok(())\n      },\n      DeltaStatus::Ignored => {\n        write!(f, \"\")?;\n        Ok(())\n      }\n    }\n  }\n}\n\n",
@@ -467,7 +514,8 @@
   "messages": [
     {
       "content": "Remove unused code",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/hook.rs c/src/hook.rs\nindex 00f5d8e..0279bc7 100644\n--- c/src/hook.rs\n+++ c/src/hook.rs\n@@ -143,17 +142,0 @@ impl Display for DeltaStatus {\n#[derive(Debug)]\nstruct PatchSummary(Vec<DeltaStatus>);\n\nimpl PatchSummary {\n  fn to_patch(&self, max_token_count: usize) -> Result<String> {\n    let tokens_per_delta = max_token_count / self.0.len();\n    let res = self.0.iter().collect::<Vec<_>>();\n    let lines: Vec<_> = res\n      .iter()\n      .map(|delta| delta.to_string().chars().take(tokens_per_delta).collect::<String>())\n      .collect();\n    let r = Ok(lines.join(\"\\n\"));\n    println!(\"{:?}\", r);\n    r\n  }\n}\n\n",
@@ -482,7 +530,8 @@
   "messages": [
     {
       "content": "Clean up patch algorithm\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/bin/hook.rs c/src/bin/hook.rs\nindex 31c5215..f334288 100644\n--- c/src/bin/hook.rs\n+++ c/src/bin/hook.rs\n@@ -64,2 +64,2 @@ async fn main() -> Result<()> {\n    // git commit --amend\n    Some(\"HEAD\") => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),\n    // git commit --amend or git commit -c\n    Some(\"HEAD\") | None => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),\n@@ -67,3 +67 @@ async fn main() -> Result<()> {\n    Some(sha1) => repo.find_object(Oid::from_str(sha1)?, None).ok().and_then(|obj| obj.peel_to_tree().ok()),\n    // git commit\n    None => repo.head().ok().and_then(|head| head.peel_to_tree().ok())\n    Some(sha1) => repo.find_object(Oid::from_str(sha1)?, None).ok().and_then(|obj| obj.peel_to_tree().ok())\n@@ -79 +77,3 @@ async fn main() -> Result<()> {\n    let commit_message = commit::generate(patch.to_string()).await.context(\"Failed to generate commit message\")?;\n    let str = patch.to_string();\n    println!(\"Patch: {}\", str);\n    let commit_message = commit::generate(str).await.context(\"Failed to generate commit message\")?;\ndiff --git c/src/hook.rs c/src/hook.rs\nindex 65c26b4..00f5d8e 100644\n--- c/src/hook.rs\n+++ c/src/hook.rs\n@@ -0,0 +1 @@\nuse std::fmt::{self, Display, Formatter};\n@@ -2 +3 @@ use std::io::{Read, Write};\nuse std::path::PathBuf;\nuse std::path::{Path, PathBuf};\n@@ -5 +6 @@ use std::fs::File;\nuse git2::{DiffFormat, DiffOptions, Repository, Tree};\nuse git2::{Delta, DiffFormat, DiffOptions, Repository, Tree};\n@@ -61 +62 @@ impl PatchDiff for git2::Diff<'_> {\n    let mut length = 0;\n    let length = 0;\n@@ -67,2 +67,0 @@ impl PatchDiff for git2::Diff<'_> {\n      let str = content.to_utf8();\n      length += str.len();\n@@ -81,2 +80,82 @@ pub trait PatchRepository {\nimpl PatchRepository for Repository {\n  fn to_patch(&self, tree: Option<Tree<'_>>, max_token_count: usize) -> Result<String> {\n#[derive(Debug, Error)]\nenum PatchError {\n  #[error(\"Error accessing repository: {0}\")]\n  RepositoryAccessError(String),\n  #[error(\"Error calculating diff: {0}\")]\n  DiffCalculationError(String)\n}\n\n#[derive(Debug, Clone)]\nenum DeltaStatus {\n  Added(PathBuf),\n  Modified(PathBuf),\n  Deleted(PathBuf),\n  Renamed(PathBuf, PathBuf),\n  Ignored\n}\n\nimpl DeltaStatus {\n  fn from(delta: &git2::DiffDelta) -> Result<DeltaStatus> {\n    let path = delta.new_file().path().or(delta.old_file().path()).ok_or_else(|| {\n      PatchError::DiffCalculationError(\"Failed to retrieve path for delta\".to_string())\n    })?;\n\n    let owned_path = path.to_path_buf();\n\n    let r = match delta.status() {\n      Delta::Added => DeltaStatus::Added(owned_path),\n      Delta::Modified => DeltaStatus::Modified(owned_path),\n      Delta::Deleted => DeltaStatus::Deleted(owned_path),\n      _ => DeltaStatus::Ignored\n    };\n\n    Ok(r)\n  }\n}\n\nimpl Display for DeltaStatus {\n  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {\n    match self {\n      DeltaStatus::Added(path) => {\n        write!(f, \"A {}\", path.to_string_lossy())?;\n        Ok(())\n      },\n      DeltaStatus::Modified(path) => {\n        write!(f, \"M {}\", path.to_string_lossy())?;\n        Ok(())\n      },\n      DeltaStatus::Deleted(path) => {\n        write!(f, \"D {}\", path.to_string_lossy())?;\n        Ok(())\n      },\n      DeltaStatus::Renamed(old, new) => {\n        write!(f, \"R {} {}\", old.to_string_lossy(), new.to_string_lossy())?;\n        Ok(())\n      },\n      DeltaStatus::Ignored => {\n        write!(f, \"\")?;\n        Ok(())\n      }\n    }\n  }\n}\n\n#[derive(Debug)]\nstruct PatchSummary(Vec<DeltaStatus>);\n\nimpl PatchSummary {\n  fn to_patch(&self, max_token_count: usize) -> Result<String> {\n    let tokens_per_delta = max_token_count / self.0.len();\n    let res = self.0.iter().collect::<Vec<_>>();\n    let lines: Vec<_> = res\n      .iter()\n      .map(|delta| delta.to_string().chars().take(tokens_per_delta).collect::<String>())\n      .collect();\n    let r = Ok(lines.join(\"\\n\"));\n    println!(\"{:?}\", r);\n    r\n  }\n}\n\nimpl<'a> PatchRepository for Repository {\n  fn to_patch(&self, tree: Option<Tree>, max_token_count: usize) -> Result<String> {\n@@ -89 +167,0 @@ impl PatchRepository for Repository {\n      .enable_fast_untracked_dirs(true)\n@@ -145,4 +222,0 @@ pub enum HookError {\n\nlazy_static! {\n  pub static ref MAX_DIFF_TOKENS: usize = dotenv!(\"MAX_DIFF_TOKENS\").parse::<usize>().unwrap();\n}\n",
@@ -497,7 +546,8 @@
   "messages": [
     {
       "content": "Improve .env.local file sourcing in test.sh script\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/tools/test.sh c/tools/test.sh\nindex feefbb5..5c3d4fb 100755\n--- c/tools/test.sh\n+++ c/tools/test.sh\n@@ -3,3 +3,3 @@\nif [ ! -f .env.local ]; then\n  echo \".env.local missing\"\n  exit 1\nif [ -f .env.local ]; then\n  echo \"Sourcing .env.local\"\n  source .env.local\n@@ -14 +13,0 @@ source .env\nsource .env.local\n",
@@ -512,7 +562,8 @@
   "messages": [
     {
       "content": "Update MODEL value in .env from gpt-4-1106-preview to gpt-4-preview\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/.env c/.env\nindex 5d9fbff..9d6b806 100644\n--- c/.env\n+++ c/.env\n@@ -2 +2 @@ DOCKER_BUILDKIT=1\nMODEL=\"gpt-4-1106-preview\"\nMODEL=\"gpt-4-preview\"\n",
@@ -527,7 +578,8 @@
   "messages": [
     {
       "content": "Removed duplicate import in commit.rs\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/commit.rs c/src/commit.rs\nindex 0ce7327..7018e80 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -2,0 +3 @@ use std::{io, str};\nuse async_openai::Client;\n@@ -5 +5,0 @@ use async_openai::error::OpenAIError;\nuse async_openai::Client;\n",
@@ -542,7 +594,8 @@
   "messages": [
     {
       "content": "Update install.rs source file\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/install.rs c/src/install.rs\nindex d6fe374..642c02b 100644\n--- c/src/install.rs\n+++ c/src/install.rs\n",
@@ -557,7 +610,8 @@
   "messages": [
     {
       "content": "Update Justfile and commit.rs for hook management and instructions\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/Justfile c/Justfile\nindex fcd5e83..af78e8a 100644\n--- c/Justfile\n+++ c/Justfile\n@@ -14,4 +14 @@ local-github-actions:\nlocal-install-hook:\n    git ai hook install -f\n\nlocal-install: local-install-hook\nlocal-install:\n@@ -18,0 +16,2 @@ local-install: local-install-hook\n    git ai hook uninstall || true\n    git ai hook install\ndiff --git c/src/commit.rs c/src/commit.rs\nindex 0b9d068..0ce7327 100644\n--- c/src/commit.rs\n+++ c/src/commit.rs\n@@ -37,7 +37,7 @@ fn system_prompt(language: String, max_length_of_commit: usize) -> Result<ChatCo\n    Create a concise git commit message in present tense for the user provided code diff.\n    Follow these guidelines:\n    * Language: {language}.\n    * Maximum Length: {max_length_of_commit} characters.\n    * Clearly detail what changes were made and why.\n    * Exclude irrelevant and unnecessary details, such as translations.\n    Your entire response will be passed directly into git commit:\n    Your role is to create concise git commit messages based on user-provided git diffs. When crafting these messages:\n    - Use {language}.\n    - - Maximum Length: {max_length_of_commit} characters.\n    - Focus on detailing the changes and reasons behind them, ensuring clarity and relevance.\n    - Avoid including irrelevant or unnecessary details, such as translations, to maintain focus on the core changes.\n    Your responses should be direct and immediately usable in a git commit, crafted in present tense to fit git conventions.\n    You work primarily with git diffs, interpreting them to generate meaningful commit messages that succinctly summarize the changes.\ndiff --git c/src/install.rs c/src/install.rs\nindex 14ce8d5..d6fe374 100644\n--- c/src/install.rs\n+++ c/src/install.rs\n@@ -11,9 +10,0 @@ use thiserror::Error;\nuse clap::Parser;\n\n/// This is a simple program\n#[derive(Parser, Debug)]\n#[clap(author, version, about, long_about = None)]\nstruct Args {\n  #[clap(long, short, action)]\n  force: bool\n}\n@@ -41,0 +33,5 @@ const EMOJI: Emoji<'_, '_> = Emoji(\"🔗\", \"\");\n\nfn can_override_hook() -> bool {\n  std::env::args().collect::<Vec<String>>().iter().any(|arg| arg == \"-f\")\n}\n\n@@ -68,2 +64 @@ pub fn run() -> Result<(), InstallError> {\n  let args = Args::parse();\n  if hook_file.exists() && !args.force {\n  if hook_file.exists() && !can_override_hook() {\n",
@@ -572,7 +626,8 @@
   "messages": [
     {
       "content": "Update test.sh to use --amend option in git commit command\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/tools/test.sh c/tools/test.sh\nindex e32fa77..feefbb5 100755\n--- c/tools/test.sh\n+++ c/tools/test.sh\n@@ -72 +72 @@ git commit --no-edit\n# TODO: git commit --amend\ngit commit --amend --no-edit\n",
@@ -587,7 +642,8 @@
   "messages": [
     {
       "content": "Add validation for .env and .env.local file existence in test.sh\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/tools/test.sh c/tools/test.sh\nindex 3d8cf1a..e32fa77 100755\n--- c/tools/test.sh\n+++ c/tools/test.sh\n@@ -3 +3,12 @@\nsource .env .env.local\nif [ ! -f .env.local ]; then\n  echo \".env.local missing\"\n  exit 1\nfi\n\nif [ ! -f .env ]; then\n  echo \".env missing\"\n  exit 1\nfi\n\nsource .env\nsource .env.local\n",
@@ -602,7 +658,8 @@
   "messages": [
     {
       "content": "Add .env.local and http-cacache/* to .gitignore, update test.sh to include .env.local and handle missing OPENAI_API_KEY.\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/.gitignore c/.gitignore\nindex f741d63..43454f6 100644\n--- c/.gitignore\n+++ c/.gitignore\n@@ -2,0 +3 @@ http-cacache/*\n.env.local\ndiff --git c/tools/test.sh c/tools/test.sh\nindex 10bb254..3d8cf1a 100755\n--- c/tools/test.sh\n+++ c/tools/test.sh\n@@ -2,0 +3,2 @@\nsource .env .env.local\n\n@@ -15,0 +18,5 @@ cd $DIR\nif [ -z \"$OPENAI_API_KEY\" ]; then\n  echo \"Please set the OPENAI_API_KEY environment variable.\"\n  exit 1\nfi\n\n",
@@ -617,7 +674,8 @@
   "messages": [
     {
       "content": "Update release script and switch to debug mode in test.sh\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/scripts/release c/scripts/release\nindex 7ed8374..b72d432 100755\n--- c/scripts/release\n+++ c/scripts/release\n@@ -5,3 +4,0 @@ set -e\n# echo \"Bump version in Cargo.toml, I'm waiting for you to do it\"\n# read -p \"Press enter to continue\\n\"\n\ndiff --git c/tools/test.sh c/tools/test.sh\nindex 3c09f79..10bb254 100755\n--- c/tools/test.sh\n+++ c/tools/test.sh\n@@ -9 +9 @@ DIR=\"/tmp/git-ai-test\"\ncargo install --path .\ncargo install --debug --path .\n",
@@ -632,7 +690,8 @@
   "messages": [
     {
       "content": "Update test.sh to add git-ai examples and amend commit feature\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/tools/test.sh c/tools/test.sh\nindex 1a70050..3c09f79 100755\n--- c/tools/test.sh\n+++ c/tools/test.sh\n@@ -47 +47 @@ echo \"Running git-ai examples...\"\ngit ai examples\ngit-ai examples\n@@ -53,0 +54,2 @@ git commit --no-edit\n# TODO: git commit --amend\n\n",
@@ -647,7 +706,8 @@
   "messages": [
     {
       "content": "Update test.sh to replace 'git ai' with 'git-ai' for consistency\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/tools/test.sh c/tools/test.sh\nindex a78159e..1a70050 100755\n--- c/tools/test.sh\n+++ c/tools/test.sh\n@@ -26 +26 @@ echo \"Testing git-ai hook installation...\"\ngit ai hook install\ngit-ai hook install\n@@ -28 +28 @@ echo \"Testing git-ai hook uninstallation...\"\ngit ai hook uninstall\ngit-ai hook uninstall\n@@ -30 +30 @@ echo \"Re-testing git-ai hook installation...\"\ngit ai hook install\ngit-ai hook install\n@@ -34,5 +34,5 @@ echo \"Setting configuration values...\"\ngit ai config set model gpt-4\ngit ai config set language en\ngit ai config set max-diff-tokens 1500\ngit ai config set max-length 72\ngit ai config set openai-api-key $OPENAI_API_KEY\ngit-ai config set model gpt-4\ngit-ai config set language en\ngit-ai config set max-diff-tokens 1500\ngit-ai config set max-length 72\ngit-ai config set openai-api-key $OPENAI_API_KEY\n",
@@ -662,7 +722,8 @@
   "messages": [
     {
       "content": "Remove CMD: docker run line in Justfile\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/Justfile c/Justfile\nindex 55501e2..fcd5e83 100644\n--- c/Justfile\n+++ c/Justfile\n@@ -20,3 +19,0 @@ local-install: local-install-hook\ndocker-exec +CMD:\n    docker run --rm -v $PWD:/git-ai -w /git-ai git-ai:latest {{CMD}}\n\n",
@@ -677,7 +738,8 @@
   "messages": [
     {
       "content": "Simplify release process and test workflow in Justfile and release script\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/Justfile c/Justfile\nindex 75fe443..55501e2 100644\n--- c/Justfile\n+++ c/Justfile\n@@ -8,12 +8,2 @@ RUST_IMG := \"rust:1.76.0\"\n\n# release:\n#     $(docker-cmd) bash -c \"\\\n#     cargo update && \\\n#     git add Cargo.lock Cargo.toml && \\\n#     git commit --no-edit && \\\n#     version=$$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version' | tr -d '\\n') && \\\n#     echo 'Releasing $$version' && \\\n#     git tag -a v$$version -m 'Release v$$version' && \\\n#     git push origin v$$version && \\\n#     git push origin main && \\\n#     git push --tags\"\nrelease: (docker-run RUST_IMG \"scripts/release\")\ntest: (docker-run RUST_IMG \"tools/test.sh\")\n@@ -28,5 +19,0 @@ local-install: local-install-hook\ntest-suite: (docker-run RUST_IMG \"cargo test --all\")\ntest-install: docker-build (docker-run RUST_IMG \"cargo install --bin git-ai --path .\")\ntest-install-hook: docker-build (docker-run RUST_IMG \"cargo install --bin git-ai-hook --path .\")\ntest: test-suite test-install test-install-hook (docker-run RUST_IMG \"git ai --version\")\n\ndiff --git c/scripts/release c/scripts/release\nindex e87b24b..7ed8374 100755\n--- c/scripts/release\n+++ c/scripts/release\n@@ -5,2 +5,2 @@ set -e\necho \"Bump version in Cargo.toml, I'm waiting for you to do it\"\nread -p \"Press enter to continue\"\n# echo \"Bump version in Cargo.toml, I'm waiting for you to do it\"\n# read -p \"Press enter to continue\\n\"\n",
@@ -692,7 +754,8 @@
   "messages": [
     {
       "content": "Update git-ai version from 0.1.19 to 0.1.20 in Cargo.lock and Cargo.toml\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/Cargo.lock c/Cargo.lock\nindex 9a4ad03..2a0efdf 100644\n--- c/Cargo.lock\n+++ c/Cargo.lock\n@@ -720 +720 @@ name = \"git-ai\"\nversion = \"0.1.19\"\nversion = \"0.1.20\"\ndiff --git c/Cargo.toml c/Cargo.toml\nindex 94a68ce..deaa88a 100644\n--- c/Cargo.toml\n+++ c/Cargo.toml\n@@ -3 +3 @@ name = \"git-ai\"\nversion = \"0.1.19\"\nversion = \"0.1.20\"\n",
@@ -707,7 +770,8 @@
   "messages": [
     {
       "content": "Add prompt to bump version in Cargo.toml before release\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/scripts/release c/scripts/release\nindex 8c1e443..e87b24b 100755\n--- c/scripts/release\n+++ c/scripts/release\n@@ -4,0 +5,3 @@ set -e\necho \"Bump version in Cargo.toml, I'm waiting for you to do it\"\nread -p \"Press enter to continue\"\n\n",
@@ -722,7 +786,8 @@
   "messages": [
     {
       "content": "Update release script to use aggressive cargo update\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/scripts/release c/scripts/release\nindex 9da7d5f..8c1e443 100755\n--- c/scripts/release\n+++ c/scripts/release\n@@ -14 +14 @@ echo \"Releasing $VERSION\"\ncargo update\ncargo update --aggressive\n",
@@ -737,7 +802,8 @@
   "messages": [
     {
       "content": "Add release script to automate the versioning and tagging process\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/scripts/release c/scripts/release\nnew file mode 100755\nindex 0000000..9da7d5f\n--- /dev/null\n+++ c/scripts/release\n@@ -0,0 +1,21 @@\n#!/bin/sh\n\nset -e\n\nVERSION=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version' | tr -d '\\n')\n\nif [ -z \"$VERSION\" ]; then\n    echo \"Failed to get version\"\n    exit 1\nfi\n\necho \"Releasing $VERSION\"\n\ncargo update\ngit add Cargo.lock Cargo.toml\ngit commit --no-edit\n\ngit tag -a v$VERSION -m \"Release v$VERSION\"\ngit push origin v$VERSION\ngit push origin main\ngit push --tags\n",
@@ -752,7 +818,8 @@
   "messages": [
     {
       "content": "Refactor Justfile to streamline build and test commands for Rust binaries\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/Justfile c/Justfile\nindex 20b2296..75fe443 100644\n--- c/Justfile\n+++ c/Justfile\n@@ -8,4 +7,0 @@ RUST_IMG := \"rust:1.76.0\"\nlocal-github-actions:\n    act --container-architecture linux/amd64\n\nbuild-hook: (docker-run RUST_IMG \"cargo build --bin hook\")\n@@ -24,0 +21,2 @@ build-hook: (docker-run RUST_IMG \"cargo build --bin hook\")\nlocal-github-actions:\n    act --container-architecture linux/amd64\n@@ -30 +28,4 @@ local-install: local-install-hook\ntest: (docker-run RUST_IMG \"cargo test --all\")\ntest-suite: (docker-run RUST_IMG \"cargo test --all\")\ntest-install: docker-build (docker-run RUST_IMG \"cargo install --bin git-ai --path .\")\ntest-install-hook: docker-build (docker-run RUST_IMG \"cargo install --bin git-ai-hook --path .\")\ntest: test-suite test-install test-install-hook (docker-run RUST_IMG \"git ai --version\")\n",
@@ -767,7 +834,8 @@
   "messages": [
     {
       "content": "Refactor Justfile: split 'install' task into 'local-install-hook' and 'local-install' tasks\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/Justfile c/Justfile\nindex c349e5f..20b2296 100644\n--- c/Justfile\n+++ c/Justfile\n@@ -12 +11,0 @@ build-hook: (docker-run RUST_IMG \"cargo build --bin hook\")\ninstall-hook: install (docker-run LOCAL_IMG \"git ai hook install -f\")\n@@ -26 +25,5 @@ install-hook: install (docker-run LOCAL_IMG \"git ai hook install -f\")\ninstall: (docker-run RUST_IMG \"cargo install --debug  --path .\")\nlocal-install-hook:\n    git ai hook install -f\nlocal-install: local-install-hook\n    cargo install --debug --path .\n\n",
@@ -782,7 +850,8 @@
   "messages": [
     {
       "content": "Update Justfile for docker configuration and debug install option\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/Justfile c/Justfile\nindex d6fdbeb..7b8906c 100644\n--- c/Justfile\n+++ c/Justfile\n@@ -15 +15 @@ install:\n    $(docker-cmd) cargo install --path .\n    $(docker-cmd) cargo install --debug  --path .\n@@ -20,2 +20,2 @@ test: docker-build\nbuild_hook:\n    $(docker-cmd) cargo build --bin hook --release\nbuild-hook:\n    $(docker-cmd) cargo build --bin hook\n@@ -24,4 +24 @@ install-hook: install\n    $(docker-cmd) git ai hook install\n\nsimulate:\n    $(docker-cmd) ./simulate.sh\n    $(docker-cmd) git ai hook install -f\n@@ -45,0 +43,2 @@ docker-build:\ndocker-run +CMD: docker-build\n    docker run --rm -v $PWD:/git-ai -w /git-ai -it git-ai:latest {{CMD}}\n",
@@ -797,7 +866,8 @@
   "messages": [
     {
       "content": "Add force flag to allow overwriting existing git hooks\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/Justfile c/Justfile\nindex 29640e5..d6fdbeb 100644\n--- c/Justfile\n+++ c/Justfile\n@@ -23,2 +23,2 @@ build_hook:\ninstall_hook: build_hook\n    $(docker-cmd) ln -rfs /git-ai/target/release/hook /git-ai/.git/hooks/prepare-commit-msg\ninstall-hook: install\n    $(docker-cmd) git ai hook install\ndiff --git c/src/install.rs c/src/install.rs\nindex 500a6b0..14ce8d5 100644\n--- c/src/install.rs\n+++ c/src/install.rs\n@@ -10,0 +11,9 @@ use thiserror::Error;\nuse clap::Parser;\n\n/// This is a simple program\n#[derive(Parser, Debug)]\n#[clap(author, version, about, long_about = None)]\nstruct Args {\n  #[clap(long, short, action)]\n  force: bool\n}\n@@ -59 +68,2 @@ pub fn run() -> Result<(), InstallError> {\n  if hook_file.exists() {\n  let args = Args::parse();\n  if hook_file.exists() && !args.force {\n",
@@ -812,7 +882,8 @@
   "messages": [
     {
       "content": "Update Dockerfile user and Justfile tasks execution environment\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/Dockerfile c/Dockerfile\nindex 31f1918..b330bf9 100644\n--- c/Dockerfile\n+++ c/Dockerfile\n@@ -21,2 +21,2 @@ RUN apt-get update && \\\nRUN useradd -m myuser\nUSER myuser\nRUN useradd -m ai-bot\nUSER ai-bot\ndiff --git c/Justfile c/Justfile\nindex 8a53f24..29640e5 100644\n--- c/Justfile\n+++ c/Justfile\n@@ -5 +5,5 @@ GITHUB_REPO := \"git-ai\"\n# GITHUB_TAG := `shell git describe --tags --abbrev=0`\n\n# Use docker run with --rm for tasks that require Rust environment\n# Mount the current directory into /git-ai in the container\n# Use the image git-ai:latest for all tasks\ndocker-cmd := \"docker run --rm -v $PWD:/git-ai -w /git-ai git-ai:latest\"\n@@ -8 +12,2 @@ github-actions:\n    act --container-architecture linux/amd64\n    $(docker-cmd) act --container-architecture linux/amd64\n\n@@ -10,5 +15,5 @@ install:\n  cargo install --path .\n  git ai hook uninstall || true\n  git ai hook install\ntest:\n  cargo test --all\n    $(docker-cmd) cargo install --path .\n\ntest: docker-build\n    $(docker-cmd) cargo test --all\n\n@@ -16 +21,2 @@ build_hook:\n  cargo build --bin hook --release\n    $(docker-cmd) cargo build --bin hook --release\n\n@@ -18 +24,2 @@ install_hook: build_hook\n  gln -rfs target/release/hook .git/hooks/prepare-commit-msg\n    $(docker-cmd) ln -rfs /git-ai/target/release/hook /git-ai/.git/hooks/prepare-commit-msg\n\n@@ -20 +27,2 @@ simulate:\n  ./simulate.sh\n    $(docker-cmd) ./simulate.sh\n\n@@ -22,12 +30,11 @@ release:\n  #!/usr/bin/env bash\n  cargo update\n  git add Cargo.lock Cargo.toml\n  git commit --no-edit\n  version=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version' | tr -d '\\n')\n  echo \"Releasing $version\"\n  git tag -a v$version -m \"Release v$version\"\n  git push origin v$version\n  git push origin main\n  git push --tags\nact:\n  act --container-architecture linux/amd64\n    $(docker-cmd) bash -c \"\\\n    cargo update && \\\n    git add Cargo.lock Cargo.toml && \\\n    git commit --no-edit && \\\n    version=$$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version' | tr -d '\\n') && \\\n    echo 'Releasing $$version' && \\\n    git tag -a v$$version -m 'Release v$$version' && \\\n    git push origin v$$version && \\\n    git push origin main && \\\n    git push --tags\"\n\n@@ -35 +42,2 @@ clean:\n  cargo clean\n    $(docker-cmd) cargo clean\n\n",
@@ -827,7 +898,8 @@
   "messages": [
     {
       "content": "Update Dockerfile to use Rust version 1.76.0 for improved compatibility\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/Dockerfile c/Dockerfile\nindex 10fc29c..31f1918 100644\n--- c/Dockerfile\n+++ c/Dockerfile\n@@ -2 +2 @@\nFROM rust:1.60 as builder\nFROM rust:1.76.0 as builder\n",
@@ -842,7 +914,8 @@
   "messages": [
     {
       "content": "Update Dockerfile to copy debug binaries instead of release binaries\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/Dockerfile c/Dockerfile\nindex 04b4d04..10fc29c 100644\n--- c/Dockerfile\n+++ c/Dockerfile\n@@ -7 +7 @@ COPY . .\nRUN cargo build --release --bins\nRUN cargo build --bins\n@@ -11,2 +11,2 @@ FROM debian:buster-slim\nCOPY --from=builder /git-ai/target/release/git-ai /usr/local/bin/git-ai\nCOPY --from=builder /git-ai/target/release/git-ai-hook /usr/local/bin/git-ai-hook\nCOPY --from=builder /git-ai/target/debug/git-ai /usr/local/bin/git-ai\nCOPY --from=builder /git-ai/target/debug/git-ai-hook /usr/local/bin/git-ai-hook\n",
@@ -857,7 +930,8 @@
   "messages": [
     {
       "content": "Refactor Dockerfile for Rust project to optimize build steps and size\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/.dockerignore c/.dockerignore\nindex 9d817a7..c216be0 100644\n--- c/.dockerignore\n+++ c/.dockerignore\n@@ -14,4 +13,0 @@ Dockerfile\n.env\n**/.env\n.env.*\n**/.env.*\ndiff --git c/Dockerfile c/Dockerfile\nindex 317ac89..04b4d04 100644\n--- c/Dockerfile\n+++ c/Dockerfile\n@@ -1,5 +1,2 @@\n# Use the official Rust image as a builder stage\nFROM rust:latest as builder\n\n# Create a new empty shell project\nRUN USER=root cargo new --bin git-ai\n# Use a specific Rust version\nFROM rust:1.60 as builder\n@@ -8,12 +5 @@ WORKDIR /git-ai\n# Copy your Rust project's files into the Docker image\nCOPY ./Cargo.toml ./Cargo.toml\nCOPY ./Cargo.lock ./Cargo.lock\n\n# Cache your dependencies\nRUN mkdir src/bin\nRUN touch src/bin/hook.rs\nRUN touch src/main.rs\nRUN touch src/lib.rs\nRUN cargo fetch\n\n# Copy the rest of your code\n# Copy project files and build the project\n@@ -20,0 +7 @@ COPY . .\nRUN cargo build --release --bins\n@@ -22,5 +9 @@ COPY . .\n# Build your application\nRUN cargo build --bins\n# RUN cargo install --debug --path .\n\n# Final base image\n# Use a slim version of Debian for the final image\n@@ -27,0 +11,2 @@ FROM debian:buster-slim\nCOPY --from=builder /git-ai/target/release/git-ai /usr/local/bin/git-ai\nCOPY --from=builder /git-ai/target/release/git-ai-hook /usr/local/bin/git-ai-hook\n@@ -29,3 +14,5 @@ FROM debian:buster-slim\n# Copy the binary from the builder stage to the final stage\nCOPY --from=builder /git-ai/target/debug/git-ai /usr/local/bin/git-ai\nCOPY --from=builder /git-ai/target/debug/git-ai-hook /usr/local/bin/git-ai-hook\n# Install git and clean up in one layer\nRUN apt-get update && \\\n    apt-get install -y git && \\\n    apt-get clean && \\\n    rm -rf /var/lib/apt/lists/*\n@@ -33,2 +20,3 @@ COPY --from=builder /git-ai/target/debug/git-ai-hook /usr/local/bin/git-ai-hook\n# Install git\nRUN apt-get update && apt-get install -y git && apt-get clean\n# Add a non-root user and switch to it\nRUN useradd -m myuser\nUSER myuser\n@@ -36 +23,0 @@ RUN apt-get update && apt-get install -y git && apt-get clean\n# Set the working directory\n@@ -39 +25,0 @@ WORKDIR /repo\n# By default, run your application\n",
@@ -872,7 +946,8 @@
   "messages": [
     {
       "content": "Update .dockerignore and Justfile for docker build optimization\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/.dockerignore c/.dockerignore\nindex d1294fc..9d817a7 100644\n--- c/.dockerignore\n+++ c/.dockerignore\n@@ -14,2 +13,0 @@ Dockerfile\nCargo.lock\n**/Cargo.lock\ndiff --git c/Justfile c/Justfile\nindex 1103bb1..8a53f24 100644\n--- c/Justfile\n+++ c/Justfile\n@@ -35,0 +36,2 @@ clean:\ndocker-build:\n  docker build -t git-ai .\n",
@@ -887,7 +962,8 @@
   "messages": [
     {
       "content": "Add .dockerignore, Dockerfile and set DOCKER_BUILDKIT in .env for optimized builds\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/.dockerignore c/.dockerignore\nnew file mode 100644\nindex 0000000..d1294fc\n--- /dev/null\n+++ c/.dockerignore\n@@ -0,0 +1,36 @@\n/target\n**/target\n**/*.log\n*.log\nhttp-cacache/\n.git\n.gitignore\n.dockerignore\nDockerfile\n**/Dockerfile\n**/.git\n**/.gitignore\n**/.dockerignore\nCargo.lock\n**/Cargo.lock\n.env\n**/.env\n.env.*\n**/.env.*\n.editorconfig\n**/.editorconfig\n.idea/\n**/.idea/\n.vscode/\n**/.vscode/\n**/*~\n*~\ntemp/\n**/temp/\ntests/\n**/tests/\nexamples/\n**/examples/\nbenches/\n**/benches/\n\ndiff --git c/.env c/.env\nindex e4162a7..5d9fbff 100644\n--- c/.env\n+++ c/.env\n@@ -0,0 +1 @@\nDOCKER_BUILDKIT=1\ndiff --git c/Dockerfile c/Dockerfile\nnew file mode 100644\nindex 0000000..317ac89\n--- /dev/null\n+++ c/Dockerfile\n@@ -0,0 +1,40 @@\n# Use the official Rust image as a builder stage\nFROM rust:latest as builder\n\n# Create a new empty shell project\nRUN USER=root cargo new --bin git-ai\nWORKDIR /git-ai\n\n# Copy your Rust project's files into the Docker image\nCOPY ./Cargo.toml ./Cargo.toml\nCOPY ./Cargo.lock ./Cargo.lock\n\n# Cache your dependencies\nRUN mkdir src/bin\nRUN touch src/bin/hook.rs\nRUN touch src/main.rs\nRUN touch src/lib.rs\nRUN cargo fetch\n\n# Copy the rest of your code\nCOPY . .\n\n# Build your application\nRUN cargo build --bins\n# RUN cargo install --debug --path .\n\n# Final base image\nFROM debian:buster-slim\n\n# Copy the binary from the builder stage to the final stage\nCOPY --from=builder /git-ai/target/debug/git-ai /usr/local/bin/git-ai\nCOPY --from=builder /git-ai/target/debug/git-ai-hook /usr/local/bin/git-ai-hook\n\n# Install git\nRUN apt-get update && apt-get install -y git && apt-get clean\n\n# Set the working directory\nWORKDIR /repo\n\n# By default, run your application\nCMD [\"git-ai\"]\n",
@@ -901,23 +977,9 @@
 }{
   "messages": [
     {
-      "content": "Merge branch 'bug/amend-no-msg'\n",
-      "role": "assistant"
-    },
-    {
-      "content": "diff --git c/Cargo.lock c/Cargo.lock\nindex a5c66e8..9a4ad03 100644\n--- c/Cargo.lock\n+++ c/Cargo.lock\n@@ -22 +22 @@ name = \"ahash\"\nversion = \"0.7.7\"\nversion = \"0.7.8\"\n@@ -24 +24 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"5a824f2aa7e75a0c98c5a504fceb80649e9c35265d44525b5f94de4771a395cd\"\nchecksum = \"891477e0c6a8957309ee5c45a6368af3ae14bb510732d2684ffa19af310920f9\"\n@@ -209 +209 @@ name = \"bumpalo\"\nversion = \"3.14.0\"\nversion = \"3.15.4\"\n@@ -211 +211 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"7f30e7476521f6f8af1a1c4c0b8cc94f0bee37d91763d0ca2665f299b6cd8aec\"\nchecksum = \"7ff69b9dd49fd426c69a0db9fc04dd934cdb6645ff000864d98f7e2af8830eaa\"\n@@ -1004 +1004 @@ name = \"js-sys\"\nversion = \"0.3.67\"\nversion = \"0.3.69\"\n@@ -1006 +1006 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"9a1d36f1235bc969acba30b7f5990b864423a6068a10f7c90ae8f0112e3a59d1\"\nchecksum = \"29c15563dc2726973df627357ce0c9ddddbea194836909d655df6a75d2cf296d\"\n@@ -1143 +1143 @@ name = \"miniz_oxide\"\nversion = \"0.7.1\"\nversion = \"0.7.2\"\n@@ -1145 +1145 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"e7810e0be55b428ada41041c41f32c9f1a42817901b4ccf45fa3d4b6561e74c7\"\nchecksum = \"9d811f3e15f28568be3407c8e7fdb6514c1cda3cb30683f15b6a1a1dc4ea14a7\"\n@@ -1240 +1240 @@ name = \"openssl\"\nversion = \"0.10.63\"\nversion = \"0.10.64\"\n@@ -1242 +1242 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"15c9d69dd87a29568d4d017cfe8ec518706046a05184e5aea92d0af890b803c8\"\nchecksum = \"95a0481286a310808298130d22dd1fef0fa571e05a8f44ec801801e84b216b1f\"\n@@ -1272 +1272 @@ name = \"openssl-sys\"\nversion = \"0.9.99\"\nversion = \"0.9.101\"\n@@ -1274 +1274 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"22e1bf214306098e4832460f797824c05d25aacdf896f64a985fb0fd992454ae\"\nchecksum = \"dda2b0f344e78efc2facf7d195d098df0dd72151b26ab98da807afc26c198dff\"\n@@ -1329 +1329 @@ name = \"pest\"\nversion = \"2.7.6\"\nversion = \"2.7.8\"\n@@ -1331 +1331 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"1f200d8d83c44a45b21764d1916299752ca035d15ecd46faca3e9a2a2bf6ad06\"\nchecksum = \"56f8023d0fb78c8e03784ea1c7f3fa36e68a723138990b8d5a47d916b651e7a8\"\n@@ -1340 +1340 @@ name = \"pest_derive\"\nversion = \"2.7.6\"\nversion = \"2.7.8\"\n@@ -1342 +1342 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"bcd6ab1236bbdb3a49027e920e693192ebfe8913f6d60e294de57463a493cfde\"\nchecksum = \"b0d24f72393fd16ab6ac5738bc33cdb6a9aa73f8b902e8fe29cf4e67d7dd1026\"\n@@ -1350 +1350 @@ name = \"pest_generator\"\nversion = \"2.7.6\"\nversion = \"2.7.8\"\n@@ -1352 +1352 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"2a31940305ffc96863a735bef7c7994a00b325a7138fdbc5bda0f1a0476d3275\"\nchecksum = \"fdc17e2a6c7d0a492f0158d7a4bd66cc17280308bbaff78d5bef566dca35ab80\"\n@@ -1363 +1363 @@ name = \"pest_meta\"\nversion = \"2.7.6\"\nversion = \"2.7.8\"\n@@ -1365 +1365 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"a7ff62f5259e53b78d1af898941cdcdccfae7385cf7d793a6e55de5d05bb4b7d\"\nchecksum = \"934cd7631c050f4674352a6e835d5f6711ffbfb9345c2fc0107155ac495ae293\"\n@@ -2229 +2229 @@ name = \"wasm-bindgen\"\nversion = \"0.2.90\"\nversion = \"0.2.92\"\n@@ -2231 +2231 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"b1223296a201415c7fad14792dbefaace9bd52b62d33453ade1c5b5f07555406\"\nchecksum = \"4be2531df63900aeb2bca0daaaddec08491ee64ceecbee5076636a3b026795a8\"\n@@ -2239 +2239 @@ name = \"wasm-bindgen-backend\"\nversion = \"0.2.90\"\nversion = \"0.2.92\"\n@@ -2241 +2241 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"fcdc935b63408d58a32f8cc9738a0bffd8f05cc7c002086c6ef20b7312ad9dcd\"\nchecksum = \"614d787b966d3989fa7bb98a654e369c762374fd3213d212cfc0251257e747da\"\n@@ -2254 +2254 @@ name = \"wasm-bindgen-futures\"\nversion = \"0.4.40\"\nversion = \"0.4.42\"\n@@ -2256 +2256 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"bde2032aeb86bdfaecc8b261eef3cba735cc426c1f3a3416d1e0791be95fc461\"\nchecksum = \"76bc14366121efc8dbb487ab05bcc9d346b3b5ec0eaa76e46594cabbe51762c0\"\n@@ -2266 +2266 @@ name = \"wasm-bindgen-macro\"\nversion = \"0.2.90\"\nversion = \"0.2.92\"\n@@ -2268 +2268 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"3e4c238561b2d428924c49815533a8b9121c664599558a5d9ec51f8a1740a999\"\nchecksum = \"a1f8823de937b71b9460c0c34e25f3da88250760bec0ebac694b49997550d726\"\n@@ -2276 +2276 @@ name = \"wasm-bindgen-macro-support\"\nversion = \"0.2.90\"\nversion = \"0.2.92\"\n@@ -2278 +2278 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"bae1abb6806dc1ad9e560ed242107c0f6c84335f1749dd4e8ddb012ebd5e25a7\"\nchecksum = \"e94f17b526d0a461a191c78ea52bbce64071ed5c04c9ffe424dcb38f74171bb7\"\n@@ -2289 +2289 @@ name = \"wasm-bindgen-shared\"\nversion = \"0.2.90\"\nversion = \"0.2.92\"\n@@ -2291 +2291 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"4d91413b1c31d7539ba5ef2451af3f0b833a005eb27a631cec32bc0635a8602b\"\nchecksum = \"af190c94f2773fdb3729c55b007a722abb5384da03bc0986df4c289bf5567e96\"\n@@ -2308 +2308 @@ name = \"web-sys\"\nversion = \"0.3.67\"\nversion = \"0.3.69\"\n@@ -2310 +2310 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"58cd2333b6e0be7a39605f0e255892fd7418a682d8da8fe042fe25128794d2ed\"\nchecksum = \"77afa9a11836342370f4817622a2f0f418b134426d91a82dfb48f532d2ec13ef\"\n",
-      "role": "user"
-    },
-    {
-      "content": "Your role is to create concise git commit messages based on user-provided git diffs. When crafting these messages: - Focus on detailing the changes and reasons behind them, ensuring clarity and relevance. - Avoid including irrelevant or unnecessary details, such as translations, to maintain focus on the core changes. Your responses should be direct and immediately usable in a git commit, crafted in present tense to fit git conventions. You work primarily with git diffs, interpreting them to generate meaningful commit messages that succinctly summarize the changes.",
-      "role": "system"
-    }
-  ]
-}{
-  "messages": [
-    {
       "content": "Update dependencies versions in Cargo.lock\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/Cargo.lock c/Cargo.lock\nindex a5c66e8..9a4ad03 100644\n--- c/Cargo.lock\n+++ c/Cargo.lock\n@@ -22 +22 @@ name = \"ahash\"\nversion = \"0.7.7\"\nversion = \"0.7.8\"\n@@ -24 +24 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"5a824f2aa7e75a0c98c5a504fceb80649e9c35265d44525b5f94de4771a395cd\"\nchecksum = \"891477e0c6a8957309ee5c45a6368af3ae14bb510732d2684ffa19af310920f9\"\n@@ -209 +209 @@ name = \"bumpalo\"\nversion = \"3.14.0\"\nversion = \"3.15.4\"\n@@ -211 +211 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"7f30e7476521f6f8af1a1c4c0b8cc94f0bee37d91763d0ca2665f299b6cd8aec\"\nchecksum = \"7ff69b9dd49fd426c69a0db9fc04dd934cdb6645ff000864d98f7e2af8830eaa\"\n@@ -1004 +1004 @@ name = \"js-sys\"\nversion = \"0.3.67\"\nversion = \"0.3.69\"\n@@ -1006 +1006 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"9a1d36f1235bc969acba30b7f5990b864423a6068a10f7c90ae8f0112e3a59d1\"\nchecksum = \"29c15563dc2726973df627357ce0c9ddddbea194836909d655df6a75d2cf296d\"\n@@ -1143 +1143 @@ name = \"miniz_oxide\"\nversion = \"0.7.1\"\nversion = \"0.7.2\"\n@@ -1145 +1145 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"e7810e0be55b428ada41041c41f32c9f1a42817901b4ccf45fa3d4b6561e74c7\"\nchecksum = \"9d811f3e15f28568be3407c8e7fdb6514c1cda3cb30683f15b6a1a1dc4ea14a7\"\n@@ -1240 +1240 @@ name = \"openssl\"\nversion = \"0.10.63\"\nversion = \"0.10.64\"\n@@ -1242 +1242 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"15c9d69dd87a29568d4d017cfe8ec518706046a05184e5aea92d0af890b803c8\"\nchecksum = \"95a0481286a310808298130d22dd1fef0fa571e05a8f44ec801801e84b216b1f\"\n@@ -1272 +1272 @@ name = \"openssl-sys\"\nversion = \"0.9.99\"\nversion = \"0.9.101\"\n@@ -1274 +1274 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"22e1bf214306098e4832460f797824c05d25aacdf896f64a985fb0fd992454ae\"\nchecksum = \"dda2b0f344e78efc2facf7d195d098df0dd72151b26ab98da807afc26c198dff\"\n@@ -1329 +1329 @@ name = \"pest\"\nversion = \"2.7.6\"\nversion = \"2.7.8\"\n@@ -1331 +1331 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"1f200d8d83c44a45b21764d1916299752ca035d15ecd46faca3e9a2a2bf6ad06\"\nchecksum = \"56f8023d0fb78c8e03784ea1c7f3fa36e68a723138990b8d5a47d916b651e7a8\"\n@@ -1340 +1340 @@ name = \"pest_derive\"\nversion = \"2.7.6\"\nversion = \"2.7.8\"\n@@ -1342 +1342 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"bcd6ab1236bbdb3a49027e920e693192ebfe8913f6d60e294de57463a493cfde\"\nchecksum = \"b0d24f72393fd16ab6ac5738bc33cdb6a9aa73f8b902e8fe29cf4e67d7dd1026\"\n@@ -1350 +1350 @@ name = \"pest_generator\"\nversion = \"2.7.6\"\nversion = \"2.7.8\"\n@@ -1352 +1352 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"2a31940305ffc96863a735bef7c7994a00b325a7138fdbc5bda0f1a0476d3275\"\nchecksum = \"fdc17e2a6c7d0a492f0158d7a4bd66cc17280308bbaff78d5bef566dca35ab80\"\n@@ -1363 +1363 @@ name = \"pest_meta\"\nversion = \"2.7.6\"\nversion = \"2.7.8\"\n@@ -1365 +1365 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"a7ff62f5259e53b78d1af898941cdcdccfae7385cf7d793a6e55de5d05bb4b7d\"\nchecksum = \"934cd7631c050f4674352a6e835d5f6711ffbfb9345c2fc0107155ac495ae293\"\n@@ -2229 +2229 @@ name = \"wasm-bindgen\"\nversion = \"0.2.90\"\nversion = \"0.2.92\"\n@@ -2231 +2231 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"b1223296a201415c7fad14792dbefaace9bd52b62d33453ade1c5b5f07555406\"\nchecksum = \"4be2531df63900aeb2bca0daaaddec08491ee64ceecbee5076636a3b026795a8\"\n@@ -2239 +2239 @@ name = \"wasm-bindgen-backend\"\nversion = \"0.2.90\"\nversion = \"0.2.92\"\n@@ -2241 +2241 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"fcdc935b63408d58a32f8cc9738a0bffd8f05cc7c002086c6ef20b7312ad9dcd\"\nchecksum = \"614d787b966d3989fa7bb98a654e369c762374fd3213d212cfc0251257e747da\"\n@@ -2254 +2254 @@ name = \"wasm-bindgen-futures\"\nversion = \"0.4.40\"\nversion = \"0.4.42\"\n@@ -2256 +2256 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"bde2032aeb86bdfaecc8b261eef3cba735cc426c1f3a3416d1e0791be95fc461\"\nchecksum = \"76bc14366121efc8dbb487ab05bcc9d346b3b5ec0eaa76e46594cabbe51762c0\"\n@@ -2266 +2266 @@ name = \"wasm-bindgen-macro\"\nversion = \"0.2.90\"\nversion = \"0.2.92\"\n@@ -2268 +2268 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"3e4c238561b2d428924c49815533a8b9121c664599558a5d9ec51f8a1740a999\"\nchecksum = \"a1f8823de937b71b9460c0c34e25f3da88250760bec0ebac694b49997550d726\"\n@@ -2276 +2276 @@ name = \"wasm-bindgen-macro-support\"\nversion = \"0.2.90\"\nversion = \"0.2.92\"\n@@ -2278 +2278 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"bae1abb6806dc1ad9e560ed242107c0f6c84335f1749dd4e8ddb012ebd5e25a7\"\nchecksum = \"e94f17b526d0a461a191c78ea52bbce64071ed5c04c9ffe424dcb38f74171bb7\"\n@@ -2289 +2289 @@ name = \"wasm-bindgen-shared\"\nversion = \"0.2.90\"\nversion = \"0.2.92\"\n@@ -2291 +2291 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"4d91413b1c31d7539ba5ef2451af3f0b833a005eb27a631cec32bc0635a8602b\"\nchecksum = \"af190c94f2773fdb3729c55b007a722abb5384da03bc0986df4c289bf5567e96\"\n@@ -2308 +2308 @@ name = \"web-sys\"\nversion = \"0.3.67\"\nversion = \"0.3.69\"\n@@ -2310 +2310 @@ source = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"58cd2333b6e0be7a39605f0e255892fd7418a682d8da8fe042fe25128794d2ed\"\nchecksum = \"77afa9a11836342370f4817622a2f0f418b134426d91a82dfb48f532d2ec13ef\"\n",
@@ -932,7 +994,8 @@
   "messages": [
     {
       "content": "Remove debug flag from cargo install command in Justfile\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/Justfile c/Justfile\nindex 6bf6902..1103bb1 100644\n--- c/Justfile\n+++ c/Justfile\n@@ -10 +10 @@ install:\n  cargo install --debug --path .\n  cargo install --path .\n",
@@ -947,7 +1010,8 @@
   "messages": [
     {
       "content": "Remove debug flag from cargo install command in Justfile\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/Justfile c/Justfile\nindex 6bf6902..1103bb1 100644\n--- c/Justfile\n+++ c/Justfile\n@@ -10 +10 @@ install:\n  cargo install --debug --path .\n  cargo install --path .\n",
@@ -962,7 +1026,8 @@
   "messages": [
     {
       "content": "Refactor hook.rs by removing duplicate git2::Oid import\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/bin/hook.rs c/src/bin/hook.rs\nindex 00aaa15..31c5215 100644\n--- c/src/bin/hook.rs\n+++ c/src/bin/hook.rs\n@@ -6 +6 @@ use termion::event::Key;\nuse git2::Repository;\nuse git2::{Oid, Repository};\n@@ -13 +12,0 @@ use tokio::time::sleep;\nuse git2::Oid;\n@@ -19 +18 @@ async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {\n  // let _stdout = std::io::stdout().into_raw_mode().unwrap();\n  let _stdout = std::io::stdout().into_raw_mode().unwrap();\n",
@@ -977,7 +1042,8 @@
   "messages": [
     {
       "content": "Remove redundant line of code in hook.rs\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/bin/hook.rs c/src/bin/hook.rs\nindex 47c1135..00aaa15 100644\n--- c/src/bin/hook.rs\n+++ c/src/bin/hook.rs\n@@ -19 +19 @@ async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {\n  let _stdout = std::io::stdout().into_raw_mode().unwrap();\n  // let _stdout = std::io::stdout().into_raw_mode().unwrap();\n",
@@ -992,7 +1058,8 @@
   "messages": [
     {
       "content": "Add missing import statements in hook.rs for commit and config modules\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/bin/hook.rs c/src/bin/hook.rs\nindex 0856edc..47c1135 100644\n--- c/src/bin/hook.rs\n+++ c/src/bin/hook.rs\n@@ -15 +14,0 @@ use tokio::signal;\nuse ai::hook::*;\n@@ -16,0 +16 @@ use ai::{commit, config};\nuse ai::hook::*;\n",
@@ -1007,7 +1074,8 @@
   "messages": [
     {
       "content": "Remove unused imports in hook.rs\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/bin/hook.rs c/src/bin/hook.rs\nindex d48980f..0856edc 100644\n--- c/src/bin/hook.rs\n+++ c/src/bin/hook.rs\n@@ -3 +2,0 @@\nuse std::io::{self, BufReader, Write};\n@@ -7 +5,0 @@ use termion::event::Key;\nuse tokio::io::AsyncReadExt;\n@@ -11 +9 @@ use clap::Parser;\nuse indicatif::{MultiProgress, ProgressBar, ProgressStyle};\nuse indicatif::{ProgressBar, ProgressStyle};\n@@ -19 +16,0 @@ use ai::{commit, config};\nuse indicatif_log_bridge::LogWrapper;\n",
@@ -1022,7 +1090,8 @@
   "messages": [
     {
       "content": "Remove unused imports in hook.rs\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/bin/hook.rs c/src/bin/hook.rs\nindex 944d5f5..d48980f 100644\n--- c/src/bin/hook.rs\n+++ c/src/bin/hook.rs\n@@ -14 +13,0 @@ use termion::raw::IntoRawMode;\nuse tokio::sync::mpsc;\n@@ -17 +16 @@ use git2::Oid;\nuse tokio::{select, signal, time};\nuse tokio::signal;\n@@ -20 +18,0 @@ use ai::{commit, config};\nuse env_logger;\n@@ -22,2 +19,0 @@ use indicatif_log_bridge::LogWrapper;\nuse crossterm::terminal;\nuse termion::async_stdin;\n",
@@ -1037,7 +1106,8 @@
   "messages": [
     {
       "content": "Refactor stdout initialization in hook.rs to improve readability\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/bin/hook.rs c/src/bin/hook.rs\nindex 408ba05..944d5f5 100644\n--- c/src/bin/hook.rs\n+++ c/src/bin/hook.rs\n@@ -26 +26 @@ async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {\n  let mut stdout = std::io::stdout().into_raw_mode().unwrap();\n  let _stdout = std::io::stdout().into_raw_mode().unwrap();\n",
@@ -1052,7 +1122,8 @@
   "messages": [
     {
       "content": "Remove commented out stdout initialization in hook.rs\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/bin/hook.rs c/src/bin/hook.rs\nindex 7a1c1b6..408ba05 100644\n--- c/src/bin/hook.rs\n+++ c/src/bin/hook.rs\n@@ -23 +22,0 @@ use crossterm::terminal;\n//   let mut stdout = tokio::io::stdout().into_raw_mode().unwrap();\n",
@@ -1067,7 +1138,8 @@
   "messages": [
     {
       "content": "Refactor hook.rs: Simplify imports and update stdout configuration\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/bin/hook.rs c/src/bin/hook.rs\nindex caaf0cb..7a1c1b6 100644\n--- c/src/bin/hook.rs\n+++ c/src/bin/hook.rs\n@@ -2,0 +3 @@\nuse std::io::{self, BufReader, Write};\n@@ -5,3 +5,0 @@ use std::time::Duration;\nuse tokio::time::sleep;\nuse tokio::signal;\nuse termion::input::TermRead;\n@@ -9,3 +7,2 @@ use termion::event::Key;\nuse indicatif::{ProgressBar, ProgressStyle};\nuse git2::{Oid, Repository};\nuse clap::Parser;\nuse tokio::io::AsyncReadExt;\nuse git2::Repository;\n@@ -12,0 +10,8 @@ use anyhow::{Context, Result};\nuse clap::Parser;\nuse indicatif::{MultiProgress, ProgressBar, ProgressStyle};\nuse termion::input::TermRead;\nuse termion::raw::IntoRawMode;\nuse tokio::sync::mpsc;\nuse tokio::time::sleep;\nuse git2::Oid;\nuse tokio::{select, signal, time};\n@@ -15,2 +20,5 @@ use ai::{commit, config};\nuse tokio::io::AsyncReadExt;\n\nuse env_logger;\nuse indicatif_log_bridge::LogWrapper;\nuse crossterm::terminal;\n//   let mut stdout = tokio::io::stdout().into_raw_mode().unwrap();\nuse termion::async_stdin;\n@@ -19 +27 @@ async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {\n  let mut stdout = tokio::io::stdout().into_raw_mode().unwrap();\n  let mut stdout = std::io::stdout().into_raw_mode().unwrap();\n",
@@ -1082,7 +1154,8 @@
   "messages": [
     {
       "content": "Implement AsyncReadExt in hook.rs for asynchronous reading\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/bin/hook.rs c/src/bin/hook.rs\nindex 9a3b0ef..caaf0cb 100644\n--- c/src/bin/hook.rs\n+++ c/src/bin/hook.rs\n@@ -14,0 +15,2 @@ use ai::{commit, config};\nuse tokio::io::AsyncReadExt;\n\n",
@@ -1097,7 +1170,8 @@
   "messages": [
     {
       "content": "Add async function for reading user input in hook.rs\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/bin/hook.rs c/src/bin/hook.rs\nindex c365af4..9a3b0ef 100644\n--- c/src/bin/hook.rs\n+++ c/src/bin/hook.rs\n@@ -16,0 +17 @@ async fn read_input(pb: ProgressBar) -> tokio::io::Result<i32> {\n  let mut stdout = tokio::io::stdout().into_raw_mode().unwrap();\n",
@@ -1112,25 +1186,11 @@
   "messages": [
     {
       "content": "Add std::time::Duration import in hook.rs and remove duplicate\n",
-      "role": "assistant"
+      "role": "assistant",
+      "weight": 1.0
     },
     {
       "content": "diff --git c/src/bin/hook.rs c/src/bin/hook.rs\nindex 8ec1d31..c365af4 100644\n--- c/src/bin/hook.rs\n+++ c/src/bin/hook.rs\n@@ -2,0 +3,2 @@\nuse std::time::Duration;\n\n@@ -7 +8,0 @@ use termion::event::Key;\nuse std::time::Duration;\n",
-      "role": "user"
-    },
-    {
-      "content": "Your role is to create concise git commit messages based on user-provided git diffs. When crafting these messages: - Focus on detailing the changes and reasons behind them, ensuring clarity and relevance. - Avoid including irrelevant or unnecessary details, such as translations, to maintain focus on the core changes. Your responses should be direct and immediately usable in a git commit, crafted in present tense to fit git conventions. You work primarily with git diffs, interpreting them to generate meaningful commit messages that succinctly summarize the changes.",
-      "role": "system"
-    }
-  ]
-}{
-  "messages": [
-    {
-      "content": "Remove unused imports from hook.rs\n",
-      "role": "assistant"
-    },
-    {
-      "content": "diff --git c/src/bin/hook.rs c/src/bin/hook.rs\nindex 982d2ff..8ec1d31 100644\n--- c/src/bin/hook.rs\n+++ c/src/bin/hook.rs\n@@ -8 +7,0 @@ use std::time::Duration;\nuse std::io::Write;\n@@ -11 +9,0 @@ use git2::{Oid, Repository};\nuse env_logger;\n",
       "role": "user"
     },
     {

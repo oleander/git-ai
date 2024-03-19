@@ -12,24 +12,7 @@ fn main() -> Result<()> {
 
   let max_tokens = 16385;
   let file_name = "file-tune.json";
-  let max_commits = 100;
-
-  let mut opts = DiffOptions::new();
-  opts
-    .ignore_whitespace_change(true)
-    .recurse_untracked_dirs(false)
-    .recurse_ignored_dirs(false)
-    .ignore_whitespace_eol(true)
-    .ignore_blank_lines(true)
-    .include_untracked(false)
-    .ignore_whitespace(true)
-    .indent_heuristic(false)
-    .ignore_submodules(true)
-    .include_ignored(false)
-    .interhunk_lines(0)
-    .context_lines(0)
-    .patience(true)
-    .minimal(true);
+  let max_commits = 10;
 
   log::info!("Creating fine-tune file with {} commits and {} tokens", max_commits, max_tokens);
 
@@ -49,15 +32,20 @@ fn main() -> Result<()> {
   for oid in revwalk.take(max_commits) {
     let oid = oid.context("Failed to get oid")?;
     let commit = repo.find_commit(oid).context("Couldn't find commit")?;
-    let commit = if commit.author().email() == Some(&user_email) {
-      commit
-    } else if commit.committer().email() == Some(&user_email) {
-      commit
-    } else {
+
+    if commit.parent_count() > 1 {
       continue;
+    }
+
+    let weight = if commit.author().email() == Some(&user_email) {
+      1.0
+    } else if commit.committer().email() == Some(&user_email) {
+      1.0
+    } else {
+      0.5
     };
 
-    let Some(content) = generate_commit_diff(&repo, &commit, &opts) else {
+    let Ok(Some(content)) = generate_commit_diff(&repo, &commit) else {
       continue;
     };
 
@@ -65,9 +53,13 @@ fn main() -> Result<()> {
       continue;
     };
 
+    if commit.starts_with("Merge") {
+      continue;
+    }
+
     let message = json!({
       "messages": [
-        { "role": "assistant", "content": commit },
+        { "role": "assistant", "content": commit, "weight": weight },
         { "role": "user", "content": content },
         { "role": "system", "content": PROMPT }
       ]
@@ -90,19 +82,56 @@ fn main() -> Result<()> {
   Ok(())
 }
 
-fn generate_commit_diff(repo: &Repository, commit: &Commit, opts: &DiffOptions) -> Result<Option<String>> {
+fn should_exclude_path(file_path: &str) -> bool {
+  let exclude_patterns = vec![
+    "/docs/", "/test/", "/spec/", "/assets/", "/images/", "Gemfile", "/config/", "/vendor/", "/submodules/",
+    ".md", // For Markdown files
+  ];
+
+  exclude_patterns.iter().any(|pattern| file_path.contains(pattern))
+}
+
+fn generate_commit_diff(repo: &Repository, commit: &Commit) -> Result<Option<String>> {
   let parent = commit.parents().next().unwrap_or_else(|| commit.clone());
   let tree = commit.tree().expect("Couldn't get commit tree");
   let parent_tree = parent.tree().expect("Couldn't get parent tree");
+  let mut opts = DiffOptions::new();
+  opts
+    .ignore_whitespace_change(true)
+    .recurse_untracked_dirs(false)
+    .recurse_ignored_dirs(false)
+    .ignore_whitespace_eol(true)
+    .ignore_blank_lines(true)
+    .include_untracked(false)
+    .ignore_whitespace(true)
+    .indent_heuristic(false)
+    .ignore_submodules(true)
+    .include_ignored(false)
+    .interhunk_lines(0)
+    .context_lines(0)
+    .patience(true)
+    .minimal(true);
 
   let diff = repo.diff_tree_to_tree(Some(&parent_tree), Some(&tree), Some(&mut opts)).context("Failed to get diff")?;
 
   let mut patch: Vec<u8> = Vec::new();
 
   #[rustfmt::skip]
-  diff.print(DiffFormat::Patch, |_, _, line| {
+  diff.print(DiffFormat::Patch, |delta, _, line| {
+    // Ignore if line is a binary file
+    if line.origin() == 'B' {
+      return false;
+    }
+
+    let file_path = delta.new_file().path().unwrap_or_else(|| delta.old_file().path().unwrap());
+
+    if should_exclude_path(file_path.to_str().unwrap()) {
+      return false;
+    }
+
     let content = line.content();
     patch.extend_from_slice(content);
+
     true
   }).context("Failed to print diff")?;
 
