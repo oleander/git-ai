@@ -6,7 +6,6 @@ use git2::{Oid, Repository};
 use ai::{commit, config};
 use std::time::Duration;
 use ai::commit::Session;
-use termion::event::Key;
 use clap::Parser;
 use ai::hook::*;
 
