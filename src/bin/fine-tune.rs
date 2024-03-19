@@ -61,7 +61,11 @@ fn main() -> Result<()> {
       continue;
     }
 
-    if commit.len() > 80 {
+    if commit.starts_with("Revert") {
+      continue;
+    }
+
+    if commit.len() > 72 {
       continue;
     }
 
