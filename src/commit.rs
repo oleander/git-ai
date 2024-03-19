@@ -107,13 +107,13 @@ pub struct OpenAIResponse {
   pub response: String
 }
 
+// Create a new assistant
 async fn create_assistant(client: &Client<OpenAIConfig>) -> Result<AssistantObject, ChatError> {
   let language = config::APP.language.clone();
   let max_length_of_commit = config::APP.max_length;
   let model = config::APP.model.clone();
   let instruction = instruction(language, max_length_of_commit);
 
-  // Ensure that the assistant is created with the code_interpreter tool
   let tools = vec![AssistantTools::Code(AssistantToolsCode {
     r#type: "code_interpreter".to_string()
   })];
