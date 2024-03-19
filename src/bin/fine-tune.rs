@@ -66,9 +66,13 @@ fn main() -> Result<()> {
       continue;
     }
 
+    if commit.contains("[") && commit.contains("]") {
+      continue;
+    }
+
     let message = json!({
       "messages": [
-        { "role": "assistant", "content": commit, "weight": weight },
+        { "role": "assistant", "content": commit.trim(), "weight": weight },
         { "role": "user", "content": content.trim() },
         { "role": "system", "content": PROMPT }
       ]
