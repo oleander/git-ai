@@ -11,7 +11,8 @@ fn main() -> Result<()> {
   env_logger::init();
 
   let max_tokens = 16385;
-  let file_name = "file-tune.json";
+  let validate_file_name = "validate.jsonl";
+  let train_file_name = "train.jsonl";
   let max_commits = 10;
 
   log::info!("Creating fine-tune file with {} commits and {} tokens", max_commits, max_tokens);
@@ -20,14 +21,17 @@ fn main() -> Result<()> {
   let config = repo.config().context("Couldn't access repository config")?;
   let user_email = config.get_string("user.email").context("Couldn't get user email")?;
   let mut revwalk = repo.revwalk().context("Failed to create Revwalk")?;
-  let mut file = File::create(file_name).context("Failed to create file")?;
+  let mut validate_file = File::create(validate_file_name).context("Failed to create file")?;
+  let mut train_file = File::create(train_file_name).context("Failed to create file")?;
 
-  file.write_all(b"").context("Failed to write to file")?;
+  validate_file.write_all(b"").context("Failed to write to file")?;
+  train_file.write_all(b"").context("Failed to write to file")?;
 
   revwalk.push_head().expect("Failed to push head");
 
   let mut curr_size = 0;
   let mut commit_count = 0;
+  let mut result = vec![];
 
   for oid in revwalk {
     let oid = oid.context("Failed to get oid")?;
@@ -38,11 +42,11 @@ fn main() -> Result<()> {
     }
 
     let weight = if commit.author().email() == Some(&user_email) {
-      1.0
+      1
     } else if commit.committer().email() == Some(&user_email) {
-      1.0
+      1
     } else {
-      0.5
+      0
     };
 
     let Ok(Some(content)) = generate_commit_diff(&repo, &commit) else {
@@ -72,13 +76,13 @@ fn main() -> Result<()> {
 
     let message = json!({
       "messages": [
-        { "role": "assistant", "content": commit.trim(), "weight": weight },
+        { "role": "assistant", "content": commit.trim() },
         { "role": "user", "content": content.trim() },
         { "role": "system", "content": PROMPT }
       ]
     });
 
-    let content = serde_json::to_string_pretty(&message)?;
+    let content = serde_json::to_string(&message)?;
     curr_size += content.split_whitespace().count();
 
     if curr_size > max_tokens {
@@ -87,10 +91,30 @@ fn main() -> Result<()> {
     }
 
     commit_count += 1;
-    file.write_all(content.as_bytes()).context("Failed to write to file")?;
+    result.push(message);
   }
 
-  log::info!("File {} created with {} commits", file_name, commit_count);
+
+  let train_result = result[..(result.len() / 2)].to_vec();
+  for (i, message) in train_result.iter().enumerate() {
+    let content = serde_json::to_string(&message)?;
+    if i > 0 {
+      train_file.write_all(b"\n").context("Failed to write to file")?;
+    }
+    train_file.write_all(content.as_bytes()).context("Failed to write to file")?;
+  }
+
+  let validate_result = result[(result.len() / 2)..].to_vec();
+  for (i, message) in validate_result.iter().enumerate() {
+    let content = serde_json::to_string(&message)?;
+    if i > 0 {
+      validate_file.write_all(b"\n").context("Failed to write to file")?;
+    }
+    validate_file.write_all(content.as_bytes()).context("Failed to write to file")?;
+
+  }
+
+  log::info!("Wrote {} commits to train file and {} commits to validate file", commit_count / 2, commit_count / 2);
 
   Ok(())
 }
