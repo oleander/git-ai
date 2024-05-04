@@ -1,0 +1,80 @@
+#!/usr/bin/env fish
+
+set repo_url "https://github.com/rails/rails.git"
+set output_file "commits_diffs.csv"
+set tmp_dir /tmp/test-git-dir-for-git-ai
+set commit_limit 2
+set header "diff,commit"
+
+set -x GIT_DIR "$tmp_dir/.git"
+echo "Using $GIT_DIR as GIT_DIR"
+
+if test -d "$tmp_dir"
+    echo "Using existing repo in $tmp_dir"
+else
+    echo "Cloning $repo_url to $tmp_dir"
+    git clone "$repo_url" "$tmp_dir"
+end
+
+echo $header >$output_file
+
+set commit_index 0
+set collected_commits 0
+
+while test $collected_commits -lt $commit_limit
+    set i $commit_index
+
+    echo "Processing commit $i"
+
+    set commit_hash (git rev-parse HEAD~$i 2>/dev/null)
+    if test -z "$commit_hash"
+        echo "[BUG] Commit $i not found"
+        exit 1
+    end
+
+    set parent_count (git rev-list --count $commit_hash^@ 2>/dev/null)
+    if not set -q parent_count
+        echo "[BUG] Commit $commit_hash has no parent"
+        exit 1
+    end
+
+    set diff (git diff HEAD~$i^ HEAD~$i 2>/dev/null)
+    if not set -q diff
+        echo "[BUG] Diff not found for commit $i"
+        exit 1
+    end
+
+    # set diff (echo $diff | sed '1d') # Remove first line of diff
+    # set diff (echo $diff | sed -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g') # Remove trailing newline
+
+    set newline_count (echo $diff | tr -cd '\n' | wc -c)
+    if test $newline_count -gt 1
+        echo "Skipping commit $i with $newline_count newlines"
+        set commit_index (math $commit_index + 1)
+        continue
+    end
+
+    if test (string length "$diff") -gt 100000
+        echo "Skipping merge commit $i"
+        set commit_index (math $commit_index + 1)
+        continue
+    end
+
+    set commit_msg (git log --format=%B -n 1 HEAD~$i 2>/dev/null)
+    if string match -q "*Merge pull*" $commit_msg
+        echo "Skipping commit $i with message: $commit_msg"
+        set commit_index (math $commit_index + 1)
+        continue
+    end
+
+    echo "Commit: $commit_msg"
+    echo "Diff: $diff"
+
+    echo "$diff,$commit_msg" >>$output_file
+
+    set commit_index (math $commit_index + 1)
+    set collected_commits (math $collected_commits + 1)
+    echo "Remaining commits: $commit_limit"
+end
+
+echo "Output stored in $output_file"
