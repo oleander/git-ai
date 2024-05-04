@@ -118,7 +118,6 @@ async fn create_assistant(client: &Client<OpenAIConfig>) -> Result<AssistantObje
   let assistant_request = CreateAssistantRequestArgs::default()
     .name("Git Commit Assistant")
     .instructions(&instruction)
-    .max_tokens(100)
     .tools(tools)
     .model(model)
     .build()?;
@@ -156,7 +155,6 @@ impl Connection {
   async fn create_run(&self) -> Result<Run, ChatError> {
     let request = CreateRunRequestArgs::default()
       .assistant_id(self.session.clone().assistant_id)
-
       .build()?;
     let run = self
       .client
