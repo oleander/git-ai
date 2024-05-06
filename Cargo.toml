@@ -4,6 +4,7 @@ version = "0.1.30"
 edition = "2021"
 description = "Git AI: Automates commit messages using ChatGPT. Stage your files, and Git AI generates the messages."
 license = "MIT"
+repository = "https://github.com/oleander/git-ai"
 
 [lib]
 name = "ai"
