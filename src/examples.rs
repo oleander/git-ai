@@ -65,7 +65,7 @@ use console::Style;
 use indicatif::{ProgressBar, ProgressStyle};
 
 pub async fn run(_args: &clap::ArgMatches) -> Result<()> {
-  let max_tokens = APP.max_diff_tokens;
+  let max_tokens = APP.max_tokens;
 
   let current_dir = std::env::current_dir().context("Failed to get current directory")?;
   let repo = Repository::open_ext(&current_dir, RepositoryOpenFlags::empty(), Vec::<&Path>::new())?;
@@ -88,7 +88,7 @@ pub async fn run(_args: &clap::ArgMatches) -> Result<()> {
 
   for (index, commit) in commits.iter().enumerate() {
     pb.set_message(format!("Loading commit #{} ...\n", index + 1));
-    let response = commit::generate(commit.show(&repo, max_tokens)?, None, None).await?;
+    let response = commit::generate(commit.show(&repo, max_tokens)?).await?;
 
     let commit_message = response.response.trim();
     pb.println(format!("Commit #{}:", index + 1));

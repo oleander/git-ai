@@ -11,12 +11,12 @@ use clap::ArgMatches;
 
 #[derive(Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct App {
-  pub openai_api_key:  Option<String>,
-  pub model:           String,
-  pub language:        String,
-  pub max_diff_tokens: usize,
-  pub max_length:      usize,
-  pub timeout:         usize
+  pub openai_api_key:    Option<String>,
+  pub model:             String,
+  pub language:          String,
+  pub max_tokens:        usize,
+  pub max_commit_length: usize,
+  pub timeout:           usize
 }
 
 impl App {
@@ -49,8 +49,8 @@ impl App {
       .add_source(config::File::new(CONFIG_PATH.to_str().unwrap(), FileFormat::Ini))
       .set_default("language", "en")?
       .set_default("timeout", 30)?
-      .set_default("max_length", 80)?
-      .set_default("max_diff_tokens", 1000)?
+      .set_default("max_commit_length", 72)?
+      .set_default("max_tokens", 512)?
       .set_default("model", "gpt-4-turbo-preview")?
       .build()?;
 
@@ -83,15 +83,15 @@ pub fn run(args: &ArgMatches) -> Result<()> {
         .context("Failed to parse language")?
         .clone();
     }
-    Some(("max-diff-tokens", args)) => {
-      app.max_diff_tokens = *args
-        .get_one("max-diff-tokens")
-        .context("Failed to parse max-diff-tokens")?;
+    Some(("max-tokens", args)) => {
+      app.max_tokens = *args
+        .get_one("max-tokens")
+        .context("Failed to parse max-tokens")?;
     }
-    Some(("max-length", args)) => {
-      app.max_length = *args
-        .get_one("max-length")
-        .context("Failed to parse max-length")?;
+    Some(("max-commit-length", args)) => {
+      app.max_commit_length = *args
+        .get_one("max-commit-length")
+        .context("Failed to parse max-commit-length")?;
     }
     Some(("openai-api-key", args)) => {
       app.openai_api_key = args

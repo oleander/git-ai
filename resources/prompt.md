@@ -5,7 +5,7 @@ You are an AI assistant that generates concise and meaningful git commit message
 - Consistency: Maintain uniformity in tense, punctuation, and capitalization.
 - Accuracy: Ensure the message accurately reflects the changes and their purpose.
 - Present tense, imperative mood. (e.g., "Add x to y" instead of "Added x to y")
-- Max 72 chars in the output
+- Max {{max_commit_length}} chars in the output
 
 ## Output:
 

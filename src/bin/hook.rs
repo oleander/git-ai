@@ -6,7 +6,6 @@ use indicatif::{ProgressBar, ProgressStyle};
 use anyhow::{Context, Result};
 use git2::{Oid, Repository};
 use ai::{commit, config};
-use ai::commit::Session;
 use clap::Parser;
 use ai::hook::*;
 
@@ -15,7 +14,7 @@ async fn main() -> Result<()> {
   env_logger::init();
 
   let args = Args::parse();
-  let max_tokens = config::APP.max_diff_tokens;
+  let max_tokens = config::APP.max_tokens;
   let pb = ProgressBar::new_spinner();
   let repo = Repository::open_from_env().context("Failed to open repository")?;
 
@@ -63,20 +62,15 @@ async fn main() -> Result<()> {
     std::process::exit(1);
   })?;
 
-  // Create a new session from the client
-  let session = Session::load_from_repo(&repo).await.unwrap();
+  pb.set_message("Generating commit message...");
 
-  // If the user has a session, then we can use it to generate the commit message
-  let response = commit::generate(patch.to_string(), session.into(), pb.clone().into()).await?;
+  let response = commit::generate(patch.to_string()).await?;
 
   // Write the response to the commit message file
   args
     .commit_msg_file
     .write(response.response.trim().to_string())
     .unwrap();
-
-  // Save the session to the repository
-  response.session.save_to_repo(&repo).await.unwrap();
 
   pb.finish_and_clear();
 

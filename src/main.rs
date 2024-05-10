@@ -33,30 +33,20 @@ fn cli() -> Command {
               )
             )
             .subcommand(
-              Command::new("language")
-                .about("Sets the language to use")
-                .arg(
-                  Arg::new("<VALUE>")
-                    .required(true)
-                    .index(1)
-                    .value_parser(clap::builder::NonEmptyStringValueParser::new())
-                )
-            )
-            .subcommand(
-              Command::new("max-diff-tokens")
+              Command::new("max-tokens")
                 .about("Sets the maximum number of tokens to use for the diff")
                 .arg(
-                  Arg::new("max-diff-tokens")
+                  Arg::new("max-tokens")
                     .required(true)
                     .index(1)
                     .value_parser(clap::value_parser!(usize))
                 )
             )
             .subcommand(
-              Command::new("max-length")
+              Command::new("max-commit-length")
                 .about("Sets the maximum length of the commit message")
                 .arg(
-                  Arg::new("max-length")
+                  Arg::new("max-commit-length")
                     .required(true)
                     .index(1)
                     .value_parser(clap::value_parser!(usize))
