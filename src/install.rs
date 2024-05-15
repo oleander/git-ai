@@ -73,8 +73,7 @@ pub fn run() -> Result<(), InstallError> {
     return Err(InstallError::GitHookExists(hook_file.relative_path()));
   }
 
-  // Symlink the hook_bin to the hook_file
-  unix_fs::symlink(&hook_bin, &hook_file)?;
+  std::fs::copy(&hook_bin, &hook_file)?;
 
   println!(
     "{EMOJI} Hook symlinked successfully to {}",
