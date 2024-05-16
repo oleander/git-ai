@@ -79,7 +79,8 @@ pub async fn generate(diff: String) -> Result<OpenAIResponse, ChatError> {
     .build()?;
 
   let response = client.chat().create(request).await?;
-  let choise = response.choices.get(0).unwrap();
+  let reason = format!("Received empty response: {:?}", response);
+  let choise = response.choices.first().context(reason)?;
   let text = choise.message.content.clone();
 
   Ok(OpenAIResponse {

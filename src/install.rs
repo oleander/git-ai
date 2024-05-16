@@ -51,7 +51,7 @@ pub fn run() -> Result<(), InstallError> {
   }
 
   let current_dir = env::current_dir()?;
-  let repo = Repository::open_ext(&current_dir, Flags::empty(), Vec::<&Path>::new())?;
+  let repo = Repository::open_ext(current_dir, Flags::empty(), Vec::<&Path>::new())?;
   let repo_path = repo
     .path()
     .parent()

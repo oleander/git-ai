@@ -115,7 +115,7 @@ pub trait PatchRepository {
   fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>>;
 }
 
-impl<'a> PatchRepository for Repository {
+impl PatchRepository for Repository {
   fn to_patch(&self, tree: Option<Tree>, max_token_count: usize) -> Result<String> {
     self.to_diff(tree)?.to_patch(max_token_count)
   }

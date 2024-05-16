@@ -46,8 +46,7 @@ impl CommitExt for git2::Commit<'_> {
       .parent(0)
       .ok()
       .as_ref()
-      .map(|c| c.tree().ok())
-      .flatten();
+      .and_then(|c| c.tree().ok());
     let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut opts))?;
 
     _ = diff

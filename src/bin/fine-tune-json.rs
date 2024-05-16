@@ -29,7 +29,7 @@ fn main() -> Result<()> {
     "<Commit message>": "<Diff content>"
   });
 
-  write!(file, "{}\n", example).context("Failed to write to file")?;
+  writeln!(file, "{}\n", example).context("Failed to write to file")?;
 
   for oid in revwalk {
     let oid = oid.context("Failed to get oid")?;
@@ -90,7 +90,7 @@ fn main() -> Result<()> {
 
     commit_count += 1;
 
-    write!(file, "{}\n", content).context("Failed to write to file")?;
+    writeln!(file, "{}\n", content).context("Failed to write to file")?;
 
     if commit_count >= max_commits {
       break;

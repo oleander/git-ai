@@ -72,33 +72,40 @@ pub fn run(args: &ArgMatches) -> Result<()> {
   let mut app = App::new()?;
   match args.subcommand() {
     Some(("model", args)) => {
-      app.model = args
-        .get_one::<String>("<VALUE>")
-        .context("Failed to parse model")?
-        .clone();
+      app.model.clone_from(
+        args
+          .get_one::<String>("<VALUE>")
+          .context("Failed to parse model")?
+      );
     }
     Some(("language", args)) => {
-      app.language = args
-        .get_one::<String>("<VALUE>")
-        .context("Failed to parse language")?
-        .clone();
+      app.language.clone_from(
+        args
+          .get_one::<String>("<VALUE>")
+          .context("Failed to parse language")?
+      );
     }
     Some(("max-tokens", args)) => {
-      app.max_tokens = *args
-        .get_one("max-tokens")
-        .context("Failed to parse max-tokens")?;
+      app.max_tokens.clone_from(
+        args
+          .get_one("max-tokens")
+          .context("Failed to parse max-tokens")?
+      );
     }
     Some(("max-commit-length", args)) => {
-      app.max_commit_length = *args
-        .get_one("max-commit-length")
-        .context("Failed to parse max-commit-length")?;
+      app.max_commit_length.clone_from(
+        args
+          .get_one("max-commit-length")
+          .context("Failed to parse max-commit-length")?
+      );
     }
     Some(("openai-api-key", args)) => {
-      app.openai_api_key = args
-        .get_one::<String>("<VALUE>")
-        .context("Failed to parse openai-api-key")?
-        .clone()
-        .into();
+      app.openai_api_key.clone_from(&Some(
+        args
+          .get_one::<String>("<VALUE>")
+          .context("Failed to parse openai-api-key")?
+          .to_owned()
+      ));
     }
     _ => unreachable!()
   }
