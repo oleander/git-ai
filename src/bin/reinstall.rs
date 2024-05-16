@@ -1,12 +1,7 @@
-use std::path::{Path, PathBuf};
-use std::{env, fs};
-use std::os::unix::fs::symlink as symlink_unix;
-
-use colored::Colorize;
 use console::Emoji;
-use git2::{Repository, RepositoryOpenFlags as Flags};
-use anyhow::{bail, Context, Result};
-use file::Filesystem;
+use anyhow::Result;
+use ai::filesystem::Filesystem;
+use colored::*;
 
 const EMOJI: Emoji<'_, '_> = Emoji("🔗", "");
 

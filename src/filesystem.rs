@@ -110,7 +110,7 @@ impl Dir {
 }
 
 impl Filesystem {
-  fn new() -> Result<Self> {
+  pub fn new() -> Result<Self> {
     let current_dir = env::current_dir().context("Failed to get current directory")?;
     let git_ai_bin_path = env::current_exe().context("Failed to get current executable")?;
 
@@ -136,7 +136,6 @@ impl Filesystem {
   }
 
   pub fn git_ai_hook_bin_path(&self) -> Result<File> {
-    // Ok(self.git_ai_hook_bin_path.as_path())
     File::new(self.git_ai_hook_bin_path.clone()).into()
   }
 
