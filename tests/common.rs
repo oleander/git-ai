@@ -14,10 +14,7 @@ impl Default for TestRepo {
     let repo = git2::Repository::init(repo_path.path()).unwrap();
     std::env::set_var("GIT_DIR", repo_path.path().join(".git"));
 
-    Self {
-      repo,
-      repo_path
-    }
+    Self { repo, repo_path }
   }
 }
 
@@ -38,11 +35,7 @@ pub struct GitFile {
 
 impl GitFile {
   pub fn new(repo: git2::Repository, path: PathBuf, repo_path: PathBuf) -> Self {
-    Self {
-      repo,
-      path,
-      repo_path
-    }
+    Self { repo, path, repo_path }
   }
 
   pub fn stage(&self) -> Result<()> {
@@ -90,13 +83,12 @@ impl GitFile {
   fn find_last_commit(&self) -> Result<git2::Commit, git2::Error> {
     let head = match self.repo.head() {
       Ok(head) => head,
-      Err(e) => {
+      Err(e) =>
         if e.code() == git2::ErrorCode::UnbornBranch || e.code() == git2::ErrorCode::NotFound {
           return Err(e);
         } else {
           panic!("Failed to retrieve HEAD: {}", e);
-        }
-      }
+        },
     };
 
     let commit = head.peel_to_commit()?;

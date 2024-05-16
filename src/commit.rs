@@ -1,8 +1,6 @@
 use std::io;
 
-use async_openai::types::{
-  ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs
-};
+use async_openai::types::{ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs};
 use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
 use async_openai::Client;
@@ -83,7 +81,5 @@ pub async fn generate(diff: String) -> Result<OpenAIResponse, ChatError> {
   let choise = response.choices.first().context(reason)?;
   let text = choise.message.content.clone();
 
-  Ok(OpenAIResponse {
-    response: text.unwrap()
-  })
+  Ok(OpenAIResponse { response: text.unwrap() })
 }

@@ -75,7 +75,7 @@ async fn main() -> Result<()> {
   let args = cli().get_matches();
 
   match args.subcommand() {
-    Some(("hook", sub)) => {
+    Some(("hook", sub)) =>
       match sub.subcommand() {
         Some(("install", _)) => {
           install::run()?;
@@ -84,16 +84,14 @@ async fn main() -> Result<()> {
           uninstall::run()?;
         }
         _ => unreachable!()
-      }
-    }
-    Some(("config", args)) => {
+      },
+    Some(("config", args)) =>
       match args.subcommand() {
         Some(("set", args)) => {
           config::run(args)?;
         }
         _ => unreachable!()
-      }
-    }
+      },
     Some(("examples", args)) => {
       examples::run(args).await?;
     }

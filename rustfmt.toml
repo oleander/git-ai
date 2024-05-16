@@ -6,7 +6,7 @@ struct_field_align_threshold = 40
 fn_params_layout = "Compressed"
 use_field_init_shorthand = true
 overflow_delimited_expr = true
-struct_lit_single_line = false
+struct_lit_single_line = true
 imports_granularity = "Module"
 imports_layout = "Horizontal"
 force_multiline_blocks = true
@@ -21,7 +21,7 @@ newline_style = "Auto"
 fn_call_width = 90
 hard_tabs = false
 version = "Two"
-max_width = 120
+max_width = 140
 tab_spaces = 2
 
 attr_fn_like_width = 120
@@ -29,6 +29,8 @@ match_block_trailing_comma = false
 where_single_line = false
 chain_width = 60
 edition = "2021"
-struct_lit_width = 0
 struct_variant_width = 0
 single_line_if_else_max_width = 0
+
+match_arm_blocks = false
+struct_lit_width = 50
