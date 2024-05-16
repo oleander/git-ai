@@ -1,4 +1,3 @@
-use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
