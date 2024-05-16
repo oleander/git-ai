@@ -20,6 +20,7 @@ pub fn main() -> Result<()> {
   let hook_bin = filesystem.git_ai_hook_bin_path()?;
 
   if hook_file.exists() {
+    log::debug!("Removing existing hook file: {}", hook_file);
     hook_file.delete()?;
   }
 

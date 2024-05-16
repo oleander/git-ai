@@ -73,7 +73,7 @@ pub struct Dir {
 
 impl std::fmt::Display for Dir {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", self.relative_path().unwrap().path.display())
+    write!(f, "{}", self.path.display())
   }
 }
 
@@ -117,7 +117,12 @@ impl Filesystem {
     let repo = Repository::open_ext(current_dir.clone(), Flags::empty(), Vec::<&Path>::new())
       .context(format!("Failed to open repository at {}", current_dir.clone().display()))?;
 
-    let git_path = repo.path();
+    let mut git_path = repo.path().to_path_buf();
+    // if relative, make it absolute
+    if git_path.is_relative() {
+      // make git_path absolute using the current folder as the base
+      git_path = current_dir.join(git_path);
+    }
 
     let git_ai_hook_bin_path = git_ai_bin_path
       .parent()
