@@ -6,8 +6,6 @@ use console::Emoji;
 const EMOJI: Emoji<'_, '_> = Emoji("🔗", "");
 
 pub fn run() -> Result<()> {
-  env_logger::init();
-
   let filesystem = Filesystem::new()?;
 
   if !filesystem.git_hooks_path().exists() {
