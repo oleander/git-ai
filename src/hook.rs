@@ -75,7 +75,7 @@ impl PatchDiff for Diff<'_> {
     let model: Model = "gpt-4".into();
 
     if model.context_size() < max_token_count {
-      return bail!(
+      bail!(
         "Invalid max token count ({}), must be less than {}",
         max_token_count,
         model.context_size()

@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use std::fmt::{self, Display};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use tiktoken_rs::get_completion_max_tokens;
 use tiktoken_rs::model::get_context_size;
 
