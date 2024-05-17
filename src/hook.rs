@@ -4,10 +4,11 @@ use std::path::PathBuf;
 use std::fs::File;
 
 use git2::{Diff, DiffFormat, DiffOptions, Repository, Tree};
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use thiserror::Error;
 use clap::Parser;
 
+use crate::model::Model;
 use crate::commit::ChatError;
 
 pub trait FilePath {
@@ -71,6 +72,16 @@ pub trait PatchDiff {
 
 impl PatchDiff for Diff<'_> {
   fn to_patch(&self, max_token_count: usize) -> Result<String> {
+    let model: Model = "gpt-4".into();
+
+    if model.context_size() < max_token_count {
+      return bail!(
+        "Invalid max token count ({}), must be less than {}",
+        max_token_count,
+        model.context_size()
+      );
+    }
+
     let truncated_message = "<truncated>";
     let number_of_files = self.deltas().len();
 
@@ -89,14 +100,16 @@ impl PatchDiff for Diff<'_> {
     #[rustfmt::skip]
     self.print(DiffFormat::Patch, |diff, _hunk, line| {
       let diff_path = diff.path();
-      let Some(tokens) = token_table.get_mut(&diff_path) else {
+      let Some(acc_count) = token_table.get_mut(&diff_path) else {
         return true;
       };
 
       let content = line.content();
-      let curr_tokens = content.to_utf8().split_whitespace().count();
-      if *tokens + curr_tokens < tokens_per_file {
-        *tokens += curr_tokens;
+      let string = content.to_utf8();
+      let curr_count = model.count_tokens(&string).context("Failed to count tokens").unwrap_or_default();
+
+      if *acc_count + curr_count < tokens_per_file {
+        *acc_count += curr_count;
         patch_acc.extend_from_slice(content);
       } else {
         patch_acc.extend_from_slice(truncated_message.as_bytes());
