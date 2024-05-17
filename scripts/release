@@ -1,16 +1,35 @@
 #!/usr/bin/env fish
 
-# Fetch the current project version using cargo metadata and jq, then remove newline characters.
-set release (cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version' | tr -d '\n')
+# Function to increment the version
+function bump_version
+  set -l current_version (cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version')
+  if test -z "$current_version"
+    echo "=> Failed to get version from cargo metadata"
+    exit 1
+  end
+  set -l IFS "."
+  set -l parts $current_version
+  set -l new_version "$parts[1].$parts[2].(math "$parts[3] + 1")"
+  echo $new_version
+end
 
-if test -z "$release"
-  echo "=> Failed to get version from cargo metadata"
+# Fetch the new version
+set new_version (bump_version)
+if test -z "$new_version"
+  echo "=> Failed to bump version"
+  exit 1
+end
+
+# Update Cargo.toml with the new version
+sed -i "s/^version = \".*\"/version = \"$new_version\"/" Cargo.toml
+if test $status -ne 0
+  echo "=> Failed to update version in Cargo.toml"
   exit 1
 end
 
 echo "=> Running tests..."
 if not cargo test
-  echo "=> Tests has to pass before releasing"
+  echo "=> Tests have to pass before releasing"
   exit 1
 end
 
@@ -27,22 +46,22 @@ if not git add Cargo.lock Cargo.toml
   exit 1
 end
 
-if not git commit -m "Update dependencies for version $release"
+if not git commit -m "Update dependencies for version $new_version"
   echo "=> Nothing to commit"
   echo "=> Make sure to bump the version in Cargo.toml before releasing"
   exit 1
 end
 
 # Create an annotated tag for the release
-if not git tag -a "v$release" -m "Release v$release"
-  echo "=> Could not create tag: v$release"
+if not git tag -a "v$new_version" -m "Release v$new_version"
+  echo "=> Could not create tag: v$new_version"
   echo "=> Make sure to bump the version in Cargo.toml before releasing"
   exit 1
 end
 
 # Push the changes and tags to the main branch
-if not git push origin "v$release"
-  echo "=> Git push failed for tag: v$release"
+if not git push origin "v$new_version"
+  echo "=> Git push failed for tag: v$new_version"
   exit 1
 end
 
@@ -56,4 +75,4 @@ if not git push --tags
   exit 1
 end
 
-echo "=> Successfully released version $release!"
+echo "=> Successfully released version $new_version!"
