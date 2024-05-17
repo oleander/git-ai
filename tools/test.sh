@@ -45,6 +45,7 @@ echo "Testing git-ai hook uninstallation..."
 git-ai hook uninstall
 echo "Re-testing git-ai hook installation..."
 git-ai hook install
+git-ai hook reinstall
 
 # Set various configuration values
 echo "Setting configuration values..."
