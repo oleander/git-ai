@@ -5,9 +5,7 @@ use colored::*;
 
 const EMOJI: Emoji<'_, '_> = Emoji("🔗", "");
 
-// Git hook: prepare-commit-msg
-// Crates an executable git hook (prepare-commit-msg) in the .git/hooks directory
-pub fn main() -> Result<()> {
+pub fn run() -> Result<()> {
   env_logger::init();
 
   let filesystem = Filesystem::new()?;
