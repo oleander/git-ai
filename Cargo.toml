@@ -49,6 +49,7 @@ colored = "2.1.0"
 ctrlc = "3.4.4"
 log = "0.4.21"
 home = "0.5.9"
+tiktoken-rs = "0.5.9"
 
 [dependencies.git2]
 default-features = false
