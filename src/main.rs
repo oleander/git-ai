@@ -69,7 +69,7 @@ fn cli() -> Command {
     .subcommand(Command::new("examples").about("Runs examples of generated commit messages"))
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
   env_logger::init();
   dotenv().ok();
