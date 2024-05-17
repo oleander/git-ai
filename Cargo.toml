@@ -2,7 +2,7 @@ cargo-features = ["edition2024"]
 
 [package]
 name = "git-ai"
-version = "0.1.33"
+version = "0.1.34"
 edition = "2024"
 description = "Git AI: Automates commit messages using ChatGPT. Stage your files, and Git AI generates the messages."
 license = "MIT"
@@ -24,11 +24,6 @@ path = "src/bin/hook.rs"
 name = "git-ai-clear"
 path = "src/bin/clear.rs"
 
-[dependencies.clap]
-features = ["derive", "wrap_help"]
-default-features = true
-version = "4.5.3"
-
 [dependencies]
 tokio = { version = "1.36.0", features = ["rt-multi-thread", "macros"] }
 reqwest = { version = "0.11.27", features = ["json"] }
@@ -49,6 +44,11 @@ colored = "2.1.0"
 ctrlc = "3.4.4"
 log = "0.4.21"
 home = "0.5.9"
+
+[dependencies.clap]
+features = ["derive", "wrap_help"]
+default-features = true
+version = "4.5.3"
 
 [dependencies.git2]
 default-features = false
