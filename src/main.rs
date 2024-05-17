@@ -1,5 +1,6 @@
 mod uninstall;
 mod install;
+mod reinstall;
 mod config;
 mod examples;
 
@@ -17,6 +18,7 @@ fn cli() -> Command {
         .about("Installs the git-ai hook")
         .subcommand(Command::new("install").about("Installs the git-ai hook"))
         .subcommand(Command::new("uninstall").about("Uninstalls the git-ai hook"))
+        .subcommand(Command::new("reinstall").about("Reinstalls the git-ai hook"))
     )
     .subcommand(
       Command::new("config")
@@ -80,8 +82,13 @@ async fn main() -> Result<()> {
         Some(("install", _)) => {
           install::run()?;
         }
+
         Some(("uninstall", _)) => {
           uninstall::run()?;
+        }
+
+        Some(("reinstall", _)) => {
+          reinstall::run()?;
         }
         _ => unreachable!()
       },
