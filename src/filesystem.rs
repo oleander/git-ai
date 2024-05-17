@@ -57,7 +57,6 @@ impl From<&File> for Dir {
     }
 }
 
-// implement the trait for rendering using format!("{}", file)
 impl std::fmt::Display for File {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "{}", self.relative_path().unwrap_or(self.into()).path.display())
