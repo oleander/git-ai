@@ -82,11 +82,12 @@ async fn main() -> Result<()> {
         Some(("install", _)) => {
           install::run()?;
         }
+
         Some(("uninstall", _)) => {
           uninstall::run()?;
         }
 
-        Some(("uninstall", _)) => {
+        Some(("reinstall", _)) => {
           reinstall::run()?;
         }
         _ => unreachable!()
