@@ -51,10 +51,9 @@ git-ai hook reinstall
 # Set various configuration values
 echo "Setting configuration values..."
 git-ai config set model gpt-4
-git-ai config set language en
-git-ai config set max-diff-tokens 1500
-git-ai config set max-length 72
-git-ai config set openai-api-key $OPENAI_API_KEY
+git-ai config set max-tokens 512
+git-ai config set max-commit-length 1024
+git-ai config set openai-api-key "$OPENAI_API_KEY"
 
 # Create a commit to test hook functionality
 echo "Hello World" > README.md
