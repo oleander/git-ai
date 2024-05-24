@@ -44,38 +44,37 @@ impl Default for Model {
   }
 }
 
+fn parse_model(s: &str) -> Result<Model> {
+  match s.trim().to_lowercase().as_str() {
+    GPT4O => Ok(Model::GPT4o),
+    GPT4 => Ok(Model::GPT4),
+    GPT4_TURBO => Ok(Model::GPT4Turbo),
+    model => bail!("Invalid model: {}", model)
+  }
+}
+
 impl FromStr for Model {
   type Err = anyhow::Error;
 
   fn from_str(s: &str) -> Result<Self> {
-    match s.trim().to_lowercase().as_str() {
-      GPT4O => Ok(Model::GPT4o),
-      GPT4 => Ok(Model::GPT4),
-      GPT4_TURBO => Ok(Model::GPT4Turbo),
-      model => bail!("Invalid model: {}", model)
-    }
+    parse_model(s)
   }
 }
 
 impl Display for Model {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}",
-     match self {
-      Model::GPT4o => GPT4O,
-      Model::GPT4 => GPT4,
-      Model::GPT4Turbo => GPT4_TURBO
-    })
+    write!(f, "{}", <&str>::from(self))
   }
 }
 
 impl From<&str> for Model {
   fn from(s: &str) -> Self {
-    s.parse().unwrap_or_default()
+    parse_model(s).unwrap_or(Model::GPT4)
   }
 }
 
 impl From<String> for Model {
   fn from(s: String) -> Self {
-    s.as_str().into()
+    parse_model(&s).unwrap_or(Model::GPT4)
   }
 }
