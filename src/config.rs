@@ -12,7 +12,7 @@ use clap::ArgMatches;
 #[derive(Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct App {
   pub openai_api_key:    Option<String>,
-  pub model:             String,
+  pub model:             crate::ai::model::Model,
   pub language:          String,
   pub max_tokens:        Option<usize>,
   pub max_commit_length: usize,
@@ -74,7 +74,7 @@ pub fn run(args: &ArgMatches) -> Result<()> {
     Some(("model", args)) => {
       app.model.clone_from(
         args
-          .get_one::<String>("<VALUE>")
+          .get_one::<crate::model::Model>("<VALUE>")
           .context("Failed to parse model")?
       );
     }
