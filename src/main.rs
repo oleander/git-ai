@@ -2,7 +2,6 @@ mod uninstall;
 mod install;
 mod reinstall;
 mod config;
-mod examples;
 
 use clap::{Arg, Command};
 use anyhow::Result;
@@ -66,7 +65,6 @@ fn cli() -> Command {
             )
         )
     )
-    .subcommand(Command::new("examples").about("Runs examples of generated commit messages"))
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -98,10 +96,7 @@ async fn main() -> Result<()> {
           config::run(args)?;
         }
         _ => unreachable!()
-      },
-    Some(("examples", args)) => {
-      examples::run(args).await?;
-    }
+      }
     _ => unreachable!()
   }
 
