@@ -5,8 +5,7 @@ use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
 use async_openai::Client;
 use thiserror::Error;
-use anyhow::Context;
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use crate::config;
 use crate::model::Model;
@@ -51,7 +50,9 @@ fn instruction() -> String {
 }
 
 pub fn token_used(model: &Model) -> Result<usize> {
-  model.count_tokens(&instruction()).context("Could not count tokens in instruction message")
+  model
+    .count_tokens(&instruction())
+    .context("Could not count tokens in instruction message")
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -79,7 +79,10 @@ impl PatchDiff for Diff<'_> {
       return Err(HookError::EmptyDiffOutput.into());
     }
 
-    let truncation_count = model.count_tokens(truncated_message).context("Failed to count tokens").unwrap_or_default();
+    let truncation_count = model
+      .count_tokens(truncated_message)
+      .context("Failed to count tokens")
+      .unwrap_or_default();
     let tokens_per_file = (max_token_count / number_of_files) - truncation_count;
     let mut token_table: HashMap<PathBuf, usize> = HashMap::new();
     let mut patch_acc = Vec::new();

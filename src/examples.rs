@@ -61,36 +61,36 @@ use anyhow::Result;
 // use indicatif::{ProgressBar, ProgressStyle};
 
 pub async fn run(_args: &clap::ArgMatches) -> Result<()> {
-//   let current_dir = std::env::current_dir().context("Failed to get current directory")?;
-//   let repo = Repository::open_ext(&current_dir, RepositoryOpenFlags::empty(), Vec::<&Path>::new())?;
-//   // let commits = repo
-//   //   .get_last_n_commits(MAX_NUMBER_OF_COMMITS)
-//   //   .context("Failed to get last commits")?;
+  //   let current_dir = std::env::current_dir().context("Failed to get current directory")?;
+  //   let repo = Repository::open_ext(&current_dir, RepositoryOpenFlags::empty(), Vec::<&Path>::new())?;
+  //   // let commits = repo
+  //   //   .get_last_n_commits(MAX_NUMBER_OF_COMMITS)
+  //   //   .context("Failed to get last commits")?;
 
-//   // Create and configure the progress bar
-//   let spinner_style = ProgressStyle::default_spinner()
-//     .tick_strings(&["-", "\\", "|", "/"])
-//     .template("{spinner:.blue} {msg}")
-//     .context("Failed to create progress bar style")?;
+  //   // Create and configure the progress bar
+  //   let spinner_style = ProgressStyle::default_spinner()
+  //     .tick_strings(&["-", "\\", "|", "/"])
+  //     .template("{spinner:.blue} {msg}")
+  //     .context("Failed to create progress bar style")?;
 
-//   let pb = ProgressBar::new_spinner();
-//   pb.set_style(spinner_style);
-//   pb.enable_steady_tick(Duration::from_millis(100));
+  //   let pb = ProgressBar::new_spinner();
+  //   pb.set_style(spinner_style);
+  //   pb.enable_steady_tick(Duration::from_millis(100));
 
-//   // let header_style = Style::new().bold();
-//   // let model: Model = "gpt-4o".into();
-//   // println!("{}", header_style.apply_to("🛠️  AI-Generated Commit Message Examples"));j
-//   // let max_commits = max_commits.unwrap_or(MAX_NUMBER_OF_COMMITS);
+  //   // let header_style = Style::new().bold();
+  //   // let model: Model = "gpt-4o".into();
+  //   // println!("{}", header_style.apply_to("🛠️  AI-Generated Commit Message Examples"));j
+  //   // let max_commits = max_commits.unwrap_or(MAX_NUMBER_OF_COMMITS);
 
-//   // for (index, commit) in commits.iter().enumerate() {
-//   //   pb.set_message(format!("Loading commit #{} ...\n", index + 1));
-//   //   let response = commit::generate(commit.show(&repo, max_tokens)?, max_tokens, "gpt-4o".into()).await?;
+  //   // for (index, commit) in commits.iter().enumerate() {
+  //   //   pb.set_message(format!("Loading commit #{} ...\n", index + 1));
+  //   //   let response = commit::generate(commit.show(&repo, max_tokens)?, max_tokens, "gpt-4o".into()).await?;
 
-//   //   let commit_message = response.response.trim();
-//   //   pb.println(format!("Commit #{}:", index + 1));
-//   //   pb.println(format!("\tOriginal: {}", commit.message().unwrap_or_default().trim().italic()));
-//   //   pb.println(format!("\tGenerated: {}", commit_message.italic()));
-//   // }
+  //   //   let commit_message = response.response.trim();
+  //   //   pb.println(format!("Commit #{}:", index + 1));
+  //   //   pb.println(format!("\tOriginal: {}", commit.message().unwrap_or_default().trim().italic()));
+  //   //   pb.println(format!("\tGenerated: {}", commit_message.italic()));
+  //   // }
 
   Ok(())
 }
