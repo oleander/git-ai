@@ -49,7 +49,7 @@ async fn main() -> Result<()> {
   };
 
   let patch = repo
-    .to_patch(tree, remaining_tokens)
+    .to_patch(tree, remaining_tokens, model)
     .context("Failed to get patch")?;
 
   if patch.is_empty() {
@@ -67,7 +67,7 @@ async fn main() -> Result<()> {
 
   pb.set_message("Generating commit message...");
 
-  let response = commit::generate(patch.to_string()).await?;
+  let response = commit::generate(patch.to_string(), remaining_tokens, model).await?;
 
   // Write the response to the commit message file
   args

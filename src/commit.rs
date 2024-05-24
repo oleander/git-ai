@@ -59,7 +59,7 @@ pub struct OpenAIResponse {
   pub response: String
 }
 
-pub async fn generate(diff: String) -> Result<OpenAIResponse, ChatError> {
+pub async fn generate(diff: String, max_tokens: usize, model: Model) -> Result<OpenAIResponse> {
   let api_key = config::APP
     .openai_api_key
     .clone()
@@ -68,8 +68,8 @@ pub async fn generate(diff: String) -> Result<OpenAIResponse, ChatError> {
   let config = OpenAIConfig::new().with_api_key(api_key);
   let client = Client::with_config(config);
   let request = CreateChatCompletionRequestArgs::default()
-    .max_tokens(config::APP.max_tokens as u16)
-    .model(config::APP.model.clone())
+    .max_tokens(max_tokens as u16)
+    .model(model.to_string())
     .messages([
       ChatCompletionRequestSystemMessageArgs::default()
         .content(instruction())

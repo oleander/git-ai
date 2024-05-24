@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::fs::File;
 
 use git2::{Diff, DiffFormat, DiffOptions, Repository, Tree};
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use thiserror::Error;
 use clap::Parser;
 
@@ -67,12 +67,11 @@ impl Utf8String for [u8] {
 }
 
 pub trait PatchDiff {
-  fn to_patch(&self, max_token_count: usize) -> Result<String>;
+  fn to_patch(&self, max_token_count: usize, model: Model) -> Result<String>;
 }
 
 impl PatchDiff for Diff<'_> {
-  fn to_patch(&self, max_token_count: usize) -> Result<String> {
-    let model: Model = "gpt-4".into();
+  fn to_patch(&self, max_token_count: usize, model: Model) -> Result<String> {
     let truncated_message = "<truncated>";
     let number_of_files = self.deltas().len();
 
@@ -116,13 +115,13 @@ impl PatchDiff for Diff<'_> {
 }
 
 pub trait PatchRepository {
-  fn to_patch(&self, tree: Option<Tree<'_>>, max_token_count: usize) -> Result<String>;
+  fn to_patch(&self, tree: Option<Tree<'_>>, max_token_count: usize, model: Model) -> Result<String>;
   fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>>;
 }
 
 impl PatchRepository for Repository {
-  fn to_patch(&self, tree: Option<Tree>, max_token_count: usize) -> Result<String> {
-    self.to_diff(tree)?.to_patch(max_token_count)
+  fn to_patch(&self, tree: Option<Tree>, max_token_count: usize, model: Model) -> Result<String> {
+    self.to_diff(tree)?.to_patch(max_token_count, model)
   }
 
   fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>> {

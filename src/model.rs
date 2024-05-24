@@ -8,7 +8,7 @@ use tiktoken_rs::model::get_context_size;
 const GPT4: &str = "gpt-4";
 const GPT4O: &str = "gpt-4o";
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum Model {
   GPT4,
   GPT4O
