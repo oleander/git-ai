@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use thiserror::Error;
 use clap::Parser;
 
-use crate::models::Model;
+use crate::model::Model;
 use crate::commit::ChatError;
 
 pub trait FilePath {
