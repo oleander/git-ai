@@ -1,6 +1,13 @@
 #!/usr/bin/env fish
 
-# Fetch the current project version using cargo metadata and jq, then remove newline characters.
+# Bump the version using cargo-bump
+cargo bump patch
+if test $status -ne 0
+  echo "=> Failed to bump the version using cargo-bump"
+  exit 1
+end
+
+# Fetch the new version
 set release (cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version' | tr -d '\n')
 
 if test -z "$release"
@@ -10,33 +17,30 @@ end
 
 echo "=> Running tests..."
 if not cargo test
-  echo "=> Tests has to pass before releasing"
+  echo "=> Tests have to pass before releasing"
   exit 1
 end
 
 # Attempt to update dependencies aggressively
 if not cargo update --aggressive
-  echo "=> Please bump the version in Cargo.toml before releasing"
+  echo "=> Failed to update dependencies"
   exit 1
 end
 
 # Add changes to git, auto-commit, and tag the release
 if not git add Cargo.lock Cargo.toml
   echo "=> Could not add Cargo.lock and Cargo.toml to git"
-  echo "=> Make sure to bump the version in Cargo.toml before releasing"
   exit 1
 end
 
 if not git commit -m "Update dependencies for version $release"
   echo "=> Nothing to commit"
-  echo "=> Make sure to bump the version in Cargo.toml before releasing"
   exit 1
 end
 
 # Create an annotated tag for the release
 if not git tag -a "v$release" -m "Release v$release"
   echo "=> Could not create tag: v$release"
-  echo "=> Make sure to bump the version in Cargo.toml before releasing"
   exit 1
 end
 

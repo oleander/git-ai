@@ -1,7 +1,7 @@
-use colored::Colorize;
-use anyhow::{bail, Result};
-use ai::filesystem::Filesystem;
 use console::Emoji;
+use anyhow::Result;
+use ai::filesystem::Filesystem;
+use colored::*;
 
 const EMOJI: Emoji<'_, '_> = Emoji("🔗", "");
 
@@ -16,12 +16,16 @@ pub fn run() -> Result<()> {
   let hook_bin = filesystem.git_ai_hook_bin_path()?;
 
   if hook_file.exists() {
-    bail!("Hook already exists at {}, please run 'git ai hook reinstall'", hook_file);
+    log::debug!("Removing existing hook file: {}", hook_file);
+    hook_file.delete()?;
   }
 
   hook_file.symlink(hook_bin)?;
 
-  println!("{EMOJI} Hook symlinked successfully to {}", hook_file.to_string().italic());
+  println!(
+    "{EMOJI} Hook symlinked successfully to {}",
+    hook_file.relative_path()?.to_string().italic()
+  );
 
   Ok(())
 }
