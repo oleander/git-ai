@@ -6,8 +6,10 @@ use async_openai::error::OpenAIError;
 use async_openai::Client;
 use thiserror::Error;
 use anyhow::Context;
+use anyhow::Result;
 
 use crate::config;
+use crate::model::Model;
 
 #[derive(Error, Debug)]
 pub enum ChatError {
@@ -46,6 +48,10 @@ fn instruction() -> String {
   ## Input:
 
   INPUT:", config::APP.max_commit_length)
+}
+
+pub fn token_used(model: &Model) -> Result<usize> {
+  model.count_tokens(&instruction()).context("Could not count tokens in instruction message")
 }
 
 #[derive(Debug, Clone, PartialEq)]

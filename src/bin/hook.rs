@@ -8,15 +8,19 @@ use git2::{Oid, Repository};
 use ai::{commit, config};
 use clap::Parser;
 use ai::hook::*;
+use ai::model::Model;
 
 #[tokio::main]
 async fn main() -> Result<()> {
   env_logger::init();
 
   let args = Args::parse();
-  let max_tokens = config::APP.max_tokens;
   let pb = ProgressBar::new_spinner();
   let repo = Repository::open_from_env().context("Failed to open repository")?;
+  let model: Model = "gpt-4o".into();
+  let used_tokens = commit::token_used(&model)?;
+  let max_tokens = config::APP.max_tokens.unwrap_or(model.context_size());
+  let remaining_tokens = max_tokens - used_tokens;
 
   // If defined, then the user already provided a commit message
   if args.commit_type.is_some() {
@@ -45,7 +49,7 @@ async fn main() -> Result<()> {
   };
 
   let patch = repo
-    .to_patch(tree, max_tokens)
+    .to_patch(tree, remaining_tokens)
     .context("Failed to get patch")?;
 
   if patch.is_empty() {

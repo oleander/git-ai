@@ -14,7 +14,7 @@ pub struct App {
   pub openai_api_key:    Option<String>,
   pub model:             String,
   pub language:          String,
-  pub max_tokens:        usize,
+  pub max_tokens:        Option<usize>,
   pub max_commit_length: usize,
   pub timeout:           usize
 }

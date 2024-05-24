@@ -73,15 +73,6 @@ pub trait PatchDiff {
 impl PatchDiff for Diff<'_> {
   fn to_patch(&self, max_token_count: usize) -> Result<String> {
     let model: Model = "gpt-4".into();
-
-    if model.context_size() < max_token_count {
-      bail!(
-        "Invalid max token count ({}), must be less than {}",
-        max_token_count,
-        model.context_size()
-      );
-    }
-
     let truncated_message = "<truncated>";
     let number_of_files = self.deltas().len();
 
@@ -89,7 +80,8 @@ impl PatchDiff for Diff<'_> {
       return Err(HookError::EmptyDiffOutput.into());
     }
 
-    let tokens_per_file = (max_token_count / number_of_files) - truncated_message.len();
+    let truncation_count = model.count_tokens(truncated_message).context("Failed to count tokens").unwrap_or_default();
+    let tokens_per_file = (max_token_count / number_of_files) - truncation_count;
     let mut token_table: HashMap<PathBuf, usize> = HashMap::new();
     let mut patch_acc = Vec::new();
 
