@@ -59,27 +59,22 @@ impl FromStr for Model {
 
 impl Display for Model {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      Model::GPT4o => write!(f, "{}", GPT4O),
-      Model::GPT4 => write!(f, "{}", GPT4),
-      Model::GPT4Turbo => write!(f, "{}", GPT4_TURBO)
-    }
+    write!(f, "{}", match self {
+      Model::GPT4o => GPT4O,
+      Model::GPT4 => GPT4,
+      Model::GPT4Turbo => GPT4_TURBO
+    })
   }
 }
 
 impl From<&str> for Model {
   fn from(s: &str) -> Self {
-    match s.trim().to_lowercase().as_str() {
-      GPT4O => Model::GPT4o,
-      GPT4 => Model::GPT4,
-      GPT4_TURBO => Model::GPT4Turbo,
-      _ => Model::GPT4
-    }
+    s.parse().unwrap_or_default()
   }
 }
 
 impl From<String> for Model {
   fn from(s: String) -> Self {
-    s.trim().to_lowercase().as_str().into()
+    s.as_str().into()
   }
 }
