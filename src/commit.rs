@@ -8,7 +8,7 @@ use thiserror::Error;
 use anyhow::{Context, Result};
 
 use crate::config;
-use crate::model::Model;
+use crate::models::Model;
 
 #[derive(Error, Debug)]
 pub enum ChatError {

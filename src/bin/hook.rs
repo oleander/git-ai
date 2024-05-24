@@ -8,7 +8,7 @@ use git2::{Oid, Repository};
 use ai::{commit, config};
 use clap::Parser;
 use ai::hook::*;
-use ai::model::Model;
+use ai::models::Model;
 
 #[tokio::main]
 async fn main() -> Result<()> {

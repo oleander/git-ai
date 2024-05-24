@@ -9,10 +9,12 @@ use lazy_static::lazy_static;
 use console::{style, Emoji};
 use clap::ArgMatches;
 
+use crate::models::Model;
+
 #[derive(Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct App {
   pub openai_api_key:    Option<String>,
-  pub model:             crate::M,
+  pub model:             Model,
   pub language:          String,
   pub max_tokens:        Option<usize>,
   pub max_commit_length: usize,
@@ -74,7 +76,7 @@ pub fn run(args: &ArgMatches) -> Result<()> {
     Some(("model", args)) => {
       app.model.clone_from(
         args
-          .get_one::<crate::M>("<VALUE>")
+          .get_one::<Model>("<VALUE>")
           .context("Failed to parse model")?
       );
     }
