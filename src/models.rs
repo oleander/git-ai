@@ -78,13 +78,8 @@ impl From<&str> for Model {
   }
 }
 
-impl From<std::string::String> for Model {
-  fn from(s: std::string::String) -> Self {
-    match s.trim().to_lowercase().as_str() {
-      GPT4O => Model::GPT4o,
-      GPT4 => Model::GPT4,
-      GPT4_TURBO => Model::GPT4Turbo,
-      _ => Model::GPT4
-    }
+impl From<String> for Model {
+  fn from(s: String) -> Self {
+    s.trim().to_lowercase().as_str().into()
   }
 }
