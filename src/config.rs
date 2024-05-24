@@ -12,7 +12,7 @@ use clap::ArgMatches;
 #[derive(Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct App {
   pub openai_api_key:    Option<String>,
-  pub model:             crate::ai::model::Model,
+  pub model:             crate::M,
   pub language:          String,
   pub max_tokens:        Option<usize>,
   pub max_commit_length: usize,
@@ -51,7 +51,7 @@ impl App {
       .set_default("timeout", 30)?
       .set_default("max_commit_length", 72)?
       .set_default("max_tokens", 512)?
-      .set_default("model", "gpt-4-turbo-preview")?
+      // .set_default("model", "gpt-4-turbo-preview")?
       .build()?;
 
     config
@@ -74,7 +74,7 @@ pub fn run(args: &ArgMatches) -> Result<()> {
     Some(("model", args)) => {
       app.model.clone_from(
         args
-          .get_one::<crate::model::Model>("<VALUE>")
+          .get_one::<crate::M>("<VALUE>")
           .context("Failed to parse model")?
       );
     }

@@ -8,7 +8,7 @@ repository = "https://github.com/oleander/git-ai"
 
 [lib]
 name = "ai"
-test = true
+# test = true
 
 [[bin]]
 name = "git-ai"
