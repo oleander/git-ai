@@ -9,8 +9,6 @@ use lazy_static::lazy_static;
 use console::{style, Emoji};
 use clap::ArgMatches;
 
-// use crate::models::Model;
-
 #[derive(Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct App {
   pub openai_api_key:    Option<String>,
