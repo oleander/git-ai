@@ -59,7 +59,8 @@ impl FromStr for Model {
 
 impl Display for Model {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", match self {
+    write!(f, "{}",
+     match self {
       Model::GPT4o => GPT4O,
       Model::GPT4 => GPT4,
       Model::GPT4Turbo => GPT4_TURBO
