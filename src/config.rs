@@ -51,7 +51,6 @@ impl App {
       .set_default("timeout", 30)?
       .set_default("max_commit_length", 72)?
       .set_default("max_tokens", 512)?
-      // .set_default("model", "gpt-4-turbo-preview")?
       .build()?;
 
     config
