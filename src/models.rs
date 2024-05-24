@@ -38,12 +38,6 @@ impl From<&Model> for &str {
   }
 }
 
-impl Default for Model {
-  fn default() -> Self {
-    Model::GPT4o
-  }
-}
-
 impl FromStr for Model {
   type Err = anyhow::Error;
 
@@ -54,6 +48,12 @@ impl FromStr for Model {
       GPT4_TURBO => Ok(Model::GPT4Turbo),
       model => bail!("Invalid model: {}", model)
     }
+  }
+}
+
+impl Default for Model {
+  fn default() -> Self {
+    Model::GPT4o
   }
 }
 
