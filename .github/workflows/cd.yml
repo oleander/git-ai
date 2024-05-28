@@ -19,6 +19,7 @@ jobs:
       fail-fast: true
       matrix:
         os: [macos-latest, ubuntu-latest]
+        rust_toolchain: [nightly, stable]
     runs-on: ${{ matrix.os }}
     continue-on-error: false
     steps:
@@ -36,7 +37,7 @@ jobs:
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: ${{ matrix.rust_toolchain }}
           override: true
 
       - name: Install cargo-bump
