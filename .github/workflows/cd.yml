@@ -27,8 +27,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          apt-get update
-          apt-get install -y jq
+          brew install jq
           cargo install cargo-bump
 
       - name: Previous version
