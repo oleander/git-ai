@@ -1,33 +1,73 @@
 name: CD
 
 on:
-  push:
-    tags:
-      - v*
+  pull_request:
+    types: [closed]
+    branches:
+      - main
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   deploy:
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v2
-      - name: Setup Rust
+
+      - name: Set up Rust
         uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          override: true
-      - name: Cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
+
       - name: Run integration tests
-        run: ./tools/test.sh
+        run: |
+          cargo build --release
+          cargo test --release
+          cargo fmt -- --check
+          cargo clippy -- -D warnings
+          ./tools/test.sh
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      - name: Cargo publish
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get install jq
+          cargo install cargo-bump cargo-metadata
+
+      - name: Current version
+        id: curr_version
+        run: cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version'
+
+      - name: Bump version using cargo-bump
+        run: cargo bump patch
+
+      - name: Next version
+        id: next_version
+        run: cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version'
+
+      - name: Update dependencies & ensure version changed
+        run: cargo update --aggressive
+        if: steps.curr_version.outputs != steps.next_version.outputs
+
+      - name: Commit changes and tag release
+        run: |
+          git add Cargo.lock Cargo.toml
+          git commit -m "Update dependencies for version ${{ env.version }}"
+          git tag -a "v${{ env.version }}" -m "Release v${{ env.version }}"
+          git push origin main
+          git push origin "v${{ env.version }}"
+          git push --tags
+        if: env.version != null
+        env:
+          version: ${{ steps.next_version.outputs }}
+
+      - name: Publish to crates.io
         uses: katyo/publish-crates@v2
         with:
           registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Success message
+        run: echo "Successfully published version ${{ env.version }}"
+        env:
+          version: ${{ steps.next_version.outputs }}
