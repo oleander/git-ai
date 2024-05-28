@@ -19,7 +19,7 @@ jobs:
       fail-fast: true
       matrix:
         os: [macos-latest, ubuntu-latest]
-        rust_toolchain: [nightly, stable]
+        rust: [nightly, stable]
     runs-on: ${{ matrix.os }}
     continue-on-error: false
     steps:
@@ -37,32 +37,32 @@ jobs:
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ matrix.rust_toolchain }}
+          toolchain: ${{ matrix.rust }}
           override: true
 
       - name: Cache cargo registry
         uses: actions/cache@v3
         with:
           path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ matrix.rust }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-registry-
+            ${{ runner.os }}-${{ matrix.rust }}-cargo-registry-
 
       - name: Cache cargo index
         uses: actions/cache@v3
         with:
           path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ matrix.rust }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-index-
+            ${{ runner.os }}-${{ matrix.rust }}-cargo-index-
 
       - name: Cache cargo build
         uses: actions/cache@v3
         with:
           path: target
-          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-build-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-build-
+            ${{ runner.os }}-cargo-build-${{ matrix.rust }}-
 
       - name: Install cargo-bump
         run: cargo install cargo-bump

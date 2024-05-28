@@ -1,5 +1,5 @@
-[build]
-rustflags = ["-Z", "macro-backtrace"]
+# [build]
+# rustflags = ["-Z", "macro-backtrace"]
 
-[env]
-RUST_LOG = "info"
+# [env]
+# RUST_LOG = "info"
