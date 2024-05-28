@@ -21,18 +21,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
 
-      # - name: Run integration tests
-      #   run: |
-      #     cargo build --release
-      #     cargo test --release
-      #     cargo fmt -- --check
-      #     cargo clippy -- -D warnings
-      #     ./tools/test.sh
-      #   env:
-      #     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Install dependencies
         run: |
@@ -50,6 +39,23 @@ jobs:
       - name: Next version
         id: next_version
         run: ./scripts/current-version
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+
+      - name: Run integration tests
+        if: ${{ github.event.pull_request.merged == true }}
+        run: |
+          cargo build --release
+          cargo test --release
+          cargo fmt -- --check
+          cargo clippy -- -D warnings
+          ./tools/test.sh
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Update dependencies & ensure version changed
         if: ${{ env.current_version != env.next_version }}
