@@ -96,7 +96,7 @@ async fn main() -> Result<()> {
           config::run(args)?;
         }
         _ => unreachable!()
-      }
+      },
     _ => unreachable!()
   }
 

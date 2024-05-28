@@ -35,7 +35,7 @@ thiserror = "1.0.61"
 indicatif = "0.17.8"
 serde_ini = "0.2.0"
 console = "0.15.8"
-anyhow = "1.0.85"
+anyhow = "1.0.86"
 dotenv = "0.15.0"
 config = "0.13.4"
 colored = "2.1.0"
@@ -55,7 +55,7 @@ version = "0.18.3"
 
 [dev-dependencies]
 tempfile = "3.10.1"
-anyhow = "1.0.85"
+anyhow = "1.0.86"
 git2 = "0.18.3"
 rand = "0.8.5"
 

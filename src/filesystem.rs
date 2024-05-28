@@ -47,7 +47,7 @@ impl File {
   }
 
   pub fn parent(&self) -> Dir {
-    Dir::new(self.path.parent().unwrap_or(Path::new("")).to_path_buf()).into()
+    Dir::new(self.path.parent().unwrap_or(Path::new("")).to_path_buf())
   }
 }
 
@@ -63,15 +63,15 @@ impl std::fmt::Display for File {
   }
 }
 
-impl Into<Result<File>> for File {
-  fn into(self) -> Result<File> {
-    Ok(self)
+impl From<File> for Result<File> {
+  fn from(file: File) -> Result<File> {
+    Ok(file)
   }
 }
 
-impl Into<Result<Dir>> for Dir {
-  fn into(self) -> Result<Dir> {
-    Ok(self)
+impl From<Dir> for Result<Dir> {
+  fn from(dir: Dir) -> Result<Dir> {
+    Ok(dir)
   }
 }
 
@@ -86,9 +86,9 @@ impl std::fmt::Display for Dir {
   }
 }
 
-impl Into<Result<Filesystem>> for Filesystem {
-  fn into(self) -> Result<Filesystem> {
-    Ok(self)
+impl From<Filesystem> for Result<Filesystem> {
+  fn from(filesystem: Filesystem) -> Result<Filesystem> {
+    Ok(filesystem)
   }
 }
 
@@ -154,7 +154,7 @@ impl Filesystem {
   }
 
   pub fn git_hooks_path(&self) -> Dir {
-    Dir::new(self.git_hooks_path.clone()).into()
+    Dir::new(self.git_hooks_path.clone())
   }
 
   pub fn prepare_commit_msg_path(&self) -> Result<File> {

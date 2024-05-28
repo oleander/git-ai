@@ -4,12 +4,11 @@ use std::path::PathBuf;
 use std::fs::File;
 
 use git2::{Diff, DiffFormat, DiffOptions, Repository, Tree};
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use thiserror::Error;
 use clap::Parser;
 
 use crate::model::Model;
-use crate::commit::ChatError;
 
 pub trait FilePath {
   fn is_empty(&self) -> Result<bool> {
@@ -71,49 +70,73 @@ pub trait PatchDiff {
 }
 
 impl PatchDiff for Diff<'_> {
-  fn to_patch(&self, max_token_count: usize, model: Model) -> Result<String> {
-    let truncated_message = "<truncated>";
-    let number_of_files = self.deltas().len();
+  // TODO: Grouo arguments
+  fn to_patch(&self, max_tokens: usize, model: Model) -> Result<String> {
+    let mut files: HashMap<PathBuf, String> = HashMap::new();
 
-    if number_of_files == 0 {
-      return Err(HookError::EmptyDiffOutput.into());
-    }
-
-    let truncation_count = model
-      .count_tokens(truncated_message)
-      .context("Failed to count tokens")
-      .unwrap_or_default();
-    let tokens_per_file = (max_token_count / number_of_files) - truncation_count;
-    let mut token_table: HashMap<PathBuf, usize> = HashMap::new();
-    let mut patch_acc = Vec::new();
-
-    for delta in self.deltas() {
-      token_table.insert(delta.path(), 0);
-    }
-
-    #[rustfmt::skip]
     self.print(DiffFormat::Patch, |diff, _hunk, line| {
-      let diff_path = diff.path();
-      let Some(acc_count) = token_table.get_mut(&diff_path) else {
-        return true;
-      };
-
       let content = line.content();
       let string = content.to_utf8();
-      let curr_count = model.count_tokens(&string).context("Failed to count tokens").unwrap_or_default();
 
-      if *acc_count + curr_count < tokens_per_file {
-        *acc_count += curr_count;
-        patch_acc.extend_from_slice(content);
-      } else {
-        patch_acc.extend_from_slice(truncated_message.as_bytes());
-        token_table.remove(&diff_path);
+      match files.get(&diff.path()) {
+        Some(file_acc) => {
+          files.insert(diff.path(), file_acc.to_owned() + &string);
+        }
+        None => {
+          files.insert(diff.path(), string);
+        }
       }
 
       true
     }).context("Failed to print diff")?;
 
-    Ok(patch_acc.to_utf8())
+    let mut diffs: Vec<_> = files.values().collect();
+
+    // TODO: No unwrap
+    diffs.sort_by_key(|diff| model.count_tokens(diff).unwrap());
+
+    diffs
+      .iter()
+      .enumerate()
+      .try_fold(
+        (max_tokens, String::new(), files.len()),
+        |(remaining_tokens, mut final_diff, total_files), (index, diff)| {
+          let files_remaining = total_files.saturating_sub(index);
+          let max_tokens_per_file = remaining_tokens.saturating_div(files_remaining);
+
+          log::debug!("max_tokens_per_file: {}", max_tokens_per_file);
+          log::debug!("remaining_tokens: {}", remaining_tokens);
+          log::debug!("total_files: {}", total_files);
+          log::debug!("index: {}", index);
+
+          if max_tokens_per_file == 0 {
+            bail!("No tokens left to generate commit message")
+          }
+
+          let file_token_count = model.count_tokens(diff).context("Failed to count tokens")?;
+          let token_limits = [file_token_count, max_tokens_per_file];
+          let file_allocated_tokens = token_limits.iter().min().unwrap();
+
+          // We have reached the token limit for the file: truncate
+          let truncated_diff = if file_token_count > *file_allocated_tokens {
+            model.truncate(diff, *file_allocated_tokens)
+          } else {
+            Ok((*diff).clone().to_owned()) // TODO: Better way?
+          };
+
+          log::debug!("file_token_count: {}", file_token_count);
+          log::debug!("file_allocated_tokens: {}", file_allocated_tokens);
+          log::debug!("diff: {}", diff);
+          log::debug!("truncated_diff: {:?}", truncated_diff);
+          log::debug!("remaining_tokens: {}", remaining_tokens);
+          log::debug!("final_diff: {}", final_diff);
+
+          final_diff += &("\n".to_owned() + &truncated_diff.context("Failed to truncate diff")?);
+
+          Ok((remaining_tokens.saturating_sub(*file_allocated_tokens), final_diff, total_files))
+        }
+      )
+      .map(|(_, final_diff, _)| final_diff)
   }
 }
 
@@ -179,9 +202,5 @@ pub enum HookError {
 
   // anyhow
   #[error(transparent)]
-  Anyhow(#[from] anyhow::Error),
-
-  // ChatError
-  #[error(transparent)]
-  Chat(#[from] ChatError)
+  Anyhow(#[from] anyhow::Error)
 }

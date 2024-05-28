@@ -3,7 +3,7 @@
 use std::time::Duration;
 
 use indicatif::{ProgressBar, ProgressStyle};
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use git2::{Oid, Repository};
 use ai::{commit, config};
 use clap::Parser;
@@ -20,7 +20,10 @@ async fn main() -> Result<()> {
   let model: Model = config::APP.model.clone().into();
   let used_tokens = commit::token_used(&model)?;
   let max_tokens = config::APP.max_tokens.unwrap_or(model.context_size());
-  let remaining_tokens = max_tokens - used_tokens;
+  let remaining_tokens = max_tokens.saturating_sub(used_tokens);
+
+  log::debug!("max_tokens: {}", max_tokens);
+  log::debug!("used_tokens: {}", used_tokens);
 
   // If defined, then the user already provided a commit message
   if args.commit_type.is_some() {
@@ -48,12 +51,16 @@ async fn main() -> Result<()> {
         .and_then(|obj| obj.peel_to_tree().ok()),
   };
 
+  if remaining_tokens == 0 {
+    bail!("No tokens left to generate commit message");
+  }
+
   let patch = repo
     .to_patch(tree, remaining_tokens, model)
     .context("Failed to get patch")?;
 
   if patch.is_empty() {
-    Err(HookError::EmptyDiffOutput)?;
+    bail!("No changes to commit")
   }
 
   let pb_clone = pb.clone();
@@ -67,9 +74,12 @@ async fn main() -> Result<()> {
 
   pb.set_message("Generating commit message...");
 
+  if remaining_tokens == 0 {
+    bail!("No tokens left to generate commit message");
+  }
+
   let response = commit::generate(patch.to_string(), remaining_tokens, model).await?;
 
-  // Write the response to the commit message file
   args
     .commit_msg_file
     .write(response.response.trim().to_string())
