@@ -116,7 +116,9 @@ impl Args {
     use Source::*;
 
     match self.source {
-      Some(Message | Template | Merge | Squash) => bail!("Invalid source {:?}", self.source),
+      Some(Message | Template | Merge | Squash) => {
+        Ok(())
+      },
       Some(Commit) | None => {
         let repo = Repository::open_from_env().context("Failed to open repository")?;
         let model = config::APP
@@ -139,7 +141,8 @@ impl Args {
         pb.enable_steady_tick(Duration::from_millis(150));
 
         if !self.commit_msg_file.is_empty().unwrap_or_default() {
-          bail!("A commit message has already been provided");
+          log::debug!("A commit message has already been provided");
+          return Ok(());
         }
 
         self
