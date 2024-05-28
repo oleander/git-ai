@@ -112,10 +112,10 @@ impl PatchDiff for Diff<'_> {
           log::debug!("index: {}", index);
 
           if max_tokens_per_file == 0 {
-            bail!("No tokens left to generate commit message")
+            bail!("No tokens left to generate commit message. Try increasing the max-tokens configuration option using `git ai config set max-tokens <value>`");
           }
 
-          let file_token_count = model.count_tokens(diff).context("Failed to count tokens")?;
+          let file_token_count = model.count_tokens(diff).context("Failed to count diff tokens")?;
           let token_limits = [file_token_count, max_tokens_per_file];
           let file_allocated_tokens = token_limits.iter().min().unwrap();
 

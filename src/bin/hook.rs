@@ -96,10 +96,6 @@ impl Args {
           .and_then(|obj| obj.peel_to_tree().ok()),
     };
 
-    if remaining_tokens == 0 {
-      bail!("No tokens left to generate commit message");
-    }
-
     let patch = repo
       .to_patch(tree, remaining_tokens, model)
       .context("Failed to get patch")?;

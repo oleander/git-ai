@@ -37,6 +37,10 @@ impl Model {
   }
 
   pub(crate) fn walk_truncate(&self, diff: &str, max_tokens: usize, within: usize) -> Result<String> {
+    log::debug!("max_tokens: {}", max_tokens);
+    log::debug!("diff: {}", diff);
+    log::debug!("within: {}", within);
+
     let str = diff
       .split_whitespace()
       .take(max_tokens)
