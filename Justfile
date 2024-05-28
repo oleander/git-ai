@@ -21,3 +21,5 @@ docker-build:
 
 docker-run IMG CMD:
     docker run --rm -v $PWD:/git-ai -w /git-ai -it {{IMG}} {{CMD}}
+cd_local:
+    act
