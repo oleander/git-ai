@@ -1,6 +1,8 @@
 #!/usr/bin/env fish
 
 set -x fish_trace 1
+set -x OPENAI_API_KEY $OPENAI_API_KEY
+set -x RUST_LOG debug
 
 if not test -n "$OPENAI_API_KEY"
     echo "Please set the OPENAI_API_KEY environment variable."
@@ -18,44 +20,109 @@ function on_exit --on-event fish_exit
     end
 end
 
+function last_commit
+    git log -1 --pretty=%B | tr -d '\n'
+end
+
+function fail
+    echo "Test failed: $argv"
+    exit 1
+end
+
 set DIR /tmp/git-ai-test
 
-cargo install --debug --path .
+cargo install --debug --path . || fail "Cargo installation failed"
 
 rm -rf $DIR
 mkdir $DIR
 cd $DIR
 
-git init
+git init || fail "Git init failed"
 git config user.name "Test User"
 git config user.email "hello@world.com"
 git config --global init.defaultBranch main
 git branch -m main
 
 git-ai hook
-git-ai hook install || exit 1
-git-ai hook uninstall || exit 1
-git-ai hook install || exit 1
-git-ai hook reinstall || exit 1
+git-ai hook install || fail "Hook installation failed"
+git-ai hook uninstall || fail "Hook uninstallation failed"
+git-ai hook install || fail "Hook reinstallation failed"
+git-ai hook reinstall || fail "Hook reinstall failed"
 
 echo "Hello World 0" >README.md
 git add README.md
-git commit --no-edit || exit 1
-git status --porcelain || exit 1
+git commit --no-edit || fail "Initial commit failed"
+git status --porcelain || fail "Git status failed after initial commit"
 
 git-ai config
 git-ai config set
-git-ai config set model gpt-4 || exit 1
-git-ai config set max-tokens 512 || exit 1
-git-ai config set max-commit-length 1024 || exit 1
-git-ai config set openai-api-key "$OPENAI_API_KEY" || exit 1
+git-ai config set model gpt-4 || fail "Setting model failed"
+git-ai config set max-tokens 512 || fail "Setting max tokens failed"
+git-ai config set max-commit-length 1024 || fail "Setting max commit length failed"
+git-ai config set openai-api-key "$OPENAI_API_KEY" || fail "Setting OpenAI API key failed"
 
+# Test case: commit -m
 echo "Hello World" >README.md
 git add README.md
-git commit -m "Initial commit" || exit 1
+git commit -m "Initial commit" || fail "Commit with message failed"
+last_commit | grep "Initial commit" || fail "Commit message 'Initial commit' not found"
 
+# Test case: commit --no-edit
 echo "Hello World 2" >README.md
 git add README.md
-git commit --no-edit || exit 1
-git commit --amend --no-edit || exit 1
-git status --porcelain || exit 1
+git commit --no-edit || fail "Commit --no-edit failed"
+git status --porcelain || fail "Git status failed after commit --no-edit"
+
+# Test case: commit --amend --no-edit
+set prev_commit (last_commit)
+git commit --amend --no-edit || fail "Commit amend --no-edit failed"
+git status --porcelain || fail "Git status failed after amend --no-edit"
+last_commit | grep "$prev_commit" || fail "Amended commit message 'Initial commit' not found"
+
+# Test case: commit -c HEAD~1
+echo "Hello World 3" >README.md
+git add README.md
+git commit -c HEAD~1 --no-edit || fail "Commit -c HEAD~1 --no-edit failed"
+git status --porcelain || fail "Git status failed after commit -c HEAD~1"
+
+# Test case: commit --squash HEAD~2
+echo "Hello World 4" >README.md
+git add README.md
+git commit -m "Third commit" || fail "Third commit failed"
+git reset --soft HEAD~1 || fail "Reset failed"
+git commit --squash HEAD~2 -m "Squashed commit" || fail "Squash commit failed"
+last_commit | grep "Squashed commit" || fail "Squash commit message 'Squashed commit' not found"
+git status --porcelain || fail "Git status failed after squash commit"
+
+# Test case: merge --no-edit
+git checkout -b feature-branch || fail "Checkout to feature-branch failed"
+echo "Feature branch change" >feature.txt
+git add feature.txt
+git commit -m "Feature commit" || fail "Feature branch commit failed"
+last_commit | grep "Feature commit" || fail "Feature branch commit message 'Feature commit' not found"
+
+git-ai hook uninstall || fail "Hook uninstall failed"
+git checkout main || fail "Checkout to main failed"
+git merge --no-edit --no-ff feature-branch || fail "Merge feature-branch failed"
+last_commit | grep "Merge branch 'feature-branch'" || fail "Merge commit message 'Merge branch 'feature-branch'' not found"
+git status --porcelain || fail "Git status failed after merge"
+
+# Test case: commit -t template.txt
+echo "Commit from template" >template.txt
+git add template.txt
+git commit -t template.txt --no-edit || true
+
+# Test case: commit --amend
+echo "Final change 1" >README.md
+git add README.md
+git commit --amend --no-edit || fail "Amend commit --no-edit failed"
+last_commit | grep -v "Commit from template" || fail "Amended commit message 'Commit from template' not found"
+git status --porcelain || fail "Git status failed after amend commit --no-edit"
+
+echo "Final change 2" >README.md
+git add README.md
+git commit --amend -m "Final change 3" || fail "Amend commit with message failed"
+last_commit | grep "Final change 3" || fail "Amended commit message 'Final change 3' not found"
+git status --porcelain || fail "Git status failed after amend commit with message"
+
+echo "All tests passed"
