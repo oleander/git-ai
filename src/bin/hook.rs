@@ -94,10 +94,6 @@ async fn main() -> Result<()> {
         .and_then(|obj| obj.peel_to_tree().ok()),
   };
 
-  if tree.is_none() {
-    bail!("Failed to determine tree");
-  }
-
   if remaining_tokens == 0 {
     bail!("No tokens left to generate commit message");
   }
