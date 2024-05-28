@@ -1,77 +1,87 @@
 name: CD
 
-on: []
-#   pull_request:
-#     types: [closed]
-#     branches:
-#       - main
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches:
+      - main
+  workflow_dispatch: {}
 
-# env:
-#   CARGO_TERM_COLOR: always
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
   deploy:
-    # if: ${{ github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # - name: Set up Rust
-      #   uses: actions-rs/toolchain@v1
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
 
-      # - name: Run integration tests
-      #   run: |
-      #     cargo build --release
-      #     cargo test --release
-      #     cargo fmt -- --check
-      #     cargo clippy -- -D warnings
-      #     ./tools/test.sh
-      #   env:
-      #     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - name: Run integration tests
+        run: |
+          cargo build --release
+          cargo test --release
+          cargo fmt -- --check
+          cargo clippy -- -D warnings
+          ./tools/test.sh
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
-      # - name: Install dependencies
-      #   run: |
-      #     sudo apt-get update
-      #     sudo apt-get install -y jq
-      #     cargo install cargo-bump cargo-metadata
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          cargo install cargo-bump cargo-metadata
 
-      # - name: Current version
-      #   id: curr_version
-      #   run: cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version'
+      - name: Current version
+        id: curr_version
+        run: cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version'
 
-      # - name: Bump version using cargo-bump
-      #   run: cargo bump patch
+      - name: Bump version using cargo-bump
+        run: cargo bump patch
 
-      # - name: Next version
-      #   id: next_version
-      #   run: cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version'
+      - name: Next version
+        id: next_version
+        run: cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version'
 
-      # - name: Update dependencies & ensure version changed
-      #   if: ${{ env.current_version != env.next_version }}
-      #   run: cargo update --aggressive
-      #   env:
-      #     current_version: "${{ steps.curr_version.outputs }}"
-      #     next_version: "${{ steps.next_version.outputs }}"
+      - name: Update dependencies & ensure version changed
+        if: ${{ env.current_version != env.next_version }}
+        run: cargo update --aggressive
+        env:
+          current_version: "${{ steps.curr_version.outputs }}"
+          next_version: "${{ steps.next_version.outputs }}"
 
-      # - name: Commit changes and tag release
-      #   if: ${{ env.current_version != env.next_version }}
-      #   run: |
-      #     git add Cargo.lock Cargo.toml
-      #     git commit -m "Update dependencies for version ${{ env.next_version }}"
-      #     git tag -a "v${{ env.next_version }}" -m "Release v${{ env.next_version }}"
-      #     git push origin main
-      #     git push origin "v${{ env.next_version }}"
-      #   env:
-      #     current_version: "${{ steps.curr_version.outputs }}"
-      #     next_version: "${{ steps.next_version.outputs }}"
+      - name: Commit changes and tag release
+        if: ${{ env.current_version != env.next_version }}
+        run: |
+          git add Cargo.lock Cargo.toml
+          git commit -m "Update dependencies for version ${{ env.next_version }}"
+          git tag -a "v${{ env.next_version }}" -m "Release v${{ env.next_version }}"
+          git push origin main
+          git push origin "v${{ env.next_version }}"
+        env:
+          current_version: "${{ steps.curr_version.outputs }}"
+          next_version: "${{ steps.next_version.outputs }}"
 
-      # - name: Publish to crates.io
-      #   uses: katyo/publish-crates@v2
-      #   with:
-      #     registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - name: Publish to crates.io (Dry Run)
+        if: ${{ github.event.pull_request.merged != true }}
+        run: |
+          echo "Dry run: would publish to crates.io but skipping because this is a dry run."
 
-      # - name: Success message
-      #   run: echo "Successfully published version ${{ env.next_version }}"
-      #   env:
-      #     next_version: "{{ steps.next_version.outputs }}"
+      - name: Publish to crates.io (Actual Run)
+        if: ${{ github.event.pull_request.merged == true }}
+        uses: katyo/publish-crates@v2
+        with:
+          registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Success message
+        if: ${{ github.event.pull_request.merged == true }}
+        run: echo "Successfully published version ${{ env.next_version }}"
+        env:
+          next_version: "${{ steps.next_version.outputs }}"
