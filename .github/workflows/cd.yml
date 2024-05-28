@@ -25,6 +25,16 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-nightly-${{ hashFiles('**/Cargo.lock') }}
+
       - name: Run clippy
         uses: actions-rs/cargo@v1
         with:
@@ -55,29 +65,15 @@ jobs:
           override: true
           profile: minimal
 
-      - name: Cache cargo registry
-        uses: actions/cache@v3
+      - uses: actions/cache@v3
         with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-${{ matrix.rust }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.rust }}-cargo-registry-
-
-      - name: Cache cargo index
-        uses: actions/cache@v3
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-${{ matrix.rust }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.rust }}-cargo-index-
-
-      - name: Cache cargo build
-        uses: actions/cache@v3
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-build-${{ matrix.rust }}-
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run integration tests
         run: |
@@ -101,6 +97,19 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
+          override: true
+          default: true
+          toolchain: stable
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-stable-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install cargo-bump
         run: cargo install cargo-bump
