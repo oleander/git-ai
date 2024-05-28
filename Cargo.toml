@@ -21,7 +21,6 @@ path = "src/bin/hook.rs"
 [dependencies]
 anyhow = "1.0.86"
 async-openai = "0.18.3"
-clap = { version = "4.5.4", features = ["derive", "wrap_help"] }
 colored = "2.1.0"
 config = "0.13.4"
 console = "0.15.8"

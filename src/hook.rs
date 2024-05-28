@@ -3,10 +3,10 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::fs::File;
 
+use structopt::StructOpt;
 use git2::{Diff, DiffFormat, DiffOptions, Repository, Tree};
 use anyhow::{Context, Result};
 use thiserror::Error;
-use clap::Parser;
 
 use crate::commit::ChatError;
 
@@ -87,24 +87,24 @@ impl PatchDiff for Diff<'_> {
     }
 
     #[rustfmt::skip]
-    self.print(DiffFormat::Patch, |diff, _hunk, line| {
-      let diff_path = diff.path();
-      let Some(tokens) = token_table.get_mut(&diff_path) else {
-        return true;
-      };
+        self.print(DiffFormat::Patch, |diff, _hunk, line| {
+            let diff_path = diff.path();
+            let Some(tokens) = token_table.get_mut(&diff_path) else {
+                return true;
+            };
 
-      let content = line.content();
-      let curr_tokens = content.to_utf8().split_whitespace().count();
-      if *tokens + curr_tokens < tokens_per_file {
-        *tokens += curr_tokens;
-        patch_acc.extend_from_slice(content);
-      } else {
-        patch_acc.extend_from_slice(truncated_message.as_bytes());
-        token_table.remove(&diff_path);
-      }
+            let content = line.content();
+            let curr_tokens = content.to_utf8().split_whitespace().count();
+            if *tokens + curr_tokens < tokens_per_file {
+                *tokens += curr_tokens;
+                patch_acc.extend_from_slice(content);
+            } else {
+                patch_acc.extend_from_slice(truncated_message.as_bytes());
+                token_table.remove(&diff_path);
+            }
 
-      true
-    }).context("Failed to print diff")?;
+            true
+        }).context("Failed to print diff")?;
 
     Ok(patch_acc.to_utf8())
   }
@@ -144,15 +144,15 @@ impl PatchRepository for Repository {
   }
 }
 
-#[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
+#[derive(StructOpt, Debug)]
+#[structopt(name = "commit-msg-hook", about = "A tool for generating commit messages.")]
 pub struct Args {
   pub commit_msg_file: PathBuf,
 
-  #[clap(required = false)]
+  #[structopt(short = "t", long = "type")]
   pub commit_type: Option<String>,
 
-  #[clap(required = false)]
+  #[structopt(short = "s", long = "sha1")]
   pub sha1: Option<String>
 }
 
