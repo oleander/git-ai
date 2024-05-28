@@ -29,7 +29,6 @@ pub async fn call(request: Request) -> Result<Response> {
   let client = Client::with_config(config);
 
   let request = CreateChatCompletionRequestArgs::default()
-    .max_tokens(request.max_tokens as u16)
     .model(request.model.to_string())
     .messages([
       ChatCompletionRequestSystemMessageArgs::default()
