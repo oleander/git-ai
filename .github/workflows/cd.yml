@@ -51,8 +51,8 @@ jobs:
         if: ${{ env.current_version != env.next_version }}
         run: cargo update --aggressive
         env:
-          current_version: ${{ steps.curr_version.outputs.current_version }}
-          next_version: ${{ steps.next_version.outputs.next_version }}
+          current_version: "${{ steps.curr_version.outputs.current_version }}"
+          next_version: "${{ steps.next_version.outputs.next_version }}"
 
       - name: Commit changes and tag release
         if: ${{ env.current_version != env.next_version }}
@@ -63,8 +63,8 @@ jobs:
           git push origin main
           git push origin "v${{ env.next_version }}"
         env:
-          current_version: ${{ steps.curr_version.outputs.current_version }}
-          next_version: ${{ steps.next_version.outputs.next_version }}
+          current_version: "${{ steps.curr_version.outputs.current_version }}"
+          next_version: "${{ steps.next_version.outputs.next_version }}"
 
       - name: Publish to crates.io
         uses: katyo/publish-crates@v2
@@ -74,4 +74,4 @@ jobs:
       - name: Success message
         run: echo "Successfully published version ${{ env.next_version }}"
         env:
-          next_version: ${{ steps.next_version.outputs.next_version }}
+          next_version: "${{ steps.next_version.outputs.next_version }}"
