@@ -33,25 +33,29 @@ git config --global init.defaultBranch main
 git branch -m main
 
 git-ai hook
-git-ai hook install
-git-ai hook uninstall
-git-ai hook install
-git-ai hook reinstall
+git-ai hook install || exit 1
+git-ai hook uninstall || exit 1
+git-ai hook install || exit 1
+git-ai hook reinstall || exit 1
+
+echo "Hello World 0" >README.md
+git add README.md
+git commit --no-edit || exit 1
+git status --porcelain || exit 1
 
 git-ai config
-git-ai config set model gpt-4
-git-ai config set max-tokens 512
-git-ai config set max-commit-length 1024
-git-ai config set openai-api-key "$OPENAI_API_KEY"
+git-ai config set
+git-ai config set model gpt-4 || exit 1
+git-ai config set max-tokens 512 || exit 1
+git-ai config set max-commit-length 1024 || exit 1
+git-ai config set openai-api-key "$OPENAI_API_KEY" || exit 1
 
 echo "Hello World" >README.md
 git add README.md
-git commit -m "Initial commit"
+git commit -m "Initial commit" || exit 1
 
 echo "Hello World 2" >README.md
 git add README.md
-git commit --no-edit
-
-git commit --amend --no-edit
-
-git status --porcelain
+git commit --no-edit || exit 1
+git commit --amend --no-edit || exit 1
+git status --porcelain || exit 1

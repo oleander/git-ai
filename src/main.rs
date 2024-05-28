@@ -3,68 +3,63 @@ mod install;
 mod reinstall;
 mod config;
 
-use clap::{Arg, Command};
+use structopt::StructOpt;
 use anyhow::Result;
 use dotenv::dotenv;
 
-fn cli() -> Command {
-  Command::new("git-ai")
-    .about("A git extension that uses OpenAI to generate commit messages")
-    .subcommand_required(true)
-    .arg_required_else_help(true)
-    .subcommand(
-      Command::new("hook")
-        .about("Installs the git-ai hook")
-        .subcommand(Command::new("install").about("Installs the git-ai hook"))
-        .subcommand(Command::new("uninstall").about("Uninstalls the git-ai hook"))
-        .subcommand(Command::new("reinstall").about("Reinstalls the git-ai hook"))
-    )
-    .subcommand(
-      Command::new("config")
-        .about("Sets or gets configuration values")
-        .subcommand(
-          Command::new("set")
-            .about("Sets a configuration value")
-            .subcommand(
-              Command::new("model").about("Sets the model to use").arg(
-                Arg::new("<VALUE>")
-                  .required(true)
-                  .index(1)
-                  .value_parser(clap::builder::NonEmptyStringValueParser::new())
-              )
-            )
-            .subcommand(
-              Command::new("max-tokens")
-                .about("Sets the maximum number of tokens to use for the diff")
-                .arg(
-                  Arg::new("max-tokens")
-                    .required(true)
-                    .index(1)
-                    .value_parser(clap::value_parser!(usize))
-                )
-            )
-            .subcommand(
-              Command::new("max-commit-length")
-                .about("Sets the maximum length of the commit message")
-                .arg(
-                  Arg::new("max-commit-length")
-                    .required(true)
-                    .index(1)
-                    .value_parser(clap::value_parser!(usize))
-                )
-            )
-            .subcommand(
-              Command::new("openai-api-key")
-                .about("Sets the OpenAI API key")
-                .arg(
-                  Arg::new("<VALUE>")
-                    .required(true)
-                    .index(1)
-                    .value_parser(clap::builder::NonEmptyStringValueParser::new())
-                )
-            )
-        )
-    )
+#[derive(StructOpt)]
+#[structopt(name = "git-ai", about = "A git extension that uses OpenAI to generate commit messages")]
+enum Cli {
+  #[structopt(about = "Installs the git-ai hook")]
+  Hook(HookSubcommand),
+  #[structopt(about = "Sets or gets configuration values")]
+  Config(ConfigSubcommand)
+}
+
+#[derive(StructOpt)]
+enum HookSubcommand {
+  #[structopt(about = "Installs the git-ai hook")]
+  Install,
+  #[structopt(about = "Uninstalls the git-ai hook")]
+  Uninstall,
+  #[structopt(about = "Reinstalls the git-ai hook")]
+  Reinstall
+}
+
+#[derive(StructOpt)]
+enum ConfigSubcommand {
+  #[structopt(about = "Sets a configuration value")]
+  Set(SetSubcommand)
+}
+
+#[derive(StructOpt)]
+enum SetSubcommand {
+  #[structopt(about = "Sets the model to use")]
+  Model(Model),
+
+  #[structopt(about = "Sets the maximum number of tokens to use for the diff")]
+  MaxTokens {
+    #[structopt(help = "The maximum number of tokens", name = "max-tokens")]
+    max_tokens: usize
+  },
+
+  #[structopt(about = "Sets the maximum length of the commit message")]
+  MaxCommitLength {
+    #[structopt(help = "The maximum length of the commit message", name = "max-commit-length")]
+    max_commit_length: usize
+  },
+
+  #[structopt(about = "Sets the OpenAI API key")]
+  OpenaiApiKey {
+    #[structopt(help = "The OpenAI API key", name = "VALUE")]
+    value: String
+  }
+}
+
+#[derive(StructOpt)]
+struct Model {
+  #[structopt(help = "The value to set", name = "VALUE")]
+  value: String
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -72,32 +67,39 @@ async fn main() -> Result<()> {
   env_logger::init();
   dotenv().ok();
 
-  let args = cli().get_matches();
+  let args = Cli::from_args();
 
-  match args.subcommand() {
-    Some(("hook", sub)) =>
-      match sub.subcommand() {
-        Some(("install", _)) => {
+  match args {
+    Cli::Hook(sub) =>
+      match sub {
+        HookSubcommand::Install => {
           install::run()?;
         }
-
-        Some(("uninstall", _)) => {
+        HookSubcommand::Uninstall => {
           uninstall::run()?;
         }
-
-        Some(("reinstall", _)) => {
+        HookSubcommand::Reinstall => {
           reinstall::run()?;
         }
-        _ => unreachable!()
       },
-    Some(("config", args)) =>
-      match args.subcommand() {
-        Some(("set", args)) => {
-          config::run(args)?;
-        }
-        _ => unreachable!()
+    Cli::Config(config) =>
+      match config {
+        ConfigSubcommand::Set(set) =>
+          match set {
+            SetSubcommand::Model(model) => {
+              config::run_model(model.value)?;
+            }
+            SetSubcommand::MaxTokens { max_tokens } => {
+              config::run_max_tokens(max_tokens)?;
+            }
+            SetSubcommand::MaxCommitLength { max_commit_length } => {
+              config::run_max_commit_length(max_commit_length)?;
+            }
+            SetSubcommand::OpenaiApiKey { value } => {
+              config::run_openai_api_key(value)?;
+            }
+          },
       },
-    _ => unreachable!()
   }
 
   Ok(())

@@ -3,10 +3,10 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::fs::File;
 
+use structopt::StructOpt;
 use git2::{Diff, DiffFormat, DiffOptions, Repository, Tree};
 use anyhow::{bail, Context, Result};
 use thiserror::Error;
-use clap::Parser;
 
 use crate::model::Model;
 
@@ -176,15 +176,15 @@ impl PatchRepository for Repository {
   }
 }
 
-#[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
+#[derive(StructOpt, Debug)]
+#[structopt(name = "commit-msg-hook", about = "A tool for generating commit messages.")]
 pub struct Args {
   pub commit_msg_file: PathBuf,
 
-  #[clap(required = false)]
+  #[structopt(short = "t", long = "type")]
   pub commit_type: Option<String>,
 
-  #[clap(required = false)]
+  #[structopt(short = "s", long = "sha1")]
   pub sha1: Option<String>
 }
 
