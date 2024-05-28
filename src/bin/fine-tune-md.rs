@@ -7,9 +7,9 @@ use anyhow::{Context, Result};
 fn main() -> Result<()> {
   env_logger::init();
 
-  let max_tokens = 49999;
   let file_name = "fine-tune.md";
   let max_commits = 100;
+  let max_tokens = 49999;
 
   log::info!("Creating fine-tune file with {} commits and {} tokens", max_commits, max_tokens);
 
