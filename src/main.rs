@@ -65,7 +65,6 @@ fn cli() -> Command {
             )
         )
     )
-    .subcommand(Command::new("examples").about("Runs examples of generated commit messages"))
 }
 
 #[tokio::main(flavor = "multi_thread")]

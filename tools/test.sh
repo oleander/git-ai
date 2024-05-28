@@ -60,10 +60,6 @@ echo "Hello World" > README.md
 git add README.md
 git commit -m "Initial commit"
 
-# Run git-ai examples
-echo "Running git-ai examples..."
-git-ai examples
-
 # Modify the file and create another commit to test hook functionality
 echo "Hello World 2" > README.md
 git add README.md
