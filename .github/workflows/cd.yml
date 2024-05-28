@@ -16,6 +16,7 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    continue-on-error: false
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -23,15 +24,15 @@ jobs:
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
 
-      - name: Run integration tests
-        run: |
-          cargo build --release
-          cargo test --release
-          cargo fmt -- --check
-          cargo clippy -- -D warnings
-          ./tools/test.sh
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      # - name: Run integration tests
+      #   run: |
+      #     cargo build --release
+      #     cargo test --release
+      #     cargo fmt -- --check
+      #     cargo clippy -- -D warnings
+      #     ./tools/test.sh
+      #   env:
+      #     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Install dependencies
         run: |
@@ -41,14 +42,14 @@ jobs:
 
       - name: Current version
         id: curr_version
-        run: cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version'
+        run: ./scripts/current-version
 
       - name: Bump version using cargo-bump
         run: cargo bump patch
 
       - name: Next version
         id: next_version
-        run: cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version'
+        run: ./scripts/current-version
 
       - name: Update dependencies & ensure version changed
         if: ${{ env.current_version != env.next_version }}

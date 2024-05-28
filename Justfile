@@ -22,6 +22,4 @@ docker-build:
 docker-run IMG CMD:
     docker run --rm -v $PWD:/git-ai -w /git-ai -it {{IMG}} {{CMD}}
 cd_local:
-    act pull_request \
-        --eventpath .github/workflows/cd.yml \
-        -P macos-latest=ghcr.io/catthehacker/ubuntu:act-latest
+    act
