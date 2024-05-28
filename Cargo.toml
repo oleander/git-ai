@@ -18,43 +18,32 @@ path = "src/main.rs"
 name = "git-ai-hook"
 path = "src/bin/hook.rs"
 
-[[bin]]
-name = "git-ai-clear"
-path = "src/bin/clear.rs"
-
 [dependencies]
-tokio = { version = "1.37.0", features = ["rt-multi-thread", "macros"] }
+anyhow = "1.0.86"
+async-openai = "0.18.3"
+clap = { version = "4.5.4", features = ["derive", "wrap_help"] }
+colored = "2.1.0"
+config = "0.13.4"
+console = "0.15.8"
+ctrlc = "3.4.4"
+dotenv = "0.15.0"
+env_logger = "0.10.2"
+git2 = { version = "0.18.3" }
+home = "0.5.9"
+indicatif = "0.17.8"
+lazy_static = "1.4.0"
+log = "0.4.21"
 reqwest = { version = "0.11.27", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
-serde_derive = "1.0.202"
-async-openai = "0.18.3"
-serde_json = "1.0.117"
-env_logger = "0.10.2"
-lazy_static = "1.4.0"
-thiserror = "1.0.61"
-indicatif = "0.17.8"
+serde_derive = "1.0.203"
 serde_ini = "0.2.0"
-console = "0.15.8"
-anyhow = "1.0.85"
-dotenv = "0.15.0"
-config = "0.13.4"
-colored = "2.1.0"
-ctrlc = "3.4.4"
-log = "0.4.21"
-home = "0.5.9"
-
-[dependencies.clap]
-features = ["derive", "wrap_help"]
-default-features = true
-version = "4.5.4"
-
-[dependencies.git2]
-default-features = false
-version = "0.18.3"
+serde_json = "1.0.117"
+thiserror = "1.0.61"
+tokio = { version = "1.37.0", features = ["rt-multi-thread", "macros"] }
 
 [dev-dependencies]
 tempfile = "3.10.1"
-anyhow = "1.0.85"
+anyhow = "1.0.86"
 git2 = "0.18.3"
 rand = "0.8.5"
 

@@ -2,7 +2,6 @@ mod uninstall;
 mod install;
 mod reinstall;
 mod config;
-mod examples;
 
 use clap::{Arg, Command};
 use anyhow::Result;
@@ -99,9 +98,6 @@ async fn main() -> Result<()> {
         }
         _ => unreachable!()
       },
-    Some(("examples", args)) => {
-      examples::run(args).await?;
-    }
     _ => unreachable!()
   }
 

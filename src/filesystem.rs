@@ -52,9 +52,9 @@ impl File {
 }
 
 impl From<&File> for Dir {
-    fn from(file: &File) -> Self {
-        file.parent()
-    }
+  fn from(file: &File) -> Self {
+    file.parent()
+  }
 }
 
 impl std::fmt::Display for File {

@@ -1,4 +1,0 @@
-set dotenv-load
-
-eval:
-  promptfoo eval
