@@ -137,6 +137,8 @@ jobs:
 
       - name: Commit changes and tag release
         run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
           git add Cargo.lock Cargo.toml
           git commit -m "Update dependencies for version ${{ steps.next_version.outputs.version }}"
           git tag -a "v${{ steps.next_version.outputs.version }}" -m "Release v${{ steps.next_version.outputs.version }}"
