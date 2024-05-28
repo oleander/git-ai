@@ -25,10 +25,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install dependencies
-        run: |
-          brew install jq
-          cargo install cargo-bump
+      - name: Install MacOS dependencies
+        if: matrix.os == 'macos-latest'
+        run: brew install jq
+
+      - name: Install Ubuntu dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get install jq
+
+      - name: Install cargo-bump
+        run: cargo install cargo-bump
 
       - name: Previous version
         id: prev_version
