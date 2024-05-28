@@ -85,11 +85,12 @@ pub fn run(args: &ArgMatches) -> Result<()> {
       );
     }
     Some(("max-tokens", args)) => {
-      app.max_tokens.clone_from(
+      app.max_tokens.clone_from(&Some(
         args
-          .get_one("max-tokens")
+          .get_one::<usize>("max-tokens")
           .context("Failed to parse max-tokens")?
-      );
+          .to_owned()
+      ));
     }
     Some(("max-commit-length", args)) => {
       app.max_commit_length.clone_from(

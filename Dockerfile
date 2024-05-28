@@ -1,34 +1,20 @@
-# Use a specific Rust version
-FROM rust:1.76.0 as builder
-WORKDIR /git-ai
+# Use an official Rust image as a parent image
+FROM rust:latest
 
-# Fake project to cache dependenciej
-WORKDIR /git-ai
-RUN cargo init --lib --name ai
-RUN cp src/lib.rs src/main.rs
-COPY Cargo.toml Cargo.lock ./
-RUN cargo build
+# Install dependencies
+RUN apt-get update && apt-get install -y git fish
 
-# Copy project files and build the project
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy the current directory contents into the container at /usr/src/myapp
 COPY . .
-RUN cargo build --bins
 
-# Use a slim version of Debian for the final image
-FROM debian:buster-slim
+# Install the git-ai from the source
+RUN cargo install --debug --path .
 
-COPY --from=builder /git-ai/target/debug/git-ai /usr/local/bin/git-ai
-COPY --from=builder /git-ai/target/debug/git-ai-hook /usr/local/bin/git-ai-hook
+# Make sure .env file exists (for demonstration, you might want to handle this differently)
+COPY ./scripts/integration-tests scripts/integration-tests
 
-# Install git and clean up in one layer
-RUN apt-get update && \
-    apt-get install -y git && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Add a non-root user and switch to it
-RUN useradd -m ai-bot
-USER ai-bot
-
-WORKDIR /repo
-
-CMD ["git-ai"]
+# Run the script
+CMD ["fish", "./scripts/integration-tests"]

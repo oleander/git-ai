@@ -1,0 +1,57 @@
+#!/usr/bin/env fish
+
+set -x fish_trace 1
+
+if not test -n "$OPENAI_API_KEY"
+    echo "Please set the OPENAI_API_KEY environment variable."
+    exit 1
+end
+
+if not command -v cargo
+    echo "Cargo not found. Please install Rust."
+    exit 1
+end
+
+function on_exit --on-event fish_exit
+    if test -d $DIR
+        rm -rf $DIR
+    end
+end
+
+set DIR /tmp/git-ai-test
+
+cargo install --debug --path .
+
+rm -rf $DIR
+mkdir $DIR
+cd $DIR
+
+git init
+git config user.name "Test User"
+git config user.email "hello@world.com"
+git config --global init.defaultBranch main
+git branch -m main
+
+git-ai hook
+git-ai hook install
+git-ai hook uninstall
+git-ai hook install
+git-ai hook reinstall
+
+git-ai config
+git-ai config set model gpt-4
+git-ai config set max-tokens 512
+git-ai config set max-commit-length 1024
+git-ai config set openai-api-key "$OPENAI_API_KEY"
+
+echo "Hello World" >README.md
+git add README.md
+git commit -m "Initial commit"
+
+echo "Hello World 2" >README.md
+git add README.md
+git commit --no-edit
+
+git commit --amend --no-edit
+
+git status --porcelain

@@ -74,21 +74,23 @@ impl PatchDiff for Diff<'_> {
   fn to_patch(&self, max_tokens: usize, model: Model) -> Result<String> {
     let mut files: HashMap<PathBuf, String> = HashMap::new();
 
-    self.print(DiffFormat::Patch, |diff, _hunk, line| {
-      let content = line.content();
-      let string = content.to_utf8();
+    self
+      .print(DiffFormat::Patch, |diff, _hunk, line| {
+        let content = line.content();
+        let string = content.to_utf8();
 
-      match files.get(&diff.path()) {
-        Some(file_acc) => {
-          files.insert(diff.path(), file_acc.to_owned() + &string);
+        match files.get(&diff.path()) {
+          Some(file_acc) => {
+            files.insert(diff.path(), file_acc.to_owned() + &string);
+          }
+          None => {
+            files.insert(diff.path(), string);
+          }
         }
-        None => {
-          files.insert(diff.path(), string);
-        }
-      }
 
-      true
-    }).context("Failed to print diff")?;
+        true
+      })
+      .context("Failed to print diff")?;
 
     let mut diffs: Vec<_> = files.values().collect();
 

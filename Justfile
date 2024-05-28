@@ -1,5 +1,3 @@
-set shell := ["bash", "-cu"]
-
 GITHUB_USER := "oleander"
 GITHUB_REPO := "git-ai"
 LOCAL_IMG := "git-ai:latest"
@@ -21,3 +19,11 @@ docker-build:
 
 docker-run IMG CMD:
     docker run --rm -v $PWD:/git-ai -w /git-ai -it {{IMG}} {{CMD}}
+cd_local:
+    act
+
+integration-test:
+    source .secrets
+    docker build -t git-ai-test .
+    docker run --rm git-ai-test -e OPENAI_API_KEY=$OPENAI_API_KEY
+
