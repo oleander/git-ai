@@ -23,12 +23,19 @@ jobs:
       - name: Setup nightly toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
-          override: true
+          components: rustfmt, clippy
 
-      - run: cargo fmt -- --check
-      - run: cargo clippy -- -D warnings
+      - name: Run clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings
 
+      - name: Run cargo fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: -- --check
   test:
     strategy:
       fail-fast: true
@@ -46,6 +53,7 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
           override: true
+          profile: minimal
 
       - name: Cache cargo registry
         uses: actions/cache@v3
@@ -92,8 +100,7 @@ jobs:
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
-          override: true
+          profile: minimal
 
       - name: Install cargo-bump
         run: cargo install cargo-bump
