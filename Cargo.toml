@@ -38,6 +38,7 @@ serde = { version = "1", features = ["derive"] }
 serde_derive = "1.0.203"
 serde_ini = "0.2.0"
 serde_json = "1.0.117"
+structopt = { version = "0.3.26", features = ["color", "suggestions"] }
 thiserror = "1.0.61"
 tokio = { version = "1.37.0", features = ["rt-multi-thread", "macros"] }
 
