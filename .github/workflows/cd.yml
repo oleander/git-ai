@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    types: [closed]
+    types: [closed, opened, synchronize, reopened]
 
 env:
   CARGO_TERM_COLOR: always
