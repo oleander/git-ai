@@ -1,19 +1,30 @@
-// Hook: prepare-commit-msg
-
 use std::time::Duration;
 
+use structopt::StructOpt;
 use indicatif::{ProgressBar, ProgressStyle};
 use anyhow::{Context, Result};
 use git2::{Oid, Repository};
 use ai::{commit, config};
-use clap::Parser;
 use ai::hook::*;
+
+#[derive(StructOpt, Debug)]
+#[structopt(name = "commit-msg-hook")]
+struct Args {
+  #[structopt(short = "t", long = "type")]
+  commit_type: Option<String>,
+
+  #[structopt(short = "s", long = "sha1")]
+  sha1: Option<String>,
+
+  #[structopt(parse(from_os_str))]
+  commit_msg_file: std::path::PathBuf
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
   env_logger::init();
 
-  let args = Args::parse();
+  let args = Args::from_args();
   let max_tokens = config::APP.max_tokens;
   let pb = ProgressBar::new_spinner();
   let repo = Repository::open_from_env().context("Failed to open repository")?;
@@ -66,10 +77,7 @@ async fn main() -> Result<()> {
   let response = commit::generate(patch.to_string()).await?;
 
   // Write the response to the commit message file
-  args
-    .commit_msg_file
-    .write(response.response.trim().to_string())
-    .unwrap();
+  std::fs::write(&args.commit_msg_file, response.response.trim())?;
 
   pb.finish_and_clear();
 
