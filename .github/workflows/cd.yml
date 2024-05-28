@@ -129,11 +129,11 @@ jobs:
         shell: bash
 
       - name: Check that version number was bumped
-        if: ${{ steps.prev_version.outputs.version == steps.next_version.outputs.version }}
+        if: steps.prev_version.outputs.version == steps.next_version.outputs.version
         run: exit 1
 
       - name: Update dependencies & ensure version changed
-        if: ${{ github.event.pull_request.merged == true }}
+        if: github.event.pull_request.merged == true
         run: cargo update --aggressive
 
       - name: Commit changes and tag release
@@ -145,18 +145,18 @@ jobs:
           git tag -a "v${{ steps.next_version.outputs.version }}" -m "Release v${{ steps.next_version.outputs.version }}"
 
       - name: Publish to crates.io (Dry Run)
-        if: ${{ github.event.pull_request.merged != true }}
+        if: github.event.pull_request.merged != true
         run: |
           echo "Dry run: would publish to crates.io but skipping because this is a dry run."
 
       - name: Push changes to main
-        if: ${{ github.event.pull_request.merged == true }}
+        if: github.event.pull_request.merged == true
         run: |
           git push origin main
           git push origin "v${{ steps.next_version.outputs.version }}"
 
       - name: Publish to crates.io (Actual Run)
-        if: ${{ github.event.pull_request.merged == true }}
+        if: github.event.pull_request.merged == true
         uses: katyo/publish-crates@v2
         with:
           registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
