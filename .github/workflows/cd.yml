@@ -35,21 +35,23 @@ jobs:
 
       - name: Previous version
         id: prev_version
-        run: ./scripts/current-version
+        run: echo "::set-output name=version::$(./scripts/current-version)"
+        shell: bash
 
       - name: Bump version using cargo-bump
         run: cargo bump patch
 
       - name: Next version
         id: next_version
-        run: ./scripts/current-version
+        run: echo "::set-output name=version::$(./scripts/current-version)"
+        shell: bash
 
       - name: Check that version number was bumped
         if: ${{ env.prev_version == env.next_version }}
         run: exit 1
         env:
-          next_version: "${{ steps.next_version.outputs }}"
-          prev_version: "${{ steps.prev_version.outputs }}"
+          next_version: "${{ steps.next_version.outputs.version }}"
+          prev_version: "${{ steps.prev_version.outputs.version }}"
 
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
@@ -77,7 +79,7 @@ jobs:
           git commit -m "Update dependencies for version ${{ env.next_version }}"
           git tag -a "v${{ env.next_version }}" -m "Release v${{ env.next_version }}"
         env:
-          next_version: "${{ steps.next_version.outputs }}"
+          next_version: "${{ steps.next_version.outputs.version }}"
 
       - name: Publish to crates.io (Dry Run)
         if: ${{ github.event.pull_request.merged != true }}
@@ -90,7 +92,7 @@ jobs:
           git push origin main
           git push origin "v${{ env.next_version }}"
         env:
-          next_version: "${{ steps.next_version.outputs }}"
+          next_version: "${{ steps.next_version.outputs.version }}"
 
       - name: Publish to crates.io (Actual Run)
         if: ${{ github.event.pull_request.merged == true }}
@@ -102,4 +104,4 @@ jobs:
         if: ${{ github.event.pull_request.merged == true }}
         run: echo "Successfully published version ${{ env.next_version }}"
         env:
-          next_version: ${{ steps.next_version.outputs }}
+          next_version: ${{ steps.next_version.outputs.version }}
