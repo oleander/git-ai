@@ -38,14 +38,14 @@ jobs:
 
       - name: Current version
         id: curr_version
-        run: echo "current_version=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version')" >> $GITHUB_ENV
+        run: cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version'
 
       - name: Bump version using cargo-bump
         run: cargo bump patch
 
       - name: Next version
         id: next_version
-        run: echo "next_version=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version')" >> $GITHUB_ENV
+        run: cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version'
 
       - name: Update dependencies & ensure version changed
         if: ${{ env.current_version != env.next_version }}
