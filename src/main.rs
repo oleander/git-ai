@@ -7,7 +7,6 @@ use structopt::StructOpt;
 use anyhow::Result;
 use dotenv::dotenv;
 
-/// Git AI Command Line Interface
 #[derive(StructOpt)]
 #[structopt(name = "git-ai", about = "A git extension that uses OpenAI to generate commit messages")]
 enum Cli {
