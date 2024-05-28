@@ -19,6 +19,7 @@ docker-build:
 
 docker-run IMG CMD:
     docker run --rm -v $PWD:/git-ai -w /git-ai -it {{IMG}} {{CMD}}
+
 cd_local:
     act
 
@@ -26,4 +27,3 @@ integration-test:
     source .secrets
     docker build -t git-ai-test .
     docker run --rm git-ai-test -e OPENAI_API_KEY=$OPENAI_API_KEY
-

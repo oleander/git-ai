@@ -2,10 +2,13 @@ name: CD
 
 on:
   push:
-    branches: [main]
-  pull_request_target:
+    branches:
+      - main
+  pull_request:
     types: [opened, synchronize, reopened, closed]
-    branches: [main]
+    branches:
+      - main
+  workflow_dispatch: {}
 
 env:
   CARGO_TERM_COLOR: always
@@ -19,11 +22,9 @@ jobs:
 
       - name: Setup nightly toolchain
         uses: actions-rs/toolchain@v1
-        id: rust
         with:
           components: rustfmt, clippy
           toolchain: nightly
-          profile: minimal
 
       - uses: actions/cache@v3
         with:
@@ -33,10 +34,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: |
-            cargo-${{ runner.os }}-nightly-${{ steps.rust.outputs.rustc_hash }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            cargo-${{ runner.os }}-nightly-${{ steps.rust.outputs.rustc_hash }}-
+          key: ${{ runner.os }}-nightly-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run clippy
         uses: actions-rs/cargo@v1
@@ -63,7 +61,6 @@ jobs:
 
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
-        id: rust
         with:
           toolchain: ${{ matrix.rust }}
           override: true
@@ -77,16 +74,13 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: |
-            cargo-${{ runner.os }}-${{ matrix.rust }}-${{ steps.rust.outputs.rustc_hash }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            cargo-${{ runner.os }}-${{ matrix.rust }}-${{ steps.rust.outputs.rustc_hash }}-
+          key: ${{ runner.os }}-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run integration tests
         run: |
           cargo build --release
           cargo test --release
-          ./scripts/integration-tests
+          ./tools/test.sh
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
@@ -94,7 +88,6 @@ jobs:
     needs: [test, lint]
     runs-on: ubuntu-latest
     continue-on-error: false
-    if: github.event.pull_request.merged == true
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -102,7 +95,6 @@ jobs:
       - run: sudo apt-get install jq
 
       - name: Set up Rust
-        id: rust
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -118,13 +110,15 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: |
-            cargo-${{ runner.os }}-stable-${{ steps.rust.outputs.rustc_hash }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            cargo-${{ runner.os }}-stable-${{ steps.rust.outputs.rustc_hash }}-
+          key: ${{ runner.os }}-stable-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install cargo-bump
         run: cargo install cargo-bump
+
+      - name: Previous version
+        id: prev_version
+        run: echo "::set-output name=version::$(./scripts/current-version)"
+        shell: bash
 
       - name: Bump version using cargo-bump
         run: cargo bump patch
@@ -134,7 +128,12 @@ jobs:
         run: echo "::set-output name=version::$(./scripts/current-version)"
         shell: bash
 
+      - name: Check that version number was bumped
+        if: ${{ steps.prev_version.outputs.version == steps.next_version.outputs.version }}
+        run: exit 1
+
       - name: Update dependencies & ensure version changed
+        if: ${{ github.event.pull_request.merged == true }}
         run: cargo update --aggressive
 
       - name: Commit changes and tag release
@@ -145,12 +144,19 @@ jobs:
           git commit -m "Update dependencies for version ${{ steps.next_version.outputs.version }}"
           git tag -a "v${{ steps.next_version.outputs.version }}" -m "Release v${{ steps.next_version.outputs.version }}"
 
+      - name: Publish to crates.io (Dry Run)
+        if: ${{ github.event.pull_request.merged != true }}
+        run: |
+          echo "Dry run: would publish to crates.io but skipping because this is a dry run."
+
       - name: Push changes to main
+        if: ${{ github.event.pull_request.merged == true }}
         run: |
           git push origin main
           git push origin "v${{ steps.next_version.outputs.version }}"
 
-      - name: Publish to crates.io
+      - name: Publish to crates.io (Actual Run)
+        if: ${{ github.event.pull_request.merged == true }}
         uses: katyo/publish-crates@v2
         with:
           registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
