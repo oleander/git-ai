@@ -13,8 +13,6 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
-
-
 jobs:
   deploy:
     strategy:
@@ -47,11 +45,8 @@ jobs:
         shell: bash
 
       - name: Check that version number was bumped
-        if: ${{ env.prev_version == env.next_version }}
+        if: ${{ steps.prev_version.outputs.version == steps.next_version.outputs.version }}
         run: exit 1
-        env:
-          next_version: "${{ steps.next_version.outputs.version }}"
-          prev_version: "${{ steps.prev_version.outputs.version }}"
 
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
@@ -76,10 +71,8 @@ jobs:
       - name: Commit changes and tag release
         run: |
           git add Cargo.lock Cargo.toml
-          git commit -m "Update dependencies for version ${{ env.next_version }}"
-          git tag -a "v${{ env.next_version }}" -m "Release v${{ env.next_version }}"
-        env:
-          next_version: "${{ steps.next_version.outputs.version }}"
+          git commit -m "Update dependencies for version ${{ steps.next_version.outputs.version }}"
+          git tag -a "v${{ steps.next_version.outputs.version }}" -m "Release v${{ steps.next_version.outputs.version }}"
 
       - name: Publish to crates.io (Dry Run)
         if: ${{ github.event.pull_request.merged != true }}
@@ -90,9 +83,7 @@ jobs:
         if: ${{ github.event.pull_request.merged == true }}
         run: |
           git push origin main
-          git push origin "v${{ env.next_version }}"
-        env:
-          next_version: "${{ steps.next_version.outputs.version }}"
+          git push origin "v${{ steps.next_version.outputs.version }}"
 
       - name: Publish to crates.io (Actual Run)
         if: ${{ github.event.pull_request.merged == true }}
@@ -102,6 +93,4 @@ jobs:
 
       - name: Success message
         if: ${{ github.event.pull_request.merged == true }}
-        run: echo "Successfully published version ${{ env.next_version }}"
-        env:
-          next_version: ${{ steps.next_version.outputs.version }}
+        run: echo "Successfully published version ${{ steps.next_version.outputs.version }}"
