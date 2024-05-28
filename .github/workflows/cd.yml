@@ -21,16 +21,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-
-
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y jq
           cargo install cargo-bump cargo-metadata
 
-      - name: Current version
-        id: curr_version
+      - name: Previous version
+        id: prev_version
         run: ./scripts/current-version
 
       - name: Bump version using cargo-bump
@@ -40,6 +38,13 @@ jobs:
         id: next_version
         run: ./scripts/current-version
 
+      - name: Check that version number was bumped
+        if: ${{ env.prev_version == env.next_version }}
+        run: exit 1
+        env:
+          next_version: "${{ steps.next_version.outputs }}"
+          prev_version: "${{ steps.prev_version.outputs }}"
+
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -47,7 +52,6 @@ jobs:
           override: true
 
       - name: Run integration tests
-        if: ${{ github.event.pull_request.merged == true }}
         run: |
           cargo build --release
           cargo test --release
@@ -58,21 +62,15 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Update dependencies & ensure version changed
-        if: ${{ env.current_version != env.next_version }}
+        if: ${{ github.event.pull_request.merged == true }}
         run: cargo update --aggressive
-        env:
-          current_version: "${{ steps.curr_version.outputs }}"
-          next_version: "${{ steps.next_version.outputs }}"
 
       - name: Commit changes and tag release
-        if: ${{ env.current_version != env.next_version }}
         run: |
           git add Cargo.lock Cargo.toml
           git commit -m "Update dependencies for version ${{ env.next_version }}"
           git tag -a "v${{ env.next_version }}" -m "Release v${{ env.next_version }}"
-
         env:
-          current_version: "${{ steps.curr_version.outputs }}"
           next_version: "${{ steps.next_version.outputs }}"
 
       - name: Publish to crates.io (Dry Run)
@@ -98,4 +96,4 @@ jobs:
         if: ${{ github.event.pull_request.merged == true }}
         run: echo "Successfully published version ${{ env.next_version }}"
         env:
-          next_version: "${{ steps.next_version.outputs }}"
+          next_version: ${{ steps.next_version.outputs }}
