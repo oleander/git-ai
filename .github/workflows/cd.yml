@@ -25,7 +25,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y jq
-          cargo install cargo-bump cargo-metadata
+          cargo install cargo-bump
 
       - name: Previous version
         id: prev_version
