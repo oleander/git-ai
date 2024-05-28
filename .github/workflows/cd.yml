@@ -63,8 +63,7 @@ jobs:
           git add Cargo.lock Cargo.toml
           git commit -m "Update dependencies for version ${{ env.next_version }}"
           git tag -a "v${{ env.next_version }}" -m "Release v${{ env.next_version }}"
-          git push origin main
-          git push origin "v${{ env.next_version }}"
+
         env:
           current_version: "${{ steps.curr_version.outputs }}"
           next_version: "${{ steps.next_version.outputs }}"
@@ -73,6 +72,14 @@ jobs:
         if: ${{ github.event.pull_request.merged != true }}
         run: |
           echo "Dry run: would publish to crates.io but skipping because this is a dry run."
+
+      - name: Push changes to main
+        if: ${{ github.event.pull_request.merged == true }}
+        run: |
+          git push origin main
+          git push origin "v${{ env.next_version }}"
+        env:
+          next_version: "${{ steps.next_version.outputs }}"
 
       - name: Publish to crates.io (Actual Run)
         if: ${{ github.event.pull_request.merged == true }}
