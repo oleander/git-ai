@@ -1,4 +1,4 @@
-# Git AI [![Rust](https://github.com/oleander/git-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/oleander/git-ai/actions/workflows/ci.yml) [![Crates.io](https://img.shields.io/crates/v/git-ai.svg)](https://crates.io/crates/git-ai) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+# Git AI [![Rust](https://github.com/oleander/git-ai/actions/workflows/cd.yml/badge.svg)](https://github.com/oleander/git-ai/actions/workflows/cd.yml) [![Crates.io](https://img.shields.io/crates/v/git-ai.svg)](https://crates.io/crates/git-ai) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **Git AI** seamlessly integrates ChatGPT with git hooks to automate commit message generation based on your staged files. Stage your changes and commit without a message; **Git AI** does the rest, crafting detailed commit messages that reflect the essence of your changes.
 
