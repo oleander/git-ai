@@ -118,7 +118,11 @@ impl Args {
       Some(Message | Template | Merge | Squash) => bail!("Invalid source {:?}", self.source),
       Some(Commit) | None => {
         let repo = Repository::open_from_env().context("Failed to open repository")?;
-        let model = config::APP.model.clone().into();
+        let model = config::APP
+          .model
+          .clone()
+          .unwrap_or("gpt-4o".to_string())
+          .into();
         let used_tokens = commit::token_used(&model)?;
         let max_tokens = config::APP.max_tokens.unwrap_or(model.context_size());
         let remaining_tokens = max_tokens.saturating_sub(used_tokens);

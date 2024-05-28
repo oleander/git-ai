@@ -19,7 +19,7 @@ fn instruction() -> String {
 
   ## Input:
 
-  INPUT:", config::APP.max_commit_length)
+  INPUT:", config::APP.max_commit_length.unwrap_or(72))
 }
 
 pub fn token_used(model: &Model) -> Result<usize> {
