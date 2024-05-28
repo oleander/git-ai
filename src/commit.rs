@@ -1,33 +1,7 @@
-use std::io;
+use anyhow::{bail, Result};
 
-use async_openai::types::{ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs};
-use async_openai::config::OpenAIConfig;
-use async_openai::error::OpenAIError;
-use async_openai::Client;
-use thiserror::Error;
-use anyhow::Context;
-
-use crate::config;
-
-#[derive(Error, Debug)]
-pub enum ChatError {
-  #[error("Failed to build HTTP client")]
-  HttpClientBuildError,
-  #[error("HTTP error: {0}")]
-  HttpRequestError(#[from] reqwest::Error),
-  #[error("IO error: {0}")]
-  IOError(#[from] io::Error),
-  #[error("Failed to parse JSON: {0}")]
-  JsonParseError(#[from] serde_json::Error),
-  #[error("Anyhow error: {0}")]
-  Anyhow(#[from] anyhow::Error),
-  #[error("OpenAI error: {0}")]
-  OpenAIError(String),
-  #[error("Failed to parse response: {1} ({0})")]
-  ParseError(serde_json::Error, String),
-  #[error("OpenAI error: {0}")]
-  OpenAI(#[from] OpenAIError)
-}
+use crate::{config, openai};
+use crate::model::Model;
 
 fn instruction() -> String {
   format!("You are an AI assistant that generates concise and meaningful git commit messages based on provided diffs. Please adhere to the following guidelines:
@@ -45,41 +19,24 @@ fn instruction() -> String {
 
   ## Input:
 
-  INPUT:", config::APP.max_commit_length)
+  INPUT:", config::APP.max_commit_length.unwrap_or(72))
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct OpenAIResponse {
-  pub response: String
+pub fn token_used(model: &Model) -> Result<usize> {
+  model.count_tokens(&instruction())
 }
 
-pub async fn generate(diff: String) -> Result<OpenAIResponse, ChatError> {
-  let api_key = config::APP
-    .openai_api_key
-    .clone()
-    .context("Failed to get OpenAI API key, please run `git-ai config set openai-api")?;
+pub async fn generate(diff: String, max_tokens: usize, model: Model) -> Result<openai::Response> {
+  if max_tokens == 0 {
+    bail!("Max can't be zero (2)")
+  }
 
-  let config = OpenAIConfig::new().with_api_key(api_key);
-  let client = Client::with_config(config);
-  let request = CreateChatCompletionRequestArgs::default()
-    .max_tokens(config::APP.max_tokens as u16)
-    .model(config::APP.model.clone())
-    .messages([
-      ChatCompletionRequestSystemMessageArgs::default()
-        .content(instruction())
-        .build()?
-        .into(),
-      ChatCompletionRequestUserMessageArgs::default()
-        .content(diff)
-        .build()?
-        .into()
-    ])
-    .build()?;
+  let request = openai::Request {
+    system: instruction(),
+    prompt: diff,
+    max_tokens,
+    model
+  };
 
-  let response = client.chat().create(request).await?;
-  let reason = format!("Received empty response: {:?}", response);
-  let choise = response.choices.first().context(reason)?;
-  let text = choise.message.content.clone();
-
-  Ok(OpenAIResponse { response: text.unwrap() })
+  openai::call(request).await
 }

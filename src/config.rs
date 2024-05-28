@@ -11,17 +11,16 @@ use console::Emoji;
 #[derive(Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct App {
   pub openai_api_key:    Option<String>,
-  pub model:             String,
-  pub language:          String,
-  pub max_tokens:        usize,
-  pub max_commit_length: usize,
-  pub timeout:           usize
+  pub model:             Option<String>,
+  pub max_tokens:        Option<usize>,
+  pub max_commit_length: Option<usize>,
+  pub timeout:           Option<usize>
 }
 
 impl App {
   #[allow(dead_code)]
   pub fn duration(&self) -> std::time::Duration {
-    std::time::Duration::from_secs(self.timeout as u64)
+    std::time::Duration::from_secs(self.timeout.unwrap_or(30) as u64)
   }
 }
 
@@ -69,21 +68,21 @@ impl App {
 
 pub fn run_model(value: String) -> Result<()> {
   let mut app = App::new()?;
-  app.model = value;
+  app.model = value.into();
   println!("{} Configuration option model updated!", Emoji("✨", ":-)"));
   app.save()
 }
 
 pub fn run_max_tokens(max_tokens: usize) -> Result<()> {
   let mut app = App::new()?;
-  app.max_tokens = max_tokens;
+  app.max_tokens = max_tokens.into();
   println!("{} Configuration option max-tokens updated!", Emoji("✨", ":-)"));
   app.save()
 }
 
 pub fn run_max_commit_length(max_commit_length: usize) -> Result<()> {
   let mut app = App::new()?;
-  app.max_commit_length = max_commit_length;
+  app.max_commit_length = max_commit_length.into();
   println!("{} Configuration option max-commit-length updated!", Emoji("✨", ":-)"));
   app.save()
 }
