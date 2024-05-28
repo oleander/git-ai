@@ -14,7 +14,22 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  deploy:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup nightly toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+
+      - run: cargo fmt -- --check
+      - run: cargo clippy -- -D warnings
+
+  test:
     strategy:
       fail-fast: true
       matrix:
@@ -25,14 +40,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
-      - name: Install MacOS dependencies
-        if: matrix.os == 'macos-latest'
-        run: brew install jq
-
-      - name: Install Ubuntu dependencies
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get install jq
 
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
@@ -64,6 +71,30 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-build-${{ matrix.rust }}-
 
+      - name: Run integration tests
+        run: |
+          cargo build --release
+          cargo test --release
+          ./tools/test.sh
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+  deploy:
+    needs: [test, lint]
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - run: sudo apt-get install jq
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
       - name: Install cargo-bump
         run: cargo install cargo-bump
 
@@ -83,16 +114,6 @@ jobs:
       - name: Check that version number was bumped
         if: ${{ steps.prev_version.outputs.version == steps.next_version.outputs.version }}
         run: exit 1
-
-      - name: Run integration tests
-        run: |
-          cargo build --release
-          cargo test --release
-          cargo fmt -- --check
-          cargo clippy -- -D warnings
-          ./tools/test.sh
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Update dependencies & ensure version changed
         if: ${{ github.event.pull_request.merged == true }}
@@ -120,7 +141,3 @@ jobs:
         uses: katyo/publish-crates@v2
         with:
           registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-
-      - name: Success message
-        if: ${{ github.event.pull_request.merged == true }}
-        run: echo "Successfully published version ${{ steps.next_version.outputs.version }}"
