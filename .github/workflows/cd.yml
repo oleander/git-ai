@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
@@ -32,35 +32,39 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get install jq
+          sudo apt-get update
+          sudo apt-get install -y jq
           cargo install cargo-bump cargo-metadata
 
       - name: Current version
         id: curr_version
-        run: cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version'
+        run: echo "current_version=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version')" >> $GITHUB_ENV
 
       - name: Bump version using cargo-bump
         run: cargo bump patch
 
       - name: Next version
         id: next_version
-        run: cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version'
+        run: echo "next_version=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version')" >> $GITHUB_ENV
 
       - name: Update dependencies & ensure version changed
+        if: ${{ env.current_version != env.next_version }}
         run: cargo update --aggressive
-        if: steps.curr_version.outputs != steps.next_version.outputs
+        env:
+          current_version: ${{ steps.curr_version.outputs.current_version }}
+          next_version: ${{ steps.next_version.outputs.next_version }}
 
       - name: Commit changes and tag release
+        if: ${{ env.current_version != env.next_version }}
         run: |
           git add Cargo.lock Cargo.toml
-          git commit -m "Update dependencies for version ${{ env.version }}"
-          git tag -a "v${{ env.version }}" -m "Release v${{ env.version }}"
+          git commit -m "Update dependencies for version ${{ env.next_version }}"
+          git tag -a "v${{ env.next_version }}" -m "Release v${{ env.next_version }}"
           git push origin main
-          git push origin "v${{ env.version }}"
-          git push --tags
-        if: env.version != null
+          git push origin "v${{ env.next_version }}"
         env:
-          version: ${{ steps.next_version.outputs }}
+          current_version: ${{ steps.curr_version.outputs.current_version }}
+          next_version: ${{ steps.next_version.outputs.next_version }}
 
       - name: Publish to crates.io
         uses: katyo/publish-crates@v2
@@ -68,6 +72,6 @@ jobs:
           registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
       - name: Success message
-        run: echo "Successfully published version ${{ env.version }}"
+        run: echo "Successfully published version ${{ env.next_version }}"
         env:
-          version: ${{ steps.next_version.outputs }}
+          next_version: ${{ steps.next_version.outputs.next_version }}
