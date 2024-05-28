@@ -77,7 +77,7 @@ async fn main() -> Result<()> {
   let response = commit::generate(patch.to_string()).await?;
 
   // Write the response to the commit message file
-  std::fs::write(&args.commit_msg_file, response.response.trim().to_string())?;
+  std::fs::write(&args.commit_msg_file, response.response.trim())?;
 
   pb.finish_and_clear();
 
