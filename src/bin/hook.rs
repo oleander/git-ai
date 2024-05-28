@@ -40,6 +40,7 @@
 // Args { commit_msg_file: PathBuf::from(".git/COMMIT_EDITMSG"), source: Some(Source::Commit), sha1: Some("HEAD") }
 // Outcome: Opens the default text editor to allow modification of the most recent commit message. No new commit message is generated automatically; it depends on user input.
 
+use std::process::exit;
 use std::str::FromStr;
 use std::time::Duration;
 use std::path::PathBuf;
@@ -157,10 +158,12 @@ async fn main() -> Result<()> {
   let args = Args::from_args();
 
   log::debug!("Arguments: {:?}", args);
-  match args.execute().await {
-    Ok(()) => log::debug!("Success in {:?}", time.elapsed()),
-    Err(err) => log::warn!("Error in {:?} ({:?})", time.elapsed(), err)
-  };
+  if let Err(err) = args.execute().await {
+    eprintln!("{} ({:?})", err, time.elapsed());
+    exit(1);
+  } else {
+    log::debug!("Completed in {:?}", time.elapsed());
+  }
 
   Ok(())
 }
