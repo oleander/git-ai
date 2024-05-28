@@ -33,6 +33,12 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get install jq
 
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+
       - name: Install cargo-bump
         run: cargo install cargo-bump
 
@@ -52,12 +58,6 @@ jobs:
       - name: Check that version number was bumped
         if: ${{ steps.prev_version.outputs.version == steps.next_version.outputs.version }}
         run: exit 1
-
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          override: true
 
       - name: Run integration tests
         run: |
