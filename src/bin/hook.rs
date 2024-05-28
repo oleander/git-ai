@@ -116,9 +116,7 @@ impl Args {
     use Source::*;
 
     match self.source {
-      Some(Message | Template | Merge | Squash) => {
-        Ok(())
-      },
+      Some(Message | Template | Merge | Squash) => Ok(()),
       Some(Commit) | None => {
         let repo = Repository::open_from_env().context("Failed to open repository")?;
         let model = config::APP
