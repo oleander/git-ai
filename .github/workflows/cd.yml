@@ -1,10 +1,8 @@
 name: CD
 
 on:
-  push:
-    branches: [main]
   pull_request:
-    types: [closed, opened, synchronize, reopened]
+    types: [opened, synchronize, reopened]
 
 env:
   CARGO_TERM_COLOR: always
@@ -79,80 +77,3 @@ jobs:
           ./tools/test.sh
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
-  deploy:
-    needs: [test, lint]
-    runs-on: ubuntu-latest
-    continue-on-error: false
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - run: sudo apt-get install jq
-
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          override: true
-          default: true
-          toolchain: stable
-
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-stable-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Install cargo-bump
-        run: cargo install cargo-bump
-
-      - name: Previous version
-        id: prev_version
-        run: echo "::set-output name=version::$(./scripts/current-version)"
-        shell: bash
-
-      - name: Bump version using cargo-bump
-        run: cargo bump patch
-
-      - name: Next version
-        id: next_version
-        run: echo "::set-output name=version::$(./scripts/current-version)"
-        shell: bash
-
-      - name: Check that version number was bumped
-        if: steps.prev_version.outputs.version == steps.next_version.outputs.version
-        run: exit 1
-
-      - name: Update dependencies & ensure version changed
-        if: github.event.pull_request.merged == true
-        run: cargo update --aggressive
-
-      - name: Commit changes and tag release
-        run: |
-          git config user.name "${{ github.actor }}"
-          git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
-          git add Cargo.lock Cargo.toml
-          git commit -m "Update dependencies for version ${{ steps.next_version.outputs.version }}"
-          git tag -a "v${{ steps.next_version.outputs.version }}" -m "Release v${{ steps.next_version.outputs.version }}"
-
-      - name: Publish to crates.io (Dry Run)
-        if: github.event.pull_request.merged != true
-        run: |
-          echo "Dry run: would publish to crates.io but skipping because this is a dry run."
-
-      - name: Push changes to main
-        if: github.event.pull_request.merged == true
-        run: |
-          git push origin main
-          git push origin "v${{ steps.next_version.outputs.version }}"
-
-      - name: Publish to crates.io (Actual Run)
-        if: github.event.pull_request.merged == true
-        uses: katyo/publish-crates@v2
-        with:
-          registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
