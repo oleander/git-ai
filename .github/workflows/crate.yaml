@@ -41,7 +41,7 @@ jobs:
         run: |
           git config user.name "Linus Oleander"
           git config user.email "oleander@users.noreply.github.com"
-          cargo install cargo-bump
+          cargo install cargo-bump --force
 
       - name: Bump version
         run: cargo bump patch --git-tag
