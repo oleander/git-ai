@@ -2,8 +2,8 @@ name: Crate
 
 on:
   pull_request:
-    types: [closed]
-    branches: [main]
+    types: [closed, synchronize]
+    branches: [main, feature/auto-deploy]
 
 env:
   CARGO_TERM_COLOR: always
@@ -19,6 +19,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
+          components: rust-std
           profile: minimal
 
       - name: Cache Cargo registry
