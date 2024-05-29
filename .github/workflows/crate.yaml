@@ -2,8 +2,8 @@ name: Crate
 
 on:
   pull_request:
-    types: [closed, synchronize]
-    branches: [main, feature/auto-deploy]
+    types: [closed]
+    branches: [main]
 
 env:
   CARGO_TERM_COLOR: always
@@ -44,13 +44,13 @@ jobs:
         run: cargo bump patch --git-tag
 
       - name: Release to crates.io (dry-run)
-        if: ${{ !env.CI }}
+        if: github.ref != 'refs/heads/main'
         run: cargo publish --dry-run
 
       - name: Release to crates.io
-        if: ${{ env.CI }}
+        if: github.ref == 'refs/heads/main'
         run: cargo publish
 
       - name: Release to GitHub
-        if: ${{ env.CI }}
+        if: github.ref == 'refs/heads/main'
         run: git push origin HEAD --tags
