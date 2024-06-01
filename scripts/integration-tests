@@ -49,17 +49,17 @@ git-ai hook uninstall || fail "Hook uninstallation failed"
 git-ai hook install || fail "Hook reinstallation failed"
 git-ai hook reinstall || fail "Hook reinstall failed"
 
-echo "Hello World 0" >README.md
-git add README.md
-git commit --no-edit || fail "Initial commit failed"
-git status --porcelain || fail "Git status failed after initial commit"
-
 git-ai config
 git-ai config set
 git-ai config set model gpt-4 || fail "Setting model failed"
 git-ai config set max-tokens 512 || fail "Setting max tokens failed"
 git-ai config set max-commit-length 1024 || fail "Setting max commit length failed"
 git-ai config set openai-api-key "$OPENAI_API_KEY" || fail "Setting OpenAI API key failed"
+
+echo "Hello World 0" >README.md
+git add README.md
+git commit --no-edit || fail "Initial commit failed"
+git status --porcelain || fail "Git status failed after initial commit"
 
 # Test case: commit -m
 echo "Hello World" >README.md
