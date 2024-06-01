@@ -47,14 +47,15 @@ impl App {
       .add_source(config::File::new(CONFIG_PATH.to_str().unwrap(), FileFormat::Ini))
       .set_default("language", "en")?
       .set_default("timeout", 30)?
-      .set_default("max-commit-length", 72)?
-      .set_default("max-tokens", 2024)?
+      .set_default("max_commit_length", 72)?
+      .set_default("max_tokens", 2024)?
       .set_default("model", "gpt-4o")?
+      .set_default("openai_api_key", "<PLACE HOLDER FOR YOUR API KEY>")?
       .build()?;
 
     config
       .try_deserialize()
-      .context("Failed to deserialize config")
+      .context("Failed to deserialize existing config. Please run `git ai config reset` and try again")
   }
 
   pub fn save(&self) -> Result<()> {
@@ -92,4 +93,15 @@ pub fn run_openai_api_key(value: String) -> Result<()> {
   app.openai_api_key = Some(value);
   println!("{} Configuration option openai-api-key updated!", Emoji("✨", ":-)"));
   app.save()
+}
+
+pub fn run_reset() -> Result<()> {
+  if !CONFIG_PATH.exists() {
+    eprintln!("{} Configuration file does not exist!", Emoji("🤷", ":-)"));
+    return Ok(());
+  }
+
+  std::fs::remove_file(CONFIG_PATH.to_str().unwrap()).context("Failed to remove config file")?;
+  println!("{} Configuration reset!", Emoji("✨", ":-)"));
+  Ok(())
 }
