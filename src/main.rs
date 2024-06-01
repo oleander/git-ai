@@ -106,7 +106,7 @@ async fn main() -> Result<()> {
               config::run_openai_api_key(value)?;
             }
           },
-      }
+      },
   }
 
   Ok(())
