@@ -55,6 +55,7 @@ jobs:
         run: |
           cargo bump --version || cargo install cargo-bump
           cargo bump patch --git-tag
+          git commit -a --amend --no-edit
 
       - name: Release to crates.io
         run: cargo publish

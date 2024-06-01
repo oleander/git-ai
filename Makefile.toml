@@ -4,7 +4,7 @@ args = [".secrets"]
 files_not_exist = [".secrets"]
 
 [tasks.integration]
-command = "fish"
+command = "bash"
 args = ["./scripts/integration-tests"]
 dependencies = ["secret"]
 env_files = [".secrets"]
