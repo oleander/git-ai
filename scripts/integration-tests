@@ -31,7 +31,7 @@ end
 
 set DIR /tmp/git-ai-test
 
-cargo install --debug --path . || fail "Cargo installation failed"
+cargo install --path . || fail "Cargo installation failed"
 
 rm -rf $DIR
 mkdir $DIR
