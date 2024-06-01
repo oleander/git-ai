@@ -1,7 +1,7 @@
 #!/usr/bin/env fish
 
 set -x fish_trace 1
-set -x OPENAI_API_KEY $OPENAI_API_KEY
+set -Ux OPENAI_API_KEY $OPENAI_API_KEY
 set -x RUST_LOG debug
 
 if not test -n "$OPENAI_API_KEY"
