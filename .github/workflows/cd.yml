@@ -70,10 +70,18 @@ jobs:
             target/
           key: ${{ runner.os }}-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Install fish on linux
+        if: startsWith(matrix.os, 'ubuntu')
+        run: sudo apt-get install fish
+
+      - name: Install fish on macos
+        if: startsWith(matrix.os, 'macos')
+        run: brew install fish
+
       - name: Run integration tests
         run: |
+          ./scripts/integration-tests
           cargo build --release
           cargo test --release
-          ./tools/test.sh
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
