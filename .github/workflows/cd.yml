@@ -69,6 +69,7 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.rust }}-
 
       - name: Install fish on linux
         if: startsWith(matrix.os, 'ubuntu')
