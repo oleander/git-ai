@@ -54,6 +54,7 @@ jobs:
       - name: Bump version
         run: |
           cargo bump --version || cargo install cargo-bump
+          git status
           cargo bump patch --git-tag
           git commit -a --amend --no-edit
 
