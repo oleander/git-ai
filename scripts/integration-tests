@@ -43,14 +43,14 @@ git config user.email "hello@world.com"
 git config --global init.defaultBranch main
 git branch -m main
 
-git-ai hook
+git-ai hook || echo "As expected"
 git-ai hook install || fail "Hook installation failed"
 git-ai hook uninstall || fail "Hook uninstallation failed"
 git-ai hook install || fail "Hook reinstallation failed"
 git-ai hook reinstall || fail "Hook reinstall failed"
 
-git-ai config
-git-ai config set
+git-ai config || echo "As expected"
+git-ai config set || echo "As expected"
 git-ai config set model gpt-4 || fail "Setting model failed"
 git-ai config set max-tokens 512 || fail "Setting max tokens failed"
 git-ai config set max-commit-length 1024 || fail "Setting max commit length failed"
