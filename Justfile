@@ -27,3 +27,18 @@ integration-test:
     source .secrets
     docker build -t git-ai-test .
     docker run --rm git-ai-test -e OPENAI_API_KEY=$OPENAI_API_KEY
+
+github-action-deploy:
+    act \
+        --job deploy \
+        --eventpath event.json \
+        --container-architecture linux/amd64 \
+        --workflows .github/workflows/deploy.yml \
+        --secret-file .secrets
+
+github-action-ci:
+    act --job ci \
+        --eventpath event.json \
+        --container-architecture linux/amd64 \
+        --workflows .github/workflows/ci.yml \
+        --secret-file .secrets

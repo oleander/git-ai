@@ -24,7 +24,6 @@ async-openai = { version = "0.18.3", default-features = false }
 colored = "2.1.0"
 config = { version = "0.13.4", features = ["ini"], default-features = false }
 console = { version = "0.15.8", default-features = false }
-ctrlc = "3.4.4"
 dotenv = "0.15.0"
 env_logger = { version = "0.10.2", default-features = false }
 git2 = { version = "0.18.3", default-features = false }

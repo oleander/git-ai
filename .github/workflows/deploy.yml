@@ -1,0 +1,69 @@
+name: deploy
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  CARGO_TARGET_DIR: ~/.cargo/target
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        id: rust
+        with:
+          toolchain: nightly
+          profile: minimal
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          save-always: true
+          path: ~/.cargo/**/*
+          key: cargo-${{ env.rustc_hash }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ env.rustc_hash }}-
+        env:
+          rustc_hash: ${{ steps.rust.outputs.rustc_hash }}
+
+      - name: Specs and tests
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          cargo make --version || cargo install cargo-make
+          cargo make ci
+
+      - name: Setup git
+        run: |
+          git config user.name "Linus Oleander"
+          git config user.email "oleander@users.noreply.github.com"
+
+      - name: Bump version
+        run: |
+          cargo bump --version || cargo install cargo-bump
+          cargo bump patch --git-tag
+
+      - name: Release to crates.io
+        run: cargo publish
+        if: github.event_name == 'pull_request'
+
+      - name: Cargo publish dry-run
+        run: cargo publish --dry-run
+        if: github.event_name != 'pull_request'
+
+      - name: Release to GitHub
+        if: github.event_name == 'pull_request'
+        run: git push origin HEAD --tags

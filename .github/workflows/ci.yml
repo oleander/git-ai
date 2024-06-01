@@ -1,0 +1,46 @@
+name: ci
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  CARGO_TARGET_DIR: ~/.cargo/target
+
+jobs:
+  ci:
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+        rust: [nightly, stable]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        id: rust
+        with:
+          toolchain: ${{ matrix.rust }}
+          override: true
+          profile: minimal
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          save-always: true
+          path: ~/.cargo/**/*
+          key: cargo-${{ env.rustc_hash }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ env.rustc_hash }}-
+        env:
+          rustc_hash: ${{ steps.rust.outputs.rustc_hash }}
+
+      - name: Run integration tests
+        run: |
+          cargo make --version || cargo install cargo-make
+          cargo make ci
