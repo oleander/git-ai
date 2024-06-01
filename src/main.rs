@@ -29,7 +29,10 @@ enum HookSubcommand {
 #[derive(StructOpt)]
 enum ConfigSubcommand {
   #[structopt(about = "Sets a configuration value")]
-  Set(SetSubcommand)
+  Set(SetSubcommand),
+
+  #[structopt(about = "Resets the internal configuration to the default values")]
+  Reset
 }
 
 #[derive(StructOpt)]
@@ -84,6 +87,10 @@ async fn main() -> Result<()> {
       },
     Cli::Config(config) =>
       match config {
+        ConfigSubcommand::Reset => {
+          config::run_reset()?;
+        }
+
         ConfigSubcommand::Set(set) =>
           match set {
             SetSubcommand::Model(model) => {
@@ -99,7 +106,7 @@ async fn main() -> Result<()> {
               config::run_openai_api_key(value)?;
             }
           },
-      },
+      }
   }
 
   Ok(())
