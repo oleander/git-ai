@@ -67,7 +67,6 @@ struct Model {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
-  env_logger::init();
   dotenv().ok();
 
   let args = Cli::from_args();
