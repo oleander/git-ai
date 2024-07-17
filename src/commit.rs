@@ -11,6 +11,7 @@ fn instruction() -> String {
   - Consistency: Maintain uniformity in tense, punctuation, and capitalization.
   - Accuracy: Ensure the message accurately reflects the changes and their purpose.
   - Present tense, imperative mood. (e.g., 'Add x to y' instead of 'Added x to y')
+  - One commit message in return, i.e; 'Add debug logging to hook.rs and commit.rs'
   - Max {} chars in the output
 
   ## Output:
