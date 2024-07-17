@@ -10,6 +10,7 @@ use tiktoken_rs::model::get_context_size;
 const GPT4: &str = "gpt-4";
 const GPT4O: &str = "gpt-4o";
 const GPT4_TURBO: &str = "gpt-4-turbo-preview";
+const LLAMA3: &str = "llama3";
 
 
 #[derive(Debug, Clone, PartialEq)]
@@ -30,15 +31,18 @@ pub enum Model {
   GPT4,
   #[default]
   GPT4o,
-  GPT4Turbo
+  GPT4Turbo,
+  Llama3
 }
 
 impl Model {
   pub fn count_tokens(&self, text: &str) -> Result<usize> {
+    let max_tokens = get_completion_max_tokens(self.into(), text).unwrap_or(8192);
+
     Ok(
       self
         .context_size()
-        .saturating_sub(get_completion_max_tokens(self.into(), text)?)
+        .saturating_sub(max_tokens)
     )
   }
 
@@ -75,7 +79,8 @@ impl From<&Model> for &str {
     match model {
       Model::GPT4o => GPT4O,
       Model::GPT4 => GPT4,
-      Model::GPT4Turbo => GPT4_TURBO
+      Model::GPT4Turbo => GPT4_TURBO,
+      Model::Llama3 => LLAMA3
     }
   }
 }
@@ -88,6 +93,7 @@ impl FromStr for Model {
       GPT4O => Ok(Model::GPT4o),
       GPT4 => Ok(Model::GPT4),
       GPT4_TURBO => Ok(Model::GPT4Turbo),
+      LLAMA3 => Ok(Model::Llama3),
       model => bail!("Invalid model: {}", model)
     }
   }

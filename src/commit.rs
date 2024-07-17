@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 
-use crate::{config, openai};
+use crate::{config, openai, ollama};
 use crate::model::{Model, Request, Response};
 
 fn instruction() -> String {
