@@ -38,5 +38,5 @@ pub async fn generate(diff: String, max_tokens: usize, model: Model) -> Result<R
     model
   };
 
-  openai::call(request).await
+  ollama::call(request).await
 }
