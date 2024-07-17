@@ -12,7 +12,6 @@ const GPT4O: &str = "gpt-4o";
 const GPT4_TURBO: &str = "gpt-4-turbo-preview";
 const LLAMA3: &str = "llama3";
 
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Response {
   pub response: String
