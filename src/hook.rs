@@ -165,7 +165,7 @@ impl PatchRepository for Repository {
       .indent_heuristic(false)
       .ignore_submodules(true)
       .include_ignored(false)
-      .interhunk_lines(0)
+      .interhunk_lines(2)
       .context_lines(5)
       .patience(true)
       .minimal(true);
