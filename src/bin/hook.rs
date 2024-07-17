@@ -97,6 +97,12 @@ impl Args {
           .and_then(|obj| obj.peel_to_tree().ok()),
     };
 
+    log::debug!("Tree: {:?}", tree);
+    log::debug!("Remaining tokens: {}", remaining_tokens);
+    if remaining_tokens == 0 {
+      bail!("Max tokens can't be zero (1)");
+    }
+
     let patch = repo
       .to_patch(tree, remaining_tokens, model)
       .context("Failed to get patch")?;

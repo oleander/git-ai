@@ -168,7 +168,7 @@ impl PatchRepository for Repository {
       .interhunk_lines(0)
       .context_lines(0)
       .patience(true)
-      .minimal(true);
+      .minimal(false);
 
     self
       .diff_tree_to_index(tree.as_ref(), None, Some(&mut opts))

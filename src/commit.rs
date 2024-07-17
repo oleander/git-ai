@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 
-use crate::{config, openai};
-use crate::model::Model;
+use crate::{config, openai, ollama};
+use crate::model::{Model, Request, Response};
 
 fn instruction() -> String {
   format!("You are an AI assistant that generates concise and meaningful git commit messages based on provided diffs. Please adhere to the following guidelines:
@@ -11,6 +11,7 @@ fn instruction() -> String {
   - Consistency: Maintain uniformity in tense, punctuation, and capitalization.
   - Accuracy: Ensure the message accurately reflects the changes and their purpose.
   - Present tense, imperative mood. (e.g., 'Add x to y' instead of 'Added x to y')
+  - One commit message in return, i.e; 'Add debug logging to hook.rs and commit.rs'
   - Max {} chars in the output
 
   ## Output:
@@ -26,17 +27,17 @@ pub fn token_used(model: &Model) -> Result<usize> {
   model.count_tokens(&instruction())
 }
 
-pub async fn generate(diff: String, max_tokens: usize, model: Model) -> Result<openai::Response> {
+pub async fn generate(diff: String, max_tokens: usize, model: Model) -> Result<Response> {
   if max_tokens == 0 {
     bail!("Max can't be zero (2)")
   }
 
-  let request = openai::Request {
+  let request = Request {
     system: instruction(),
     prompt: diff,
     max_tokens,
     model
   };
 
-  openai::call(request).await
+  ollama::call(request).await
 }
