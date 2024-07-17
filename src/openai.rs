@@ -4,20 +4,9 @@ use async_openai::Client;
 use anyhow::{Context, Result};
 
 use crate::config;
-use crate::model::Model;
+use crate::model::Response;
+use crate::model::Request;
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Response {
-  pub response: String
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Request {
-  pub prompt:     String,
-  pub system:     String,
-  pub max_tokens: usize,
-  pub model:      Model
-}
 
 pub async fn call(request: Request) -> Result<Response> {
   let api_key = config::APP

@@ -11,6 +11,20 @@ const GPT4: &str = "gpt-4";
 const GPT4O: &str = "gpt-4o";
 const GPT4_TURBO: &str = "gpt-4-turbo-preview";
 
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Response {
+  pub response: String
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Request {
+  pub prompt:     String,
+  pub system:     String,
+  pub max_tokens: usize,
+  pub model:      Model
+}
+
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Serialize, Deserialize, Default)]
 pub enum Model {
   GPT4,
