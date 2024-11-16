@@ -1,10 +1,17 @@
 [package]
 name = "git-ai"
-version = "0.2.26"
+version = "0.2.29"
 edition = "2021"
 description = "Git AI: Automates commit messages using ChatGPT. Stage your files, and Git AI generates the messages."
 license = "MIT"
 repository = "https://github.com/oleander/git-ai"
+
+[package.metadata.binstall]
+name = "git-ai"
+default-target = "x86_64-apple-darwin"
+targets = ["x86_64-apple-darwin"]
+pkg-url = "{ repo_url }/releases/download/{ version }/{ name }-{ target }{ archive-suffix }"
+pkg-fmt = "zip"
 
 [lib]
 name = "ai"
@@ -58,10 +65,3 @@ lto = true
 [profile.release.package."*"]
 codegen-units = 1
 opt-level = 3
-
-[package.metadata.binstall]
-name = "git-ai"
-default-target = "x86_64-apple-darwin"
-targets = ["x86_64-apple-darwin"]
-pkg-url = "{ repo_url }/releases/download/{ version }/{ name }-{ target }{ archive-suffix }"
-pkg-fmt = "zip"
