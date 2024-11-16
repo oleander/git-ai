@@ -52,9 +52,6 @@ jobs:
           override: true
           profile: minimal
 
-      - name: Install cargo-bump
-        run: cargo install cargo-bump
-
       - name: Ensure no changes
         run: git diff --exit-code --quiet && cargo check
 
@@ -94,6 +91,9 @@ jobs:
           toolchain: nightly
           override: true
           profile: minimal
+
+      - name: Install cargo-bump
+        run: cargo install cargo-bump
 
       - name: Bump version
         run: |
