@@ -1,6 +1,6 @@
 [package]
 name = "git-ai"
-version = "0.2.35"
+version = "0.2.40"
 edition = "2021"
 description = "Git AI: Automates commit messages using ChatGPT. Stage your files, and Git AI generates the messages."
 license = "MIT"
