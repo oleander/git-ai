@@ -47,7 +47,7 @@ jobs:
           components: rust-src,cargo
           target: ${{ env.TARGET }}
           override: true
-          profile: dev
+          profile: minimal
 
       - name: Install cargo-bump
         run: cargo install cargo-bump
