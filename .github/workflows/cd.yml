@@ -1,93 +1,79 @@
 name: CD
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  push:
+    tags:
+      - "**"
+    branches:
+      - "main"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  lint:
+  build-x86:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Setup nightly toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          components: rustfmt, clippy
-          toolchain: nightly
+      - name: Add target
+        run: rustup target add x86_64-unknown-linux-gnu
 
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-nightly-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build for x86_64-unknown-linux-gnu
+        run: cargo build --release --target x86_64-unknown-linux-gnu
 
-      - name: Run clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -- -D warnings
+      - name: Package Binary
+        run: tar czf target/*/release/git-ai-*.tar.gz git-*
 
-      - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
         with:
-          command: fmt
-          args: -- --check
-  test:
-    needs: lint
-    strategy:
-      fail-fast: true
-      matrix:
-        os: [macos-latest, ubuntu-latest]
-        rust: [nightly, stable]
-    runs-on: ${{ matrix.os }}
-    continue-on-error: false
+          name: git-ai-x86_64-unknown-linux-gnu.tar.gz
+          path: git-ai-*.tar.gz
+
+  build-arm:
+    runs-on: macos-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
+      - name: Add target
+        run: rustup target add aarch64-apple-darwin
+
+      - name: Build for aarch64-apple-darwin
+        run: cargo build --release --target aarch64-apple-darwin
+
+      - name: Package Binary
+        run: tar czf target/*/release/git-ai-*.tar.gz git-*
+
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
         with:
-          toolchain: ${{ matrix.rust }}
-          override: true
-          profile: minimal
+          name: git-ai-aarch64-apple-darwin.tar.gz
+          path: git-ai-*.tar.gz
 
-      - uses: actions/cache@v4
+  release:
+    needs: [build-x86, build-arm]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-${{ matrix.rust }}-
+          files: git-ai-*.tar.gz
+          tag_name: ${{ github.ref_name }}
 
-      - name: Install fish on linux
-        if: startsWith(matrix.os, 'ubuntu')
-        run: sudo apt-get install fish
-
-      - name: Install fish on macos
-        if: startsWith(matrix.os, 'macos')
-        run: brew install fish
-
-      - name: Run integration tests
-        run: |
-          ./scripts/integration-tests
-          cargo build --release
-          cargo test --release
+      - name: Publish to crates.io
+        run: cargo publish
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
