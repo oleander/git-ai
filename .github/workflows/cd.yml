@@ -61,14 +61,16 @@ jobs:
         run: git status && exit 1
 
       - name: Bump version
-        run: cargo bump patch --git-tag || git status
+        run: |
+          cargo bump patch --git-tag
+          cargo check
+
+      - name: Include the version bump in the commit message
+        run: git commit -a --amend --no-edit
 
       - name: Get the latest tag
         run: git describe --tags --abbrev=0 HEAD
         id: version
-
-      - name: Include the version bump in the commit message
-        run: git commit -a --amend --no-edit
 
       - name: Publish to crates.io
         run: cargo publish --allow-dirty --target ${{ env.TARGET }}
