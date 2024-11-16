@@ -37,6 +37,7 @@ jobs:
         with:
           name: git-ai-x86_64-unknown-linux-gnu.tar.gz
           if-no-files-found: error
+          compression-level: 9
           overwrite: true
           path: git-ai.tar.gz
 
@@ -59,7 +60,8 @@ jobs:
         with:
           name: git-ai-aarch64-apple-darwin.tar.gz
           if-no-files-found: error
-          overwrite: true
+          # overwrite: true
+          compression-level: 9
           path: git-ai.tar.gz
 
   release:
