@@ -14,117 +14,68 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-
-# jobs:
-#   build-x86:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/checkout@v4
-
-#       - name: Add target
-#         run: rustup target add x86_64-unknown-linux-musl
-
-#       - name: Compile
-#         id: compile-x86
-#         uses: rust-build/rust-build.action@v1.4.5
-#         with:
-#           RUSTTARGET: x86_64-unknown-linux-musl
-#           UPLOAD_MODE: none
-
-#       - name: Upload artifact
-#         uses: actions/upload-artifact@v3
-#         with:
-#           name: Binary-x86
-#           path: |
-#             ${{ steps.compile-x86.outputs.BUILT_ARCHIVE }}
-#             ${{ steps.compile-x86.outputs.BUILT_CHECKSUM }}
-
-#   build-arm:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/checkout@v4
-
-#       - name: Add target
-#         run: rustup target add aarch64-unknown-linux-gnu
-
-#       - name: Compile
-#         id: compile-arm
-#         uses: rust-build/rust-build.action@v1.4.5
-#         with:
-#           RUSTTARGET: aarch64-unknown-linux-gnu
-#           UPLOAD_MODE: none
-
-#       - name: Upload artifact
-#         uses: actions/upload-artifact@v3
-#         with:
-#           name: Binary-arm
-#           path: |
-#             ${{ steps.compile-arm.outputs.BUILT_ARCHIVE }}
-#             ${{ steps.compile-arm.outputs.BUILT_CHECKSUM }}
-
-#   release:
-#     needs: [build-x86, build-arm]
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/checkout@v4
-#         with:
-#           fetch-depth: 0
-#           token: ${{ secrets.GITHUB_TOKEN }}
-
-#       - name: Setup Git
-#         run: |
-#           git config user.name "Linus Oleander"
-#           git config user.email "oleander@users.noreply.github.com"
-
-#       - name: Install cargo-bump
-#         run: cargo install cargo-bump
-
-#       - name: Bump version
-#         run: |
-#           git stash
-#           cargo bump patch --git-tag
-#           git diff-index --quiet HEAD -- || git commit -a --amend --no-edit
-#           git push origin HEAD --tags
-
-#       - name: Download all artifacts
-#         uses: actions/download-artifact@v4
-
-#       - name: Create Release
-#         uses: softprops/action-gh-release@v2
-#         with:
-#           tag_name: "0.2.26"
-#           files: |
-#             Binary-x86
-#             Binary-arm
-
-#       - name: Publish to crates.io
-#         run: cargo publish --allow-dirty
-#         env:
-#           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-
-# on:
-#   release:
-#     types: [created]
+  # TARGET: x86_64-apple-darwin
+  TARGET: aarch64-unknown-linux-gnu
+  CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
 jobs:
-  release:
-    name: release ${{ matrix.target }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # - target: x86_64-unknown-linux-musl
-          #   archive: tar.gz tar.xz tar.zst
-          - target: x86_64-apple-darwin
-            archive: zip
+  build:
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Compile and release
-        uses: rust-build/rust-build.action@v1.4.5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Git
+        run: |
+          git config user.name "Linus Oleander"
+          git config user.email "oleander@users.noreply.github.com"
+
+      - name: Cache target and cargo build
+        uses: actions/cache@v4
         with:
-          RUSTTARGET: ${{ matrix.target }}
-          ARCHIVE_TYPES: ${{ matrix.archive }}
-          STATIC_LINKING: false
+          path: |
+            ~/.rustup/toolchains/
+            target/
+          key: ${{ runner.os }}-rustup-cargo-${{ env.TARGET }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-rustup-cargo-${{ env.TARGET }}-
+
+      # - name: Add target (${{ env.TARGET }})
+      #   run: rustup target add ${{ env.TARGET }}
+
+      - name: Install cargo-bump
+        run: cargo install cargo-bump
+
+      - name: Ensure no changes
+        continue-on-error: true
+        run: git diff --exit-code --quiet && cargo check
+
+      - name: Git status
+        if: failure()
+        run: git status && exit 1
+
+      - name: Bump version
+        run: cargo bump patch --git-tag || git status
+
+      - name: Get the latest tag
+        id: version
+        run: git describe --tags --abbrev=0 HEAD
+
+      - name: Include the version bump in the commit message
+        run: git commit -a --amend --no-edit
+
+      # - name: Publish to crates.io
+      #   run: cargo publish --allow-dirty --dry-run
+
+      - name: Build for target (${{ env.TARGET }})
+        run: cargo build -Z unstable-options --profile dev --artifact-dir bin --target ${{ env.TARGET }}
+
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: v${{ steps.version.outputs.version }}-${{ runner.os }}
+          path: bin/{git-ai,git-ai-hook}
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Push to origin
+        run: git push origin HEAD
