@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - oleander-patch-1
+  pull_request:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
