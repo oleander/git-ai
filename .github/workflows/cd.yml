@@ -70,7 +70,9 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: git-ai-*.tar.gz
+          files: |
+            git-ai-x86_64-unknown-linux-gnu.tar.gz
+            git-ai-aarch64-apple-darwin.tar.gz
           tag_name: ${{ github.ref_name }}
 
       - name: Publish to crates.io
