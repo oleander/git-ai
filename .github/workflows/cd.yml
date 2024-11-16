@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -42,6 +46,7 @@ jobs:
           command: fmt
           args: -- --check
   test:
+    needs: lint
     strategy:
       fail-fast: true
       matrix:

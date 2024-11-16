@@ -1,11 +1,11 @@
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
-use colored::Colorize;
+use anyhow::{bail, Context, Result};
 use ai::style::Styled;
+use colored::Colorize;
 use console::Emoji;
 use git2::{Repository, RepositoryOpenFlags as Flags};
-use anyhow::{bail, Context, Result};
 use thiserror::Error;
 
 #[derive(Error, Debug)]

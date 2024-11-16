@@ -1,6 +1,6 @@
-use colored::Colorize;
 use anyhow::{bail, Result};
 use ai::filesystem::Filesystem;
+use colored::Colorize;
 use console::Emoji;
 
 const EMOJI: Emoji<'_, '_> = Emoji("🔗", "");
