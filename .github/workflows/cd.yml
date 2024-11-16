@@ -3,7 +3,7 @@ name: CD
 on:
   push:
     tags:
-      - "*"
+      - "**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -21,42 +21,40 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Add target
+        run: rustup target add x86_64-unknown-linux-gnu
+
       - name: Build for x86_64-unknown-linux-gnu
-        run: |
-          rustup target add x86_64-unknown-linux-gnu
-          cargo build --release --target x86_64-unknown-linux-gnu
+        run: cargo build --release --target x86_64-unknown-linux-gnu
 
       - name: Package Binary
-        run: |
-          cd target/x86_64-unknown-linux-gnu/release
-          tar czf git-ai-x86_64-unknown-linux-gnu.tar.gz git-ai git-ai-hook
+        run: tar czf target/*/release/git-ai-*.tar.gz git-*
 
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
           name: git-ai-x86_64-unknown-linux-gnu.tar.gz
-          path: target/x86_64-unknown-linux-gnu/release/git-ai-x86_64-unknown-linux-gnu.tar.gz
+          path: git-ai-*.tar.gz
 
   build-arm:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
+      - name: Add target
+        run: rustup target add aarch64-apple-darwin
+
       - name: Build for aarch64-apple-darwin
-        run: |
-          rustup target add aarch64-apple-darwin
-          cargo build --release --target aarch64-apple-darwin
+        run: cargo build --release --target aarch64-apple-darwin
 
       - name: Package Binary
-        run: |
-          cd target/aarch64-apple-darwin/release
-          tar czf git-ai-aarch64-apple-darwin.tar.gz git-ai git-ai-hook
+        run: tar czf target/*/release/git-ai-*.tar.gz git-*
 
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
           name: git-ai-aarch64-apple-darwin.tar.gz
-          path: target/aarch64-apple-darwin/release/git-ai-aarch64-apple-darwin.tar.gz
+          path: git-ai-*.tar.gz
 
   release:
     needs: [build-x86, build-arm]
@@ -70,7 +68,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: target/*/release/git-ai-*.tar.gz
+          files: git-ai-*.tar.gz
           draft: false
           prerelease: false
           tag_name: ${{ github.ref_name }}
