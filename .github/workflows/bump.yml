@@ -31,9 +31,9 @@ jobs:
 
       - name: Bump version
         run: |
-          git stash || echo "No changes to stash"
+          git stash || true
           cargo bump patch --git-tag
-          git commit -a --amend --no-edit || echo "No changes to commit"
+          git commit -a --amend --no-edit || true
 
       - name: Push to GitHub
         run: git push origin HEAD --tags
