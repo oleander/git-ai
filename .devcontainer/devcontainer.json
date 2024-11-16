@@ -1,0 +1,8 @@
+{
+  "image": "mcr.microsoft.com/devcontainers/rust:latest-bullseye",
+  "tasks": {
+    "test": "cargo test",
+    "build": "cargo build",
+    "launch": "cargo fmt --check"
+  }
+}

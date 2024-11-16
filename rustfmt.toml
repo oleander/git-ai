@@ -20,7 +20,7 @@ reorder_modules = false
 newline_style = "Auto"
 fn_call_width = 90
 hard_tabs = false
-version = "Two"
+style_edition = "2021"
 max_width = 140
 tab_spaces = 2
 
