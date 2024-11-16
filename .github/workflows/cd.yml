@@ -32,8 +32,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Ensure no changes (1)
-        continue-on-error: true
         run: git diff --exit-code --quiet && cargo check
+        continue-on-error: true
 
       - name: Git status
         if: failure()
@@ -68,7 +68,10 @@ jobs:
           cargo check
 
       - name: Include the version bump in the commit message
-        run: git commit -a --amend --no-edit
+        run: |
+          git tag -d $(git describe --tags --abbrev=0)
+          git commit -a --amend --no-edit
+          git tag $(git describe --tags --abbrev=0)
 
       - name: Get the latest tag
         run: git describe --tags --abbrev=0 HEAD
