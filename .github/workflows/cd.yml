@@ -89,7 +89,9 @@ jobs:
         with:
           name: v${{ steps.version.outputs.version }}-${{ runner.os }}
           if-no-files-found: error
-          path: bin/{git-ai,git-ai-hook}
+          path: |
+            bin/git-ai
+            bin/git-ai-hook
 
       - name: Print the artifact URL
         run: echo ${{ steps.upload-artifact.outputs.artifact-url }}
