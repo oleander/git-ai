@@ -13,17 +13,20 @@ permissions:
   contents: write
 
 env:
-  CARGO_TERM_COLOR: always
-  # TARGET: x86_64-apple-darwin
-  # TARGET: aarch64-unknown-linux-gnu
-  # TARGET: x86_64-unknown-linux-gnu
-  TARGET: x86_64-apple-darwin
   CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
   ACTIONS_RUNTIME_TOKEN: dummy
+  CARGO_TERM_COLOR: always
 
 jobs:
   build:
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
     continue-on-error: false
     steps:
       - uses: actions/checkout@v4
@@ -45,8 +48,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
-          components: rust-src,cargo
-          target: ${{ env.TARGET }}
+          target: ${{ matrix.target }}
           override: true
           profile: minimal
 
@@ -73,10 +75,10 @@ jobs:
         id: version
 
       - name: Publish to crates.io
-        run: cargo publish --allow-dirty --target ${{ env.TARGET }}
+        run: cargo publish --allow-dirty --target ${{ matrix.target }}
 
-      - name: Build for target (${{ env.TARGET }})
-        run: cargo build -Zunstable-options -Zbuild-std --artifact-dir bin --target ${{ env.TARGET }}
+      - name: Build for target
+        run: cargo build -Z unstable-options --profile dev --artifact-dir bin --target ${{ matrix.target }}
 
       - name: List all targets
         run: |
@@ -86,9 +88,8 @@ jobs:
 
       - name: Upload Binary
         uses: actions/upload-artifact@v4
-        id: upload-artifact
         with:
-          name: v${{ steps.version.outputs.version }}-${{ runner.os }}
+          name: v${{ steps.version.outputs.version }}-${{ matrix.target }}
           if-no-files-found: error
           path: |
             bin/git-ai
