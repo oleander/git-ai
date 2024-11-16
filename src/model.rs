@@ -1,6 +1,6 @@
 use std::default::Default;
-use std::str::FromStr;
 use std::fmt::{self, Display};
+use std::str::FromStr;
 
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
