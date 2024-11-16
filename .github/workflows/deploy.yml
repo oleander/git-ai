@@ -4,7 +4,11 @@ on:
   push:
     branches:
       - main
-  pull_request:
+      - oleander-patch-1
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:

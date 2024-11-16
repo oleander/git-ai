@@ -5,6 +5,10 @@ on:
     types: [closed]
     branches: [main]
 
+concurrency:
+  group: crate-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
