@@ -2,9 +2,8 @@ name: CD
 
 on:
   push:
-    branches:
-      - main
-      - feature/bundle-bin
+    tags:
+      - "v*"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -20,102 +19,68 @@ jobs:
   build-x86:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          components: rustfmt, clippy
+      - uses: actions/checkout@v4
 
       - name: Build for x86_64-unknown-linux-gnu
         run: |
           rustup target add x86_64-unknown-linux-gnu
           cargo build --release --target x86_64-unknown-linux-gnu
 
-      - name: Install cargo-binstall
-        run: cargo install cargo-binstall
+      - name: Package Binary
+        run: |
+          cd target/x86_64-unknown-linux-gnu/release
+          tar czf git-ai-x86_64-unknown-linux-gnu.tar.gz git-ai git-ai-hook
 
-      - name: Upload binaries
+      - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
-          name: binaries-x86_64
-          path: target/x86_64-unknown-linux-gnu/release/
+          name: git-ai-x86_64-unknown-linux-gnu.tar.gz
+          path: target/x86_64-unknown-linux-gnu/release/git-ai-x86_64-unknown-linux-gnu.tar.gz
 
   build-arm:
     runs-on: macos-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          components: rustfmt, clippy
+      - uses: actions/checkout@v4
 
       - name: Build for aarch64-apple-darwin
         run: |
           rustup target add aarch64-apple-darwin
           cargo build --release --target aarch64-apple-darwin
 
-      - name: Install cargo-binstall
-        run: cargo install cargo-binstall
+      - name: Package Binary
+        run: |
+          cd target/aarch64-apple-darwin/release
+          tar czf git-ai-aarch64-apple-darwin.tar.gz git-ai git-ai-hook
 
-      - name: Upload binaries
+      - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
-          name: binaries-arm
-          path: target/aarch64-apple-darwin/release/
+          name: git-ai-aarch64-apple-darwin.tar.gz
+          path: target/aarch64-apple-darwin/release/git-ai-aarch64-apple-darwin.tar.gz
 
-  crate:
-    runs-on: ubuntu-latest
+  release:
     needs: [build-x86, build-arm]
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Get version
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
         with:
-          toolchain: nightly
-          components: rust-std
-          profile: minimal
+          files: |
+            git-ai-x86_64-unknown-linux-gnu.tar.gz/git-ai-x86_64-unknown-linux-gnu.tar.gz
+            git-ai-aarch64-apple-darwin.tar.gz/git-ai-aarch64-apple-darwin.tar.gz
+          draft: false
+          prerelease: false
 
-      - name: Cache Cargo registry
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-crate-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-crate-
-
-      - name: Setup environment
-        run: |
-          git config user.name "Linus Oleander"
-          git config user.email "oleander@users.noreply.github.com"
-          cargo install cargo-bump --force
-
-      - name: Bump version
-        run: cargo bump patch --git-tag
-
-      - name: Release to crates.io (dry-run)
-        if: github.ref != 'refs/heads/main'
-        run: cargo publish --dry-run
-
-      - name: Release to crates.io
-        if: github.ref == 'refs/heads/main'
+      - name: Publish to crates.io
         run: cargo publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-
-      - name: Release to GitHub
-        if: github.ref == 'refs/heads/main'
-        run: git push origin HEAD --tags
