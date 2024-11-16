@@ -69,8 +69,8 @@ jobs:
       - name: Include the version bump in the commit message
         run: git commit -a --amend --no-edit
 
-      # - name: Publish to crates.io
-      #   run: cargo publish --allow-dirty --dry-run
+      - name: Publish to crates.io
+        run: cargo publish --allow-dirty --dry-run --target ${{ env.TARGET }}
 
       - name: Build for target (${{ env.TARGET }})
         run: cargo build -Zunstable-options -Zbuild-std --artifact-dir bin --target ${{ env.TARGET }}
