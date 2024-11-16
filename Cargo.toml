@@ -62,8 +62,8 @@ opt-level = 3
 
 [package.metadata.binstall]
 name = "git-ai"
-default-target = "x86_64-unknown-linux-gnu"
-targets = ["x86_64-unknown-linux-gnu", "aarch64-apple-darwin"]
+default-target = "x86_64-unknown-linux-musl"
+targets = ["x86_64-unknown-linux-musl", "aarch64-apple-darwin"]
 
 [dependencies]
 rust-build = { version = "1.4.5" }
