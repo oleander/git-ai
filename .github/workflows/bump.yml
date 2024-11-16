@@ -24,7 +24,7 @@ jobs:
         run: cargo install cargo-bump --force
 
       - name: Bump version
-        run: cargo bump patch --git-tag --build
+        run: cargo bump patch --git-tag
 
       - name: Push to GitHub
         run: git push origin HEAD --tags
