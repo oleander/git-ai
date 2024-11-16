@@ -33,7 +33,7 @@ jobs:
         run: |
           git stash || echo "No changes to stash"
           cargo bump patch --git-tag
-          git commit -a --amend --no-edit
+          git commit -a --amend --no-edit || echo "No changes to commit"
 
       - name: Push to GitHub
         run: git push origin HEAD --tags
