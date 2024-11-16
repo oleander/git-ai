@@ -62,14 +62,6 @@ jobs:
         if: failure()
         run: git status && exit 1
 
-      - name: Bump version
-        run: |
-          cargo bump patch --git-tag
-          cargo check
-
-      - name: Include the version bump in the commit message
-        run: git commit -a --amend --no-edit
-
       - name: Build for target
         run: cargo build -Z unstable-options --profile dev --artifact-dir bin --target ${{ matrix.target }}
 
@@ -102,6 +94,14 @@ jobs:
           toolchain: nightly
           override: true
           profile: minimal
+
+      - name: Bump version
+        run: |
+          cargo bump patch --git-tag
+          cargo check
+
+      - name: Include the version bump in the commit message
+        run: git commit -a --amend --no-edit
 
       - name: Publish to crates.io
         run: cargo publish --allow-dirty
