@@ -81,8 +81,9 @@ jobs:
 
       - name: Bump version
         run: |
+          git diff-index --quiet HEAD -- || git stash
           cargo bump patch --git-tag
-          git commit -a --amend --no-edit
+          git diff-index --quiet HEAD -- || git commit -a --amend --no-edit
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
