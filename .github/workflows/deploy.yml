@@ -7,7 +7,7 @@ on:
       - oleander-patch-1
 
 concurrency:
-  group: deploy-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -34,21 +34,16 @@ jobs:
           echo 'export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig' >> $GITHUB_ENV
           echo 'export PKG_CONFIG_SYSROOT_DIR=/usr/aarch64-linux-gnu' >> $GITHUB_ENV
 
-      - name: Build for ${{ matrix.target }}
-        run: |
-          rustup target add ${{ matrix.target }}
-          cargo build --release --target ${{ matrix.target }}
-
       - name: Install dependencies
         run: sudo apt-get install -y musl-tools
 
-      - name: Install cargo-binstall
-        run: cargo install cargo-binstall
-
       - name: Build for ${{ matrix.target }}
         run: |
           rustup target add ${{ matrix.target }}
           cargo build --release --target ${{ matrix.target }}
+
+      - name: Install cargo-binstall
+        run: cargo install cargo-binstall
 
       - name: Upload binaries
         uses: actions/upload-artifact@v4
