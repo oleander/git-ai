@@ -81,7 +81,7 @@ jobs:
 
       - name: Bump version
         run: |
-          git diff-index --quiet HEAD -- || git stash
+          git stash
           cargo bump patch --git-tag
           git diff-index --quiet HEAD -- || git commit -a --amend --no-edit
           git push origin HEAD --tags
