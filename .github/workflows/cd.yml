@@ -84,7 +84,7 @@ jobs:
           git diff-index --quiet HEAD -- || git stash
           cargo bump patch --git-tag
           git diff-index --quiet HEAD -- || git commit -a --amend --no-edit
-          git push origin main --tags
+          git push origin/main --tags
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
