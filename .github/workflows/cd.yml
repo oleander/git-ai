@@ -29,14 +29,13 @@ jobs:
       - name: Build for x86_64-unknown-linux-gnu
         run: cargo build --release --target x86_64-unknown-linux-gnu
 
-      - name: Package Binary
-        run: tar czf git-ai.tar.gz -C target/*/release git-ai git-ai-hook
-
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
           name: git-ai-x86_64-unknown-linux-gnu.tar.gz
-          path: git-ai.tar.gz
+          if-no-files-found: error
+          overwrite: true
+          path: target/*/release/git-*
 
   build-arm:
     runs-on: macos-latest
@@ -49,14 +48,13 @@ jobs:
       - name: Build for aarch64-apple-darwin
         run: cargo build --release --target aarch64-apple-darwin
 
-      - name: Package Binary
-        run: tar czf git-ai.tar.gz -C target/*/release git-ai git-ai-hook
-
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
           name: git-ai-aarch64-apple-darwin.tar.gz
-          path: git-ai.tar.gz
+          if-no-files-found: error
+          overwrite: true
+          path: target/*/release/git-*
 
   release:
     needs: [build-x86, build-arm]
@@ -70,9 +68,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            git-ai-x86_64-unknown-linux-gnu.tar.gz
-            git-ai-aarch64-apple-darwin.tar.gz
+          files: git-ai-*.tar.gz
           tag_name: ${{ github.ref_name }}
 
       - name: Publish to crates.io
