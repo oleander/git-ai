@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - feature/bundle-bin
+permissions:
+  contents: write
 
 jobs:
   bump:
