@@ -71,7 +71,7 @@ jobs:
           files: git-ai-*.tar.gz
           draft: false
           prerelease: false
-          tag_name: ${{ env.GITHUB_REF_NAME }}
+          tag_name: ${{ github.ref_name }}
 
       - name: Publish to crates.io
         run: cargo publish
