@@ -77,13 +77,12 @@ jobs:
           git config user.email "oleander@users.noreply.github.com"
 
       - name: Install cargo-bump
-        run: cargo install cargo-bump || true
+        run: cargo install cargo-bump
 
       - name: Bump version
         run: |
-          git stash || true
           cargo bump patch --git-tag
-          git commit -a --amend --no-edit || true
+          git commit -a --amend --no-edit
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
