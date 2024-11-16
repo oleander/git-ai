@@ -95,7 +95,6 @@ jobs:
           files: |
             git-ai-x86_64-unknown-linux-gnu.tar.gz/git-ai.tar.gz
             git-ai-aarch64-apple-darwin.tar.gz/git-ai.tar.gz
-          tag_name: ${{ github.ref_name }}
 
       - name: Publish to crates.io
         run: cargo publish --allow-dirty
