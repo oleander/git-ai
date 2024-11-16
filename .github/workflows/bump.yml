@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feature/bundle-bin
 
 jobs:
   bump:
@@ -14,17 +15,16 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup environment
+      - name: Setup Git
         run: |
           git config user.name "Linus Oleander"
           git config user.email "oleander@users.noreply.github.com"
-          cargo install cargo-bump --force
 
       - name: Install cargo-bump
         run: cargo install cargo-bump --force
 
       - name: Bump version
-        run: cargo bump patch --git-tag
+        run: cargo bump patch --git-tag --build
 
       - name: Push to GitHub
         run: git push origin HEAD --tags
