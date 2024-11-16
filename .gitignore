@@ -2,3 +2,4 @@
 http-cacache/*
 .secrets
 .env.local
+${env:TMPDIR}
