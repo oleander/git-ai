@@ -24,20 +24,20 @@ jobs:
       - name: Add target
         run: rustup target add x86_64-unknown-linux-gnu
 
-      - name: Build for x86_64-unknown-linux-gnu
-        run: cargo build --release --target x86_64-unknown-linux-gnu
-
-      - name: Package Binary
-        run: tar czf git-ai.tar.gz -C target/*/release git-ai git-ai-hook
-
-      - name: Upload Binary
-        uses: actions/upload-artifact@v4
+      - name: Compile
+        id: compile-x86
+        uses: rust-build/rust-build.action@v1.4.5
         with:
-          name: git-ai-x86_64-unknown-linux-gnu.tar.gz
-          if-no-files-found: error
-          compression-level: 9
-          overwrite: true
-          path: git-ai.tar.gz
+          RUSTTARGET: x86_64-unknown-linux-gnu
+          UPLOAD_MODE: none
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: Binary-x86
+          path: |
+            ${{ steps.compile-x86.outputs.BUILT_ARCHIVE }}
+            ${{ steps.compile-x86.outputs.BUILT_CHECKSUM }}
 
   build-arm:
     runs-on: macos-latest
@@ -47,20 +47,20 @@ jobs:
       - name: Add target
         run: rustup target add aarch64-apple-darwin
 
-      - name: Build for aarch64-apple-darwin
-        run: cargo build --release --target aarch64-apple-darwin
-
-      - name: Package Binary
-        run: tar czf git-ai.tar.gz -C target/*/release git-ai git-ai-hook
-
-      - name: Upload Binary
-        uses: actions/upload-artifact@v4
+      - name: Compile
+        id: compile-arm
+        uses: rust-build/rust-build.action@v1.4.5
         with:
-          name: git-ai-aarch64-apple-darwin.tar.gz
-          if-no-files-found: error
-          overwrite: true
-          compression-level: 9
-          path: git-ai.tar.gz
+          RUSTTARGET: aarch64-apple-darwin
+          UPLOAD_MODE: none
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: Binary-arm
+          path: |
+            ${{ steps.compile-arm.outputs.BUILT_ARCHIVE }}
+            ${{ steps.compile-arm.outputs.BUILT_CHECKSUM }}
 
   release:
     needs: [build-x86, build-arm]
@@ -94,8 +94,8 @@ jobs:
         with:
           tag_name: "0.2.26"
           files: |
-            git-ai-x86_64-unknown-linux-gnu.tar.gz/git-ai.tar.gz
-            git-ai-aarch64-apple-darwin.tar.gz/git-ai.tar.gz
+            Binary-x86
+            Binary-arm
 
       - name: Publish to crates.io
         run: cargo publish --allow-dirty
