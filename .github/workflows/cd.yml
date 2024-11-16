@@ -84,6 +84,7 @@ jobs:
           git diff-index --quiet HEAD -- || git stash
           cargo bump patch --git-tag
           git diff-index --quiet HEAD -- || git commit -a --amend --no-edit
+          git push origin main --tags
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -100,6 +101,3 @@ jobs:
         run: cargo publish --allow-dirty
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-
-      - name: Push to GitHub
-        run: git push origin ${{ github.ref }} --tags
