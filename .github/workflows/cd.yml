@@ -92,6 +92,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: "0.2.26"
           files: |
             git-ai-x86_64-unknown-linux-gnu.tar.gz/git-ai.tar.gz
             git-ai-aarch64-apple-darwin.tar.gz/git-ai.tar.gz
