@@ -22,13 +22,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Add target
-        run: rustup target add x86_64-unknown-linux-gnu
+        run: rustup target add x86_64-unknown-linux-musl
 
       - name: Compile
         id: compile-x86
         uses: rust-build/rust-build.action@v1.4.5
         with:
-          RUSTTARGET: x86_64-unknown-linux-gnu
+          RUSTTARGET: x86_64-unknown-linux-musl
           UPLOAD_MODE: none
 
       - name: Upload artifact
