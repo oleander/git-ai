@@ -60,5 +60,7 @@ opt-level = 3
 
 [package.metadata.binstall]
 name = "git-ai"
-default-target = "x86_64-unknown-linux-musl"
-targets = ["x86_64-unknown-linux-musl", "aarch64-apple-darwin"]
+default-target = "x86_64-apple-darwin"
+targets = ["x86_64-apple-darwin"]
+pkg-url = "{ repo_url }/releases/download/{ version }/{ name }-{ target }{ archive-suffix }"
+pkg-fmt = "zip"
