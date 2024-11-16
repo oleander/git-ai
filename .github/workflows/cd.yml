@@ -70,9 +70,6 @@ jobs:
       - name: Include the version bump in the commit message
         run: git commit -a --amend --no-edit
 
-      - name: Publish to crates.io
-        run: cargo publish --allow-dirty --target ${{ matrix.target }}
-
       - name: Build for target
         run: cargo build -Z unstable-options --profile dev --artifact-dir bin --target ${{ matrix.target }}
 
@@ -96,3 +93,18 @@ jobs:
 
       - name: Push to origin
         run: git push origin HEAD
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          profile: minimal
+
+      - name: Publish to crates.io
+        run: cargo publish --allow-dirty
