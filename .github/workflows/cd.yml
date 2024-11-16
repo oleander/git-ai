@@ -24,8 +24,8 @@ jobs:
         include:
           - os: macos-latest
             target: x86_64-apple-darwin
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
+          # - os: ubuntu-latest
+          #   target: x86_64-unknown-linux-gnu
     runs-on: ${{ matrix.os }}
     continue-on-error: false
     steps:
@@ -68,14 +68,7 @@ jobs:
           cargo check
 
       - name: Include the version bump in the commit message
-        run: |
-          git tag -d $(git describe --tags --abbrev=0)
-          git commit -a --amend --no-edit
-          git tag $(git describe --tags --abbrev=0)
-
-      - name: Get the latest tag
-        run: git describe --tags --abbrev=0 HEAD
-        id: version
+        run: git commit -a --amend --no-edit
 
       - name: Publish to crates.io
         run: cargo publish --allow-dirty --target ${{ matrix.target }}
@@ -92,7 +85,7 @@ jobs:
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
-          name: v${{ steps.version.outputs.version }}-${{ matrix.target }}
+          name: ${{ matrix.target }}-${{ github.run_number }}
           if-no-files-found: error
           path: |
             bin/git-ai
