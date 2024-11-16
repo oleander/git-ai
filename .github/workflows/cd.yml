@@ -40,22 +40,13 @@ jobs:
           git config user.name "Linus Oleander"
           git config user.email "oleander@users.noreply.github.com"
 
-      # - name: Cache target and cargo build
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: |
-      #       ~/.rustup/toolchains/
-      #       target/
-      #     key: ${{ runner.os }}-rustup-cargo-${{ env.TARGET }}-${{ hashFiles('**/Cargo.lock') }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-rustup-cargo-${{ env.TARGET }}-
-
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
           target: ${{ env.TARGET }}
           override: true
+          profile: dev
 
       - name: Install cargo-bump
         run: cargo install cargo-bump
@@ -81,7 +72,7 @@ jobs:
       #   run: cargo publish --allow-dirty --dry-run
 
       - name: Build for target (${{ env.TARGET }})
-        run: cargo build -Zunstable-options -Zbuild-std --profile dev --artifact-dir bin --target ${{ env.TARGET }}
+        run: cargo build -Zunstable-options --profile dev --artifact-dir bin --target ${{ env.TARGET }}
 
       - name: List all targets
         run: |
