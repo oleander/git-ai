@@ -14,10 +14,11 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Git
+      - name: Setup environment
         run: |
-          git config user.name "GitHub Actions Bot"
-          git config user.email "actions@github.com"
+          git config user.name "Linus Oleander"
+          git config user.email "oleander@users.noreply.github.com"
+          cargo install cargo-bump --force
 
       - name: Install cargo-bump
         run: cargo install cargo-bump --force
