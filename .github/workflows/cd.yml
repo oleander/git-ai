@@ -50,8 +50,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-rustup-cargo-${{ env.TARGET }}-
 
-      # - name: Add target (${{ env.TARGET }})
-      #   run: rustup target add ${{ env.TARGET }}
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          target: ${{ env.TARGET }}
+          override: true
 
       - name: Install cargo-bump
         run: cargo install cargo-bump
