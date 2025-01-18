@@ -2,6 +2,8 @@ mod uninstall;
 mod install;
 mod reinstall;
 mod config;
+mod wizard;
+pub mod model;
 
 use structopt::StructOpt;
 use anyhow::Result;
@@ -32,7 +34,10 @@ enum ConfigSubcommand {
   Set(SetSubcommand),
 
   #[structopt(about = "Resets the internal configuration to the default values")]
-  Reset
+  Reset,
+
+  #[structopt(about = "Run the interactive configuration wizard")]
+  Wizard
 }
 
 #[derive(StructOpt)]
@@ -69,6 +74,11 @@ struct Model {
 async fn main() -> Result<()> {
   dotenv().ok();
 
+  // Check if setup is needed and run wizard if necessary
+  if wizard::needs_setup() {
+    wizard::run()?;
+  }
+
   let args = Cli::from_args();
 
   match args {
@@ -89,7 +99,9 @@ async fn main() -> Result<()> {
         ConfigSubcommand::Reset => {
           config::run_reset()?;
         }
-
+        ConfigSubcommand::Wizard => {
+          wizard::run()?;
+        }
         ConfigSubcommand::Set(set) =>
           match set {
             SetSubcommand::Model(model) => {
