@@ -120,7 +120,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        run: gh run download {{ github.run_id }}
+        run: gh run download ${{ github.run_id }}
 
       - name: Zip each downloaded directory
         run: |
