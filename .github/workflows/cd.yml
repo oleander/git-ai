@@ -25,7 +25,7 @@ jobs:
   artifact:
     runs-on: ${{ matrix.os }}
     continue-on-error: false
-    if: startsWith(github.event.base_ref, 'refs/heads/')
+    if: startsWith(github.event.ref, 'refs/heads/')
     strategy:
       matrix:
         include:
@@ -117,7 +117,7 @@ jobs:
         run: git push origin HEAD --tags
 
   precompile:
-    if: startsWith(github.event.base_ref, 'refs/tags/')
+    if: startsWith(github.event.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
