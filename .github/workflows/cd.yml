@@ -52,6 +52,21 @@ jobs:
           override: true
           profile: minimal
 
+      - name: Add Specific Targets
+        run: |
+          if [[ "${{ matrix.target }}" == "x86_64-unknown-linux-musl" ]]; then
+            rustup target add x86_64-unknown-linux-musl
+            sudo apt-get update && sudo apt-get install -y musl-tools
+          elif [[ "${{ matrix.target }}" == "wasm32-unknown-unknown" ]]; then
+            rustup target add wasm32-unknown-unknown
+          fi
+
+      - name: Install Dependencies for musl Target
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
       - name: Ensure no changes
         run: git diff --exit-code --quiet && cargo check
 
