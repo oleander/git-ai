@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - "*"
   pull_request:
   workflow_dispatch:
 
@@ -105,27 +103,21 @@ jobs:
       - name: Commit Version Bump
         run: git commit -a --amend --no-edit
 
-      # - name: New version
-      #   id: new_version
-      #   run: git describe --tags --abbrev=0 HEAD
+      - name: New version
+        id: app
+        run: echo "version=$(git describe --tags --abbrev=0 HEAD)" >> $GITHUB_OUTPUT
 
-      # - name: Delete old tag
-      #   run: git tag -d ${{ steps.new_version.outputs.new_version }}
+      - name: Delete old tag
+        run: git tag -d ${{ steps.app.outputs.version }}
 
-      # - name: Create new tag
-      #   run: git tag v${{ steps.new_version.outputs.new_version }}
+      - name: Create new tag
+        run: git tag v${{ steps.app.outputs.version }}
 
       # - name: Publish to crates.io
       #   run: cargo publish --allow-dirty
 
       - name: Push to origin
         run: git push origin HEAD --tags
-
-  precompile:
-    needs: release
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
       - name: Download all artifacts
         run: gh run download ${{ github.run_id }}
@@ -139,5 +131,6 @@ jobs:
       - name: Uploads compressed artifacts
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.app.outputs.version }}
           fail_on_unmatched_files: true
           files: git-ai-*.tar.gz
