@@ -86,21 +86,19 @@ jobs:
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.target }}-${{ github.run_number }}
+          name: git-ai-${{ matrix.target }}
           if-no-files-found: error
           path: |
             bin/git-ai
             bin/git-ai-hook
 
-      - name: Print the artifact URL
-        run: echo ${{ steps.upload-artifact.outputs.artifact-url }}
-
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.event.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -121,7 +119,7 @@ jobs:
           cargo bump patch --git-tag
           cargo check
 
-      - name: Include the version bump in the commit message
+      - name: Commit Version Bump
         run: git commit -a --amend --no-edit
 
       - name: Publish to crates.io
@@ -129,3 +127,13 @@ jobs:
 
       - name: Push to origin
         run: git push origin HEAD --tags
+
+  # precompile:
+  #   if: github.event.ref == 'refs/tags/*'
+  #   needs: release
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Release
+  #       uses: softprops/action-gh-release@v2
+  #       with:
+  #         files: Release.txt
