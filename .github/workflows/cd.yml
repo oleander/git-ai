@@ -7,6 +7,7 @@ on:
     tags:
       - "*"
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -117,7 +118,7 @@ jobs:
         run: git push origin HEAD --tags
 
   precompile:
-    if: startsWith(github.event.ref, 'refs/tags/')
+    needs: release
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
@@ -129,9 +130,13 @@ jobs:
             tar -czf ${dir}.tar.gz ${dir}
           done
 
+      - name: Get tag name
+        id: tag_name
+        run: git describe --tags --abbrev=0 HEAD
+
       - name: Uploads compressed artifacts
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.ref_name }}
+          tag_name: v${{ steps.tag_name.outputs.tag_name }}
           fail_on_unmatched_files: true
           files: git-ai-*.tar.gz
