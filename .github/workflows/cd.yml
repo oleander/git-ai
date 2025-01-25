@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -102,18 +102,18 @@ jobs:
       - name: Commit Version Bump
         run: git commit -a --amend --no-edit
 
-      # - name: New version
-      #   id: new_version
-      #   run: git describe --tags --abbrev=0 HEAD
+      - name: New version
+        id: new_version
+        run: git describe --tags --abbrev=0 HEAD
 
-      # - name: Delete old tag
-      #   run: git tag -d ${{ steps.new_version.outputs.new_version }}
+      - name: Delete old tag
+        run: git tag -d ${{ steps.new_version.outputs.new_version }}
 
-      # - name: Create new tag
-      #   run: git tag v${{ steps.new_version.outputs.new_version }}
+      - name: Create new tag
+        run: git tag v${{ steps.new_version.outputs.new_version }}
 
-      # - name: Publish to crates.io
-      #   run: cargo publish --allow-dirty
+      - name: Publish to crates.io
+        run: cargo publish --allow-dirty
 
       - name: Push to origin
         run: git push origin HEAD --tags
