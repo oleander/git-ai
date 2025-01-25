@@ -2,10 +2,10 @@ name: CD
 
 on:
   push:
-    branches: [main]
+    branches: [trigger]
     tags: ["v*"]
   release:
-    types: [published] # Changed: handles both stable and pre-releases
+    types: [published]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -29,7 +29,7 @@ jobs:
   # Do: 1. Bump version using cargo-bump
   #     2. Push to tag and changes to main
   version-bump:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/trigger' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
