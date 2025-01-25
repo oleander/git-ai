@@ -11,8 +11,14 @@
 ## Quick Start
 
 ```bash
-# Install Git AI
+# Install Git AI from source
 cargo install git-ai
+
+# alternatively, install a precompiled binary with cargo-binstall
+cargo install cargo-binstall
+
+# install the precompiled binary
+cargo binstall git-ai
 
 # Set your OpenAI API key
 git-ai config set openai-api-key <your key>
