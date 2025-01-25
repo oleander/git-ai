@@ -41,7 +41,6 @@ jobs:
         with:
           toolchain: nightly
           override: true
-          profile: dev
 
       - name: Configure git
         run: |
