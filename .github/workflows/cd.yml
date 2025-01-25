@@ -5,7 +5,7 @@ on:
     branches: [main]
     tags: ["v*"]
   release:
-    types: [prereleased, released]
+    types: [published] # Changed: handles both stable and pre-releases
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -29,7 +29,7 @@ jobs:
   # Do: 1. Bump version using cargo-bump
   #     2. Push to tag and changes to main
   version-bump:
-    if: github.event.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,13 +53,29 @@ jobs:
           git commit -a --amend --no-edit
           git push origin HEAD --tags
 
-  # Build artifacts when release is created in draft
+  # Create draft release when tag is pushed
   #
-  # On: Draft release is created
+  # On: Tag is pushed
+  # Do: 1. Create draft release
+  create-draft:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Draft Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+
+  # Build and upload artifacts when release is published (including pre-releases)
+  #
+  # On: Release is published
   # Do: 1. Build artifacts for all platforms
-  #     2. Upload artifacts to draft release
+  #     2. Upload artifacts to release
   build-artifacts:
-    if: github.event.release.draft
+    if: github.event_name == 'release' && github.event.action == 'published'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -107,45 +123,18 @@ jobs:
         run: zip -r git-ai-${{ matrix.target }}.zip bin/git-*
 
       - name: Upload artifacts
-        run: gh release upload v${{ github.event.release.tag_name }} git-ai-${{ matrix.target }}.zip
-
-  mark-release-as-ready:
-    needs: build-artifacts
-    runs-on: ubuntu-latest
-    steps:
-      - name: Mark release as ready
-        run: gh release edit v${{ github.event.release.tag_name }} --draft=false
-
-  # Create a draft release
-  #
-  # On: Tag is created
-  # Do: 1. Create a draft release
-  create-draft-release:
-    if: contains(github.event.ref, 'tags')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      # - name: Download all artifacts
-      #   run: gh run download ${{ github.run_id }}
-
-      # - name: Zip each downloaded directory
-      #   run: |
-      #     for dir in $(ls -d git-ai-*); do
-      #       tar -czf ${dir}.tar.gz ${dir}
-      #     done
-
-      - name: Create draft release
         uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          tag_name: ${{ github.event.release.tag_name }}
+          files: git-ai-*.zip
 
-  # Publish to crates.io when release is published (not draft)
+  # Publish to crates.io when release is published
   #
   # On: Release is published
   # Do: 1. Publish to crates.io
-  publish-to-crates:
-    if: github.event.release.draft == false
+  publish:
+    needs: build-artifacts
+    if: github.event_name == 'release' && github.event.action == 'published'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
