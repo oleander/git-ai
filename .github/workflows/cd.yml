@@ -111,8 +111,8 @@ jobs:
       - name: Commit Version Bump
         run: git commit -a --amend --no-edit
 
-      - name: Publish to crates.io
-        run: cargo publish --allow-dirty
+      # - name: Publish to crates.io
+      #   run: cargo publish --allow-dirty
 
       - name: Push to origin
         run: git push origin HEAD --tags
