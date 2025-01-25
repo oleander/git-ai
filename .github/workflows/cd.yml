@@ -131,6 +131,6 @@ jobs:
       - name: Uploads compressed artifacts
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.event.ref }}
+          tag_name: v${{ github.event.ref_name }}
           fail_on_unmatched_files: true
           files: git-ai-*.tar.gz
