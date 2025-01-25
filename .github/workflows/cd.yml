@@ -103,15 +103,15 @@ jobs:
       - name: Commit Version Bump
         run: git commit -a --amend --no-edit
 
-      - name: New version
-        id: new_version
-        run: git describe --tags --abbrev=0 HEAD
+      # - name: New version
+      #   id: new_version
+      #   run: git describe --tags --abbrev=0 HEAD
 
-      - name: Delete old tag
-        run: git tag -d ${{ steps.new_version.outputs.new_version }}
+      # - name: Delete old tag
+      #   run: git tag -d ${{ steps.new_version.outputs.new_version }}
 
-      - name: Create new tag
-        run: git tag v${{ steps.new_version.outputs.new_version }}
+      # - name: Create new tag
+      #   run: git tag v${{ steps.new_version.outputs.new_version }}
 
       - name: Publish to crates.io
         run: cargo publish --allow-dirty
@@ -136,7 +136,7 @@ jobs:
 
       - name: Get tag name
         id: tag_name
-        run: git describe --tags --abbrev=0 HEAD
+        run: git describe --tags --abbrev=0
 
       - name: Uploads compressed artifacts
         uses: softprops/action-gh-release@v2
