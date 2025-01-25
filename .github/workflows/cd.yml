@@ -19,7 +19,10 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  artifact:
+    runs-on: ${{ matrix.os }}
+    continue-on-error: false
+    if: github.event.ref != 'refs/tags/*'
     strategy:
       matrix:
         include:
@@ -31,18 +34,8 @@ jobs:
             target: aarch64-apple-darwin
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
-    runs-on: ${{ matrix.os }}
-    continue-on-error: false
     steps:
       - uses: actions/checkout@v4
-
-      - name: Ensure no changes (1)
-        run: git diff --exit-code --quiet && cargo check
-        continue-on-error: true
-
-      - name: Git status
-        if: failure()
-        run: git status && exit 1
 
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
@@ -67,23 +60,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
 
-      - name: Ensure no changes
-        run: git diff --exit-code --quiet && cargo check
-
-      - name: Git status
-        if: failure()
-        run: git status && exit 1
-
       - name: Build for target
-        run: cargo build -Z unstable-options --profile dev --artifact-dir bin --target ${{ matrix.target }}
-
-      - name: List all targets
         run: |
-          ls -halt bin/
-          pwd
-          realpath bin/
+          cargo build \
+            -Z unstable-options \
+            --profile dev \
+            --artifact-dir bin \
+            --target ${{ matrix.target }}
 
-      - name: Upload Binary
+      - name: Upload and compress artifacts
         uses: actions/upload-artifact@v4
         with:
           name: git-ai-${{ matrix.target }}
@@ -93,9 +78,8 @@ jobs:
             bin/git-ai-hook
 
   release:
-    needs: build
     runs-on: ubuntu-latest
-    if: github.event.ref == 'refs/heads/main'
+    needs: artifact
     steps:
       - uses: actions/checkout@v4
 
@@ -128,12 +112,22 @@ jobs:
       - name: Push to origin
         run: git push origin HEAD --tags
 
-  # precompile:
-  #   if: github.event.ref == 'refs/tags/*'
-  #   needs: release
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Release
-  #       uses: softprops/action-gh-release@v2
-  #       with:
-  #         files: Release.txt
+  precompile:
+    if: github.event.ref == 'refs/tags/*'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        run: gh run download {{ github.run_id }}
+
+      - name: Zip each downloaded directory
+        run: |
+          for dir in $(ls -d git-ai-*); do
+            tar -czf ${dir}.tar.gz ${dir}
+          done
+
+      - name: Uploads compressed artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.event.ref }}
+          fail_on_unmatched_files: true
+          files: git-ai-*.tar.gz
