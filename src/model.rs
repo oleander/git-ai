@@ -20,10 +20,6 @@ pub enum Model {
 }
 
 impl Model {
-  pub fn variants() -> Vec<Model> {
-    vec![Model::GPT4, Model::GPT4o, Model::GPT4Turbo]
-  }
-
   pub fn count_tokens(&self, text: &str) -> Result<usize> {
     Ok(
       self
