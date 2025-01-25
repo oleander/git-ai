@@ -3,7 +3,6 @@ name: CD
 on:
   push:
     branches: [trigger]
-    tags: ["**"]
   release:
     types: [published]
 
@@ -55,22 +54,6 @@ jobs:
           cargo bump patch --git-tag
           git commit -a --amend --no-edit
           git push origin HEAD --tags
-
-  # Create draft release when tag is pushed
-  #
-  # On: Tag is pushed
-  # Do: 1. Create draft release
-  create-draft:
-    if: startsWith(github.event.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Create Draft Release
-        uses: softprops/action-gh-release@v2
-        with:
-          draft: true
-          generate_release_notes: true
 
   # Build and upload artifacts when release is published (including pre-releases)
   #
