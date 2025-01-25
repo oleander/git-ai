@@ -104,7 +104,7 @@ jobs:
 
       - name: New version
         id: new_version
-        run: git describe --tags --abbrev=0 HEAD
+        run: git describe --tags --abbrev=0
 
       - name: Delete old tag
         run: git tag -d ${{ steps.new_version.outputs.new_version }}
