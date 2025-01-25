@@ -4,14 +4,17 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "**"
   pull_request:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: write
+  packages: write
 
 env:
   CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
@@ -19,7 +22,10 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  artifact:
+    runs-on: ${{ matrix.os }}
+    continue-on-error: false
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     strategy:
       matrix:
         include:
@@ -31,18 +37,8 @@ jobs:
             target: aarch64-apple-darwin
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
-    runs-on: ${{ matrix.os }}
-    continue-on-error: false
     steps:
       - uses: actions/checkout@v4
-
-      - name: Ensure no changes (1)
-        run: git diff --exit-code --quiet && cargo check
-        continue-on-error: true
-
-      - name: Git status
-        if: failure()
-        run: git status && exit 1
 
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
@@ -67,40 +63,30 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
 
-      - name: Ensure no changes
-        run: git diff --exit-code --quiet && cargo check
-
-      - name: Git status
-        if: failure()
-        run: git status && exit 1
-
       - name: Build for target
-        run: cargo build -Z unstable-options --profile dev --artifact-dir bin --target ${{ matrix.target }}
-
-      - name: List all targets
         run: |
-          ls -halt bin/
-          pwd
-          realpath bin/
+          cargo build \
+            -Z unstable-options \
+            --profile dev \
+            --artifact-dir bin \
+            --target ${{ matrix.target }}
 
-      - name: Upload Binary
+      - name: Upload and compress artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.target }}-${{ github.run_number }}
+          name: git-ai-${{ matrix.target }}
           if-no-files-found: error
           path: |
             bin/git-ai
             bin/git-ai-hook
 
-      - name: Print the artifact URL
-        run: echo ${{ steps.upload-artifact.outputs.artifact-url }}
-
   release:
-    needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    needs: artifact
+    if: ${{ github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -121,7 +107,7 @@ jobs:
           cargo bump patch --git-tag
           cargo check
 
-      - name: Include the version bump in the commit message
+      - name: Commit Version Bump
         run: git commit -a --amend --no-edit
 
       - name: Publish to crates.io
@@ -129,3 +115,23 @@ jobs:
 
       - name: Push to origin
         run: git push origin HEAD --tags
+
+  precompile:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        run: gh run download ${{ github.run_id }}
+
+      - name: Zip each downloaded directory
+        run: |
+          for dir in $(ls -d git-ai-*); do
+            tar -czf ${dir}.tar.gz ${dir}
+          done
+
+      - name: Uploads compressed artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.ref_name }}
+          fail_on_unmatched_files: true
+          files: git-ai-*.tar.gz
