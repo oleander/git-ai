@@ -125,8 +125,8 @@ jobs:
       - name: Upload artifacts
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.release.tag_name }}
           files: git-ai-*.zip
+          tag_name: ${{ github.event.release.tag_name }}
 
   # Publish to crates.io when release is published
   #
