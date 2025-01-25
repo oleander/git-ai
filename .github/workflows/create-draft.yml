@@ -2,7 +2,7 @@ name: Create Draft Release
 
 on:
   push:
-    tags: ["**"]
+    tags: ["*"]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
