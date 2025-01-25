@@ -114,8 +114,8 @@ jobs:
       - name: Create new tag
         run: git tag v${{ steps.new_version.outputs.new_version }}
 
-      - name: Publish to crates.io
-        run: cargo publish --allow-dirty
+      # - name: Publish to crates.io
+      #   run: cargo publish --allow-dirty
 
       - name: Push to origin
         run: git push origin HEAD --tags
