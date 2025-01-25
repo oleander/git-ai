@@ -24,7 +24,6 @@ jobs:
   artifact:
     runs-on: ${{ matrix.os }}
     continue-on-error: false
-    if: startsWith(github.event.ref, 'refs/heads/')
     strategy:
       matrix:
         include:
@@ -47,14 +46,11 @@ jobs:
           override: true
           profile: minimal
 
-      - name: Add Specific Targets
+      - name: Add x86_64-unknown-linux-musl target
+        if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
-          if [[ "${{ matrix.target }}" == "x86_64-unknown-linux-musl" ]]; then
-            rustup target add x86_64-unknown-linux-musl
-            sudo apt-get update && sudo apt-get install -y musl-tools
-          elif [[ "${{ matrix.target }}" == "wasm32-unknown-unknown" ]]; then
-            rustup target add wasm32-unknown-unknown
-          fi
+          rustup target add x86_64-unknown-linux-musl
+          sudo apt-get update && sudo apt-get install -y musl-tools
 
       - name: Install Dependencies for musl Target
         if: matrix.target == 'x86_64-unknown-linux-musl'
@@ -107,18 +103,18 @@ jobs:
       - name: Commit Version Bump
         run: git commit -a --amend --no-edit
 
-      # - name: New version
-      #   id: new_version
-      #   run: git describe --tags --abbrev=0 HEAD
+      - name: New version
+        id: new_version
+        run: git describe --tags --abbrev=0 HEAD
 
-      # - name: Delete old tag
-      #   run: git tag -d ${{ steps.new_version.outputs.new_version }}
+      - name: Delete old tag
+        run: git tag -d ${{ steps.new_version.outputs.new_version }}
 
-      # - name: Create new tag
-      #   run: git tag v${{ steps.new_version.outputs.new_version }}
+      - name: Create new tag
+        run: git tag v${{ steps.new_version.outputs.new_version }}
 
-      # - name: Publish to crates.io
-      #   run: cargo publish --allow-dirty
+      - name: Publish to crates.io
+        run: cargo publish --allow-dirty
 
       - name: Push to origin
         run: git push origin HEAD --tags
@@ -145,6 +141,6 @@ jobs:
       - name: Uploads compressed artifacts
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.tag_name.outputs.tag_name }}
+          tag_name: ${{ steps.tag_name.outputs.tag_name }}
           fail_on_unmatched_files: true
           files: git-ai-*.tar.gz
