@@ -19,6 +19,7 @@ permissions:
 
 env:
   CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+  GH_TOKEN: ${{ secrets.GH_TOKEN }}
   ACTIONS_RUNTIME_TOKEN: dummy
   CARGO_TERM_COLOR: always
 
