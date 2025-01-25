@@ -13,8 +13,8 @@ concurrency:
 
 permissions:
   contents: write
-  packages: write
   actions: write
+  packages: write
 
 env:
   CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
