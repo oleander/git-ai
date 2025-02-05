@@ -9,14 +9,14 @@ use tiktoken_rs::model::get_context_size;
 
 const GPT4: &str = "gpt-4";
 const GPT4O: &str = "gpt-4o";
-const GPT4_TURBO: &str = "gpt-4-turbo-preview";
+const GPT4OMINI: &str = "gpt-4o-mini";
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Serialize, Deserialize, Default)]
 pub enum Model {
   GPT4,
-  #[default]
   GPT4o,
-  GPT4Turbo
+  #[default]
+  GPT4oMini
 }
 
 impl Model {
@@ -61,7 +61,7 @@ impl From<&Model> for &str {
     match model {
       Model::GPT4o => GPT4O,
       Model::GPT4 => GPT4,
-      Model::GPT4Turbo => GPT4_TURBO
+      Model::GPT4oMini => GPT4OMINI
     }
   }
 }
@@ -73,7 +73,7 @@ impl FromStr for Model {
     match s.trim().to_lowercase().as_str() {
       GPT4O => Ok(Model::GPT4o),
       GPT4 => Ok(Model::GPT4),
-      GPT4_TURBO => Ok(Model::GPT4Turbo),
+      GPT4OMINI => Ok(Model::GPT4oMini),
       model => bail!("Invalid model: {}", model)
     }
   }
