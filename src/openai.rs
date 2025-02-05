@@ -15,7 +15,7 @@ pub struct Response {
 pub struct Request {
   pub prompt:     String,
   pub system:     String,
-  pub max_tokens: usize,
+  pub max_tokens: u16,
   pub model:      Model
 }
 
@@ -30,6 +30,7 @@ pub async fn call(request: Request) -> Result<Response> {
 
   let request = CreateChatCompletionRequestArgs::default()
     .model(request.model.to_string())
+    .max_tokens(request.max_tokens)
     .messages([
       ChatCompletionRequestSystemMessageArgs::default()
         .content(request.system)

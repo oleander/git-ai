@@ -34,7 +34,7 @@ pub async fn generate(diff: String, max_tokens: usize, model: Model) -> Result<o
   let request = openai::Request {
     system: instruction(),
     prompt: diff,
-    max_tokens,
+    max_tokens: max_tokens.try_into().unwrap_or(u16::MAX),
     model
   };
 
