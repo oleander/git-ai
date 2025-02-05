@@ -70,7 +70,6 @@ pub trait PatchDiff {
 }
 
 impl PatchDiff for Diff<'_> {
-  // TODO: Grouo arguments
   fn to_patch(&self, max_tokens: usize, model: Model) -> Result<String> {
     let mut files: HashMap<PathBuf, String> = HashMap::new();
 
@@ -79,12 +78,19 @@ impl PatchDiff for Diff<'_> {
         let content = line.content();
         let string = content.to_utf8();
 
+        // Include both changes and context, but prefix context lines with "context: "
+        // This helps the model understand the context while still identifying actual changes
+        let line_content = match line.origin() {
+          '+' | '-' => string,
+          _ => format!("context: {}", string)
+        };
+
         match files.get(&diff.path()) {
           Some(file_acc) => {
-            files.insert(diff.path(), file_acc.to_owned() + &string);
+            files.insert(diff.path(), file_acc.to_owned() + &line_content);
           }
           None => {
-            files.insert(diff.path(), string);
+            files.insert(diff.path(), line_content);
           }
         }
 
