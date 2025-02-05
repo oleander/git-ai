@@ -7,6 +7,21 @@ use crate::config;
 use crate::model::Response;
 use crate::model::Request;
 
+<<<<<<< HEAD
+=======
+#[derive(Debug, Clone, PartialEq)]
+pub struct Response {
+  pub response: String
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Request {
+  pub prompt:     String,
+  pub system:     String,
+  pub max_tokens: u16,
+  pub model:      Model
+}
+>>>>>>> 44782ec (Improve AI prompt (#26))
 
 pub async fn call(request: Request) -> Result<Response> {
   let api_key = config::APP
@@ -19,6 +34,7 @@ pub async fn call(request: Request) -> Result<Response> {
 
   let request = CreateChatCompletionRequestArgs::default()
     .model(request.model.to_string())
+    .max_tokens(request.max_tokens)
     .messages([
       ChatCompletionRequestSystemMessageArgs::default()
         .content(request.system)

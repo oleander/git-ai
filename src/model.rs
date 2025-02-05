@@ -11,6 +11,7 @@ const GPT4: &str = "gpt-4";
 const GPT4O: &str = "gpt-4o";
 const GPT4_TURBO: &str = "gpt-4-turbo-preview";
 const LLAMA3: &str = "llama3";
+const GPT4OMINI: &str = "gpt-4o-mini";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Response {
@@ -28,10 +29,11 @@ pub struct Request {
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Serialize, Deserialize, Default)]
 pub enum Model {
   GPT4,
-  #[default]
   GPT4o,
   GPT4Turbo,
-  Llama3
+  Llama3,
+  #[default]
+  GPT4oMini
 }
 
 impl Model {
@@ -79,7 +81,8 @@ impl From<&Model> for &str {
       Model::GPT4o => GPT4O,
       Model::GPT4 => GPT4,
       Model::GPT4Turbo => GPT4_TURBO,
-      Model::Llama3 => LLAMA3
+      Model::Llama3 => LLAMA3,
+      Model::GPT4oMini => GPT4OMINI
     }
   }
 }
@@ -93,6 +96,7 @@ impl FromStr for Model {
       GPT4 => Ok(Model::GPT4),
       GPT4_TURBO => Ok(Model::GPT4Turbo),
       LLAMA3 => Ok(Model::Llama3),
+      GPT4OMINI => Ok(Model::GPT4oMini),
       model => bail!("Invalid model: {}", model)
     }
   }
