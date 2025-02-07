@@ -664,6 +664,7 @@ dependencies = [
  "lazy_static",
  "log",
  "openssl-sys",
+ "parking_lot",
  "rand",
  "rayon",
  "reqwest",

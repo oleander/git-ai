@@ -9,9 +9,37 @@ use git2::{Diff, DiffFormat, DiffOptions, Repository, Tree};
 use anyhow::{bail, Context, Result};
 use thiserror::Error;
 use rayon::prelude::*;
+use parking_lot::Mutex;
 
 use crate::model::Model;
 use crate::profile;
+
+// String pool for reusing allocations
+struct StringPool {
+  strings:  Vec<String>,
+  capacity: usize
+}
+
+impl StringPool {
+  fn new(capacity: usize) -> Self {
+    Self { strings: Vec::with_capacity(capacity), capacity }
+  }
+
+  fn get(&mut self) -> String {
+    self
+      .strings
+      .pop()
+      .unwrap_or_else(|| String::with_capacity(self.capacity))
+  }
+
+  fn put(&mut self, mut string: String) {
+    string.clear();
+    if self.strings.len() < 100 {
+      // Limit pool size
+      self.strings.push(string);
+    }
+  }
+}
 
 pub trait FilePath {
   fn is_empty(&self) -> Result<bool> {
@@ -58,13 +86,13 @@ pub trait Utf8String {
 
 impl Utf8String for Vec<u8> {
   fn to_utf8(&self) -> String {
-    String::from_utf8(self.to_vec()).unwrap_or_default()
+    String::from_utf8_lossy(self).into_owned()
   }
 }
 
 impl Utf8String for [u8] {
   fn to_utf8(&self) -> String {
-    String::from_utf8(self.to_vec()).unwrap_or_default()
+    String::from_utf8_lossy(self).into_owned()
   }
 }
 
@@ -75,24 +103,36 @@ pub trait PatchDiff {
 impl PatchDiff for Diff<'_> {
   fn to_patch(&self, max_tokens: usize, model: Model) -> Result<String> {
     profile!("Generating patch diff");
-    let mut files: HashMap<PathBuf, String> = HashMap::new();
+    let pool = Arc::new(Mutex::new(StringPool::new(4096)));
+    let files = Arc::new(Mutex::new(HashMap::new()));
 
     {
       profile!("Processing diff changes");
       self.print(DiffFormat::Patch, |diff, _hunk, line| {
         let content = line.content().to_utf8();
-        let line_content = match line.origin() {
-          '+' | '-' => content,
-          _ => format!("context: {}", content)
+        let mut line_content = pool.lock().get();
+        match line.origin() {
+          '+' | '-' => line_content.push_str(&content),
+          _ => {
+            line_content.push_str("context: ");
+            line_content.push_str(&content);
+          }
         };
 
-        files
+        let mut files = files.lock();
+        let entry = files
           .entry(diff.path())
-          .or_insert_with(|| String::with_capacity(4096))
-          .push_str(&line_content);
+          .or_insert_with(|| String::with_capacity(4096));
+        entry.push_str(&line_content);
+        pool.lock().put(line_content);
         true
       })?;
     }
+
+    // Get the files out of Arc<Mutex>
+    let files = Arc::try_unwrap(files)
+      .expect("Arc still has multiple owners")
+      .into_inner();
 
     let mut result = String::with_capacity(files.values().map(|s| s.len()).sum());
     let mut remaining_tokens = max_tokens;
@@ -104,15 +144,27 @@ impl PatchDiff for Diff<'_> {
       // Convert model to Arc for thread-safe sharing
       let model = Arc::new(model);
 
-      // Pre-compute token counts in parallel
-      let file_tokens: HashMap<PathBuf, usize> = files
+      // Process files in chunks to maintain better memory usage
+      const CHUNK_SIZE: usize = 10;
+      let chunks: Vec<_> = files
         .iter()
         .collect::<Vec<_>>()
+        .chunks(CHUNK_SIZE)
+        .map(|chunk| chunk.to_vec())
+        .collect();
+
+      // Pre-compute token counts in parallel by chunks
+      let file_tokens: HashMap<PathBuf, usize> = chunks
         .par_iter()
-        .map(|(path, content)| {
-          let model = Arc::clone(&model);
-          let count = model.count_tokens(content).unwrap_or_default();
-          ((*path).clone(), count)
+        .flat_map(|chunk| {
+          chunk
+            .par_iter()
+            .map(|(path, content)| {
+              let model = Arc::clone(&model);
+              let count = model.count_tokens(content).unwrap_or_default();
+              ((*path).clone(), count)
+            })
+            .collect::<Vec<_>>()
         })
         .collect();
 
