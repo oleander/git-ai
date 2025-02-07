@@ -32,18 +32,37 @@ pub async fn generate(diff: String, max_tokens: usize, model: Model) -> Result<C
     bail!("Max can't be zero (2)")
   }
 
-  let api_key = config::APP
-    .openai_api_key
-    .clone()
-    .ok_or_else(|| anyhow::anyhow!("OpenAI API key not found"))?;
+  let provider: Box<dyn LLMProvider> = match config::APP.provider.as_deref() {
+    Some("openai") | None => {
+      let api_key = config::APP
+        .openai
+        .api_key
+        .clone()
+        .ok_or_else(|| anyhow::anyhow!("OpenAI API key not found"))?;
+      Box::new(openai::OpenAIProvider::new(api_key))
+    }
+    Some("ollama") => Box::new(crate::llm::OllamaProvider::new()),
+    Some(other) => bail!("Unknown provider: {}", other)
+  };
 
-  let provider = openai::OpenAIProvider::new(api_key);
+  let model_type = match config::APP.provider.as_deref() {
+    Some("openai") | None => ModelType::OpenAI(model.to_string()),
+    Some("ollama") =>
+      ModelType::Ollama(
+        config::APP
+          .ollama
+          .model
+          .clone()
+          .unwrap_or_else(|| "llama2".to_string())
+      ),
+    Some(_) => unreachable!()
+  };
 
   let request = CompletionRequest {
     system:     instruction(),
     prompt:     diff,
     max_tokens: Some(max_tokens.try_into().unwrap_or(u16::MAX)),
-    model:      ModelType::OpenAI(model.to_string())
+    model:      model_type
   };
 
   provider.generate_completion(request).await
