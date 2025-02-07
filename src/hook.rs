@@ -77,82 +77,60 @@ impl PatchDiff for Diff<'_> {
 
     {
       profile!("Processing diff changes");
-      self
-        .print(DiffFormat::Patch, |diff, _hunk, line| {
-          let content = line.content();
-          let string = content.to_utf8();
+      self.print(DiffFormat::Patch, |diff, _hunk, line| {
+        let content = line.content().to_utf8();
+        let line_content = match line.origin() {
+          '+' | '-' => content,
+          _ => format!("context: {}", content)
+        };
 
-          // Include both changes and context, but prefix context lines with "context: "
-          // This helps the model understand the context while still identifying actual changes
-          let line_content = match line.origin() {
-            '+' | '-' => string,
-            _ => format!("context: {}", string)
-          };
-
-          match files.get(&diff.path()) {
-            Some(file_acc) => {
-              files.insert(diff.path(), file_acc.to_owned() + &line_content);
-            }
-            None => {
-              files.insert(diff.path(), line_content);
-            }
-          }
-
-          true
-        })
-        .context("Failed to print diff")?;
+        files
+          .entry(diff.path())
+          .or_insert_with(|| String::with_capacity(4096))
+          .push_str(&line_content);
+        true
+      })?;
     }
 
-    let mut diffs: Vec<_> = files.values().collect();
+    let mut result = String::with_capacity(files.values().map(|s| s.len()).sum());
+    let mut remaining_tokens = max_tokens;
+    let total_files = files.len();
 
     {
-      profile!("Sorting and truncating diffs");
-      // TODO: No unwrap
-      diffs.sort_by_key(|diff| model.count_tokens(diff).unwrap());
+      profile!("Processing and truncating diffs");
 
-      diffs
-        .iter()
-        .enumerate()
-        .try_fold(
-          (max_tokens, String::new(), files.len()),
-          |(remaining_tokens, mut final_diff, total_files), (index, diff)| {
-            let files_remaining = total_files.saturating_sub(index);
-            let max_tokens_per_file = remaining_tokens.saturating_div(files_remaining);
+      // Pre-compute token counts
+      let mut file_tokens: HashMap<PathBuf, usize> = HashMap::new();
+      for (path, content) in &files {
+        file_tokens.insert(path.clone(), model.count_tokens(content)?);
+      }
 
-            log::debug!("max_tokens_per_file: {}", max_tokens_per_file);
-            log::debug!("remaining_tokens: {}", remaining_tokens);
-            log::debug!("total_files: {}", total_files);
-            log::debug!("index: {}", index);
+      for (index, (path, diff)) in files.iter().enumerate() {
+        let files_remaining = total_files.saturating_sub(index);
+        let max_tokens_per_file = remaining_tokens.saturating_div(files_remaining);
 
-            if max_tokens_per_file == 0 {
-              bail!("No tokens left to generate commit message. Try increasing the max-tokens configuration option using `git ai config set max-tokens <value>`");
-            }
+        if max_tokens_per_file == 0 {
+          bail!("No tokens left to generate commit message. Try increasing the max-tokens configuration option using `git ai config set max-tokens <value>`");
+        }
 
-            let file_token_count = model.count_tokens(diff).context("Failed to count diff tokens")?;
-            let token_limits = [file_token_count, max_tokens_per_file];
-            let file_allocated_tokens = token_limits.iter().min().unwrap();
+        let file_token_count = file_tokens.get(path).copied().unwrap_or_default();
+        let file_allocated_tokens = file_token_count.min(max_tokens_per_file);
 
-            // We have reached the token limit for the file: truncate
-            let truncated_diff = if file_token_count > *file_allocated_tokens {
-              model.truncate(diff, *file_allocated_tokens)
-            } else {
-              Ok((*diff).clone().to_owned()) // TODO: Better way?
-            };
+        let truncated_content = if file_token_count > file_allocated_tokens {
+          model.truncate(diff, file_allocated_tokens)?
+        } else {
+          diff.clone()
+        };
 
-            log::debug!("file_token_count: {}", file_token_count);
-            log::debug!("file_allocated_tokens: {}", file_allocated_tokens);
-            log::debug!("diff: {}", diff);
-            log::debug!("truncated_diff: {:?}", truncated_diff);
-            log::debug!("remaining_tokens: {}", remaining_tokens);
-            log::debug!("final_diff: {}", final_diff);
-
-            final_diff += &("\n".to_owned() + &truncated_diff.context("Failed to truncate diff")?);
-
-            Ok((remaining_tokens.saturating_sub(*file_allocated_tokens), final_diff, total_files))
-          }
-        )
-        .map(|(_, final_diff, _)| final_diff)
+        if !result.is_empty() {
+          result.push('\n');
+        }
+        result.push_str(&truncated_content);
+        remaining_tokens = remaining_tokens.saturating_sub(file_allocated_tokens);
+      }
     }
+
+    Ok(result)
   }
 }
 
