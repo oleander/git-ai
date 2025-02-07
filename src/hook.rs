@@ -110,7 +110,7 @@ impl PatchDiff for Diff<'_> {
     let thread_pool = rayon::ThreadPoolBuilder::new()
       .num_threads(num_cpus::get())
       .build()
-      .unwrap();
+      .context("Failed to create thread pool")?;
 
     // Step 1: Collect all diff data into thread-safe structures
     let string_pool = Arc::new(Mutex::new(StringPool::new(4096)));

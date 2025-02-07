@@ -25,7 +25,9 @@ impl App {
 }
 
 lazy_static! {
-    pub static ref CONFIG_DIR: PathBuf = home::home_dir().unwrap().join(".config/git-ai");
+    pub static ref CONFIG_DIR: PathBuf = home::home_dir()
+        .expect("Failed to determine home directory")
+        .join(".config/git-ai");
     #[derive(Debug)]
     pub static ref APP: App = App::new().expect("Failed to load config");
     pub static ref CONFIG_PATH: PathBuf = CONFIG_DIR.join("config.ini");
@@ -36,20 +38,20 @@ impl App {
     dotenv::dotenv().ok();
 
     if !CONFIG_DIR.exists() {
-      std::fs::create_dir_all(CONFIG_DIR.to_str().unwrap()).context("Failed to create config directory")?;
-      File::create(CONFIG_PATH.to_str().unwrap()).context("Failed to create config file")?;
+      std::fs::create_dir_all(&*CONFIG_DIR).with_context(|| format!("Failed to create config directory at {:?}", *CONFIG_DIR))?;
+      File::create(&*CONFIG_PATH).with_context(|| format!("Failed to create config file at {:?}", *CONFIG_PATH))?;
     } else if !CONFIG_PATH.exists() {
-      File::create(CONFIG_PATH.to_str().unwrap()).context("Failed to create config file")?;
+      File::create(&*CONFIG_PATH).with_context(|| format!("Failed to create config file at {:?}", *CONFIG_PATH))?;
     }
 
     let config = Config::builder()
       .add_source(config::Environment::with_prefix("APP").try_parsing(true))
-      .add_source(config::File::new(CONFIG_PATH.to_str().unwrap(), FileFormat::Ini))
+      .add_source(config::File::new(CONFIG_PATH.to_string_lossy().as_ref(), FileFormat::Ini))
       .set_default("language", "en")?
       .set_default("timeout", 30)?
       .set_default("max_commit_length", 72)?
       .set_default("max_tokens", 2024)?
-      .set_default("model", "gpt-4o")?
+      .set_default("model", "gpt-4")?
       .set_default("openai_api_key", "<PLACE HOLDER FOR YOUR API KEY>")?
       .build()?;
 
@@ -60,7 +62,7 @@ impl App {
 
   pub fn save(&self) -> Result<()> {
     let contents = serde_ini::to_string(&self).context(format!("Failed to serialize config: {:?}", self))?;
-    let mut file = File::create(CONFIG_PATH.to_str().unwrap()).context("Failed to create config file")?;
+    let mut file = File::create(&*CONFIG_PATH).with_context(|| format!("Failed to create config file at {:?}", *CONFIG_PATH))?;
     file
       .write_all(contents.as_bytes())
       .context("Failed to write config file")
