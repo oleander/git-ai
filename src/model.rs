@@ -9,19 +9,33 @@ use tiktoken_rs::model::get_context_size;
 
 use crate::profile;
 
+// Model identifiers
 const GPT4: &str = "gpt-4";
 const GPT4O: &str = "gpt-4o";
 const GPT4OMINI: &str = "gpt-4o-mini";
 
+/// Represents the available AI models for commit message generation.
+/// Each model has different capabilities and token limits.
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Serialize, Deserialize, Default)]
 pub enum Model {
+  /// Standard GPT-4 model
   GPT4,
+  /// Optimized GPT-4 model
   GPT4o,
+  /// Default model - Mini version of optimized GPT-4
   #[default]
   GPT4oMini
 }
 
 impl Model {
+  /// Counts the number of tokens in the given text for the current model.
+  /// This is used to ensure we stay within the model's token limits.
+  ///
+  /// # Arguments
+  /// * `text` - The text to count tokens for
+  ///
+  /// # Returns
+  /// * `Result<usize>` - The number of tokens or an error
   pub fn count_tokens(&self, text: &str) -> Result<usize> {
     profile!("Count tokens");
     Ok(
@@ -31,16 +45,37 @@ impl Model {
     )
   }
 
+  /// Gets the maximum context size for the current model.
+  ///
+  /// # Returns
+  /// * `usize` - The maximum number of tokens the model can process
   pub fn context_size(&self) -> usize {
     profile!("Get context size");
     get_context_size(self.into())
   }
 
+  /// Truncates the given text to fit within the specified token limit.
+  ///
+  /// # Arguments
+  /// * `diff` - The text to truncate
+  /// * `max_tokens` - The maximum number of tokens allowed
+  ///
+  /// # Returns
+  /// * `Result<String>` - The truncated text or an error
   pub(crate) fn truncate(&self, diff: &str, max_tokens: usize) -> Result<String> {
     profile!("Truncate text");
     self.walk_truncate(diff, max_tokens, usize::MAX)
   }
 
+  /// Recursively truncates text to fit within token limits while maintaining coherence.
+  ///
+  /// # Arguments
+  /// * `diff` - The text to truncate
+  /// * `max_tokens` - The maximum number of tokens allowed
+  /// * `within` - The maximum allowed deviation from target token count
+  ///
+  /// # Returns
+  /// * `Result<String>` - The truncated text or an error
   pub(crate) fn walk_truncate(&self, diff: &str, max_tokens: usize, within: usize) -> Result<String> {
     profile!("Walk truncate iteration");
     log::debug!("max_tokens: {}", max_tokens);

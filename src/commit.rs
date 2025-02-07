@@ -3,6 +3,8 @@ use anyhow::{bail, Result};
 use crate::{config, openai, profile};
 use crate::model::Model;
 
+/// Returns the instruction template for the AI model.
+/// This template guides the model in generating appropriate commit messages.
 fn instruction() -> String {
   profile!("Generate instruction template");
   format!("You are an AI assistant that generates concise and meaningful git commit messages based on provided diffs. Please adhere to the following guidelines:
@@ -23,16 +25,35 @@ fn instruction() -> String {
   INPUT:", config::APP.max_commit_length.unwrap_or(72))
 }
 
+/// Calculates the number of tokens used by the instruction template.
+///
+/// # Arguments
+/// * `model` - The AI model to use for token counting
+///
+/// # Returns
+/// * `Result<usize>` - The number of tokens used or an error
 pub fn token_used(model: &Model) -> Result<usize> {
   profile!("Calculate instruction tokens");
   model.count_tokens(&instruction())
 }
 
+/// Generates a commit message using the AI model.
+///
+/// # Arguments
+/// * `diff` - The git diff to generate a commit message for
+/// * `max_tokens` - Maximum number of tokens allowed for the response
+/// * `model` - The AI model to use for generation
+///
+/// # Returns
+/// * `Result<openai::Response>` - The generated commit message or an error
+///
+/// # Errors
+/// Returns an error if max_tokens is 0 or if the OpenAI API call fails
 pub async fn generate(diff: String, max_tokens: usize, model: Model) -> Result<openai::Response> {
   profile!("Generate commit message");
 
   if max_tokens == 0 {
-    bail!("Max can't be zero (2)")
+    bail!("Max tokens cannot be zero")
   }
 
   let request = {
