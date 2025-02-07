@@ -5,6 +5,8 @@ use std::os::unix::fs::symlink as symlink_unix;
 use anyhow::{bail, Context, Result};
 use git2::{Repository, RepositoryOpenFlags as Flags};
 
+use crate::profile;
+
 #[derive(Debug, Clone)]
 pub struct Filesystem {
   git_ai_hook_bin_path: PathBuf,
@@ -22,20 +24,24 @@ impl File {
   }
 
   pub fn exists(&self) -> bool {
+    profile!("Check file exists");
     self.path.exists()
   }
 
   pub fn delete(&self) -> Result<()> {
+    profile!("Delete file");
     log::debug!("Removing file at {}", self);
     fs::remove_file(&self.path).context(format!("Failed to remove file at {}", self))
   }
 
   pub fn symlink(&self, target: File) -> Result<()> {
+    profile!("Create symlink");
     log::debug!("Symlinking {} to {}", target, self);
     symlink_unix(&target.path, &self.path).context(format!("Failed to symlink {} to {}", target, self))
   }
 
   pub fn relative_path(&self) -> Result<Dir> {
+    profile!("Get relative file path");
     Dir::new(
       self
         .path
@@ -47,6 +53,7 @@ impl File {
   }
 
   pub fn parent(&self) -> Dir {
+    profile!("Get parent directory");
     Dir::new(self.path.parent().unwrap_or(Path::new("")).to_path_buf())
   }
 }
@@ -98,15 +105,18 @@ impl Dir {
   }
 
   pub fn exists(&self) -> bool {
+    profile!("Check directory exists");
     self.path.exists()
   }
 
   pub fn create_dir_all(&self) -> Result<()> {
+    profile!("Create directory recursively");
     log::debug!("Creating directory at {}", self);
     fs::create_dir_all(&self.path).context(format!("Failed to create directory at {}", self))
   }
 
   pub fn relative_path(&self) -> Result<Self> {
+    profile!("Get relative directory path");
     Self::new(
       self
         .path
@@ -120,23 +130,39 @@ impl Dir {
 
 impl Filesystem {
   pub fn new() -> Result<Self> {
-    let current_dir = env::current_dir().context("Failed to get current directory")?;
-    let git_ai_bin_path = env::current_exe().context("Failed to get current executable")?;
+    profile!("Initialize filesystem");
 
-    let repo = Repository::open_ext(current_dir.clone(), Flags::empty(), Vec::<&Path>::new())
-      .context(format!("Failed to open repository at {}", current_dir.clone().display()))?;
+    let current_dir = {
+      profile!("Get current directory");
+      env::current_dir().context("Failed to get current directory")?
+    };
+
+    let git_ai_bin_path = {
+      profile!("Get executable path");
+      env::current_exe().context("Failed to get current executable")?
+    };
+
+    let repo = {
+      profile!("Open git repository");
+      Repository::open_ext(current_dir.clone(), Flags::empty(), Vec::<&Path>::new())
+        .context(format!("Failed to open repository at {}", current_dir.clone().display()))?
+    };
 
     let mut git_path = repo.path().to_path_buf();
     // if relative, make it absolute
     if git_path.is_relative() {
+      profile!("Convert relative git path to absolute");
       // make git_path absolute using the current folder as the base
       git_path = current_dir.join(git_path);
     }
 
-    let git_ai_hook_bin_path = git_ai_bin_path
-      .parent()
-      .context(format!("Failed to get parent directory of {}", git_ai_bin_path.display()))?
-      .join("git-ai-hook");
+    let git_ai_hook_bin_path = {
+      profile!("Get hook binary path");
+      git_ai_bin_path
+        .parent()
+        .context(format!("Failed to get parent directory of {}", git_ai_bin_path.display()))?
+        .join("git-ai-hook")
+    };
 
     if !git_ai_hook_bin_path.exists() {
       bail!("Hook binary not found at {}", git_ai_hook_bin_path.display());
@@ -150,14 +176,17 @@ impl Filesystem {
   }
 
   pub fn git_ai_hook_bin_path(&self) -> Result<File> {
+    profile!("Get hook binary file");
     File::new(self.git_ai_hook_bin_path.clone()).into()
   }
 
   pub fn git_hooks_path(&self) -> Dir {
+    profile!("Get hooks directory");
     Dir::new(self.git_hooks_path.clone())
   }
 
   pub fn prepare_commit_msg_path(&self) -> Result<File> {
+    profile!("Get prepare-commit-msg hook path");
     if !self.git_hooks_path.exists() {
       bail!("Hooks directory not found at {}", self.git_hooks_path.display());
     }
