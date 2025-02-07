@@ -106,9 +106,14 @@ impl Args {
     }
 
     let response = commit::generate(patch.to_string(), remaining_tokens, model).await?;
-    std::fs::write(&self.commit_msg_file, response.response.trim())?;
+    self.write_commit_msg(response)?;
     pb.finish_and_clear();
 
+    Ok(())
+  }
+
+  fn write_commit_msg(&self, response: ai::llm::CompletionResponse) -> Result<()> {
+    std::fs::write(&self.commit_msg_file, response.content.trim())?;
     Ok(())
   }
 

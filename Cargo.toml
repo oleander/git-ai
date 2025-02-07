@@ -27,6 +27,7 @@ path = "src/bin/hook.rs"
 [dependencies]
 anyhow = { version = "1.0.86", default-features = false }
 async-openai = { version = "0.18.3", default-features = false }
+async-trait = "0.1.77"
 colored = "2.1.0"
 config = { version = "0.13.4", default-features = false, features = ["ini"] }
 console = { version = "0.15.8", default-features = false }
@@ -48,6 +49,7 @@ thiserror = "1.0.61"
 tokio = { version = "1.38.0", features = ["rt-multi-thread"] }
 tiktoken-rs = { version = "0.5.9" }
 openssl-sys = { version = "0.9.102", features = ["vendored"] }
+ollama-rs = { version = "0.2.5", features = ["stream"] }
 
 [dev-dependencies]
 tempfile = "3.10.1"

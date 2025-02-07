@@ -5,3 +5,4 @@ pub mod style;
 pub mod model;
 pub mod filesystem;
 pub mod openai;
+pub mod llm;
