@@ -2,11 +2,13 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::fs::File;
+use std::sync::Arc;
 
 use structopt::StructOpt;
 use git2::{Diff, DiffFormat, DiffOptions, Repository, Tree};
 use anyhow::{bail, Context, Result};
 use thiserror::Error;
+use rayon::prelude::*;
 
 use crate::model::Model;
 use crate::profile;
@@ -99,12 +101,22 @@ impl PatchDiff for Diff<'_> {
     {
       profile!("Processing and truncating diffs");
 
-      // Pre-compute token counts
-      let mut file_tokens: HashMap<PathBuf, usize> = HashMap::new();
-      for (path, content) in &files {
-        file_tokens.insert(path.clone(), model.count_tokens(content)?);
-      }
+      // Convert model to Arc for thread-safe sharing
+      let model = Arc::new(model);
 
+      // Pre-compute token counts in parallel
+      let file_tokens: HashMap<PathBuf, usize> = files
+        .iter()
+        .collect::<Vec<_>>()
+        .par_iter()
+        .map(|(path, content)| {
+          let model = Arc::clone(&model);
+          let count = model.count_tokens(content).unwrap_or_default();
+          ((*path).clone(), count)
+        })
+        .collect();
+
+      // Process files sequentially since we need to maintain token budget
       for (index, (path, diff)) in files.iter().enumerate() {
         let files_remaining = total_files.saturating_sub(index);
         let max_tokens_per_file = remaining_tokens.saturating_div(files_remaining);

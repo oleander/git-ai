@@ -56,19 +56,19 @@ impl GitFile {
   pub fn commit(&self) -> Result<()> {
     let mut index = self.repo.index()?;
     let oid = index.write_tree()?;
-    let signature = git2::Signature::now("Test User", "test@example.com")?;
+    let signature = git2::Signature::now("Your Name", "email@example.com")?;
     let tree = self.repo.find_tree(oid)?;
 
     match self.find_last_commit() {
       Ok(parent_commit) => {
         self
           .repo
-          .commit(Some("HEAD"), &signature, &signature, "Test commit", &tree, &[&parent_commit])?;
+          .commit(Some("HEAD"), &signature, &signature, "Commit message", &tree, &[&parent_commit])?;
       }
       Err(_) => {
         self
           .repo
-          .commit(Some("HEAD"), &signature, &signature, "Initial test commit", &tree, &[])?;
+          .commit(Some("HEAD"), &signature, &signature, "Initial commit", &tree, &[])?;
       }
     }
 
