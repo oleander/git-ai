@@ -27,3 +27,6 @@ integration-test:
     source .secrets
     docker build -t git-ai-test .
     docker run --rm git-ai-test -e OPENAI_API_KEY=$OPENAI_API_KEY
+
+test-using-docker:
+    docker run --rm -it git-ai-test /bin/bash ./test-git-ai.sh

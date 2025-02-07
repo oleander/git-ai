@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use console::Emoji;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(default)]
 pub struct AppConfig {
   #[serde(rename = "provider")]
@@ -20,7 +20,7 @@ pub struct AppConfig {
   pub max_commit_length: Option<usize>
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct OpenAIConfig {
   #[serde(rename = "openai_api_key")]
   pub api_key: Option<String>,
@@ -28,7 +28,7 @@ pub struct OpenAIConfig {
   pub model:   Option<String>
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct OllamaConfig {
   #[serde(rename = "ollama_model")]
   pub model: Option<String>,
@@ -72,13 +72,14 @@ impl Default for OllamaConfig {
 
 lazy_static! {
   pub static ref CONFIG_DIR: PathBuf = home::home_dir().unwrap().join(".config/git-ai");
+  pub static ref CONFIG_PATH: PathBuf = std::env::var("GIT_AI_CONFIG")
+    .map(PathBuf::from)
+    .unwrap_or_else(|_| CONFIG_DIR.join("config.ini"));
   pub static ref APP: AppConfig = load_config().unwrap_or_default();
-  pub static ref CONFIG_PATH: PathBuf = CONFIG_DIR.join("config.ini");
 }
 
 pub fn run_reset() -> Result<()> {
-  let config = AppConfig::default();
-  save_config(&config)
+  save_config(&AppConfig::default())
 }
 
 pub fn run_provider(provider: String) -> Result<()> {
@@ -117,13 +118,12 @@ pub fn run_ollama_config(model: Option<String>, host: Option<String>, port: Opti
   save_config(&config)
 }
 
-fn load_config() -> Result<AppConfig> {
+pub fn load_config() -> Result<AppConfig> {
   if !CONFIG_PATH.exists() {
     return Ok(AppConfig::default());
   }
 
   let contents = std::fs::read_to_string(&*CONFIG_PATH).context("Failed to read config file")?;
-
   let mut config = AppConfig::default();
 
   for line in contents.lines() {
@@ -137,20 +137,14 @@ fn load_config() -> Result<AppConfig> {
       let value = value.trim();
 
       match key {
-        // General settings
         "provider" => config.provider = Some(value.to_string()),
         "max_tokens" => config.max_tokens = value.parse().ok(),
         "max_commit_length" => config.max_commit_length = value.parse().ok(),
-
-        // OpenAI settings
         "openai_api_key" => config.openai.api_key = Some(value.to_string()),
         "openai_model" => config.openai.model = Some(value.to_string()),
-
-        // Ollama settings
         "ollama_model" => config.ollama.model = Some(value.to_string()),
         "ollama_host" => config.ollama.host = Some(value.to_string()),
         "ollama_port" => config.ollama.port = value.parse().ok(),
-
         _ => log::warn!("Unknown config key: {}", key)
       }
     }
@@ -159,12 +153,11 @@ fn load_config() -> Result<AppConfig> {
   Ok(config)
 }
 
-fn save_config(config: &AppConfig) -> Result<()> {
+pub fn save_config(config: &AppConfig) -> Result<()> {
   if let Some(parent) = CONFIG_PATH.parent() {
     std::fs::create_dir_all(parent).context("Failed to create config directory")?;
   }
 
-  // Convert config to a simple key-value format
   let mut contents = String::new();
 
   // General settings
@@ -198,7 +191,6 @@ fn save_config(config: &AppConfig) -> Result<()> {
   }
 
   std::fs::write(&*CONFIG_PATH, contents).context("Failed to write config file")?;
-
   println!("{} Configuration updated!", Emoji("✨", ":-)"));
   Ok(())
 }

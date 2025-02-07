@@ -27,3 +27,18 @@ examples/
 **/examples/
 benches/
 **/benches/
+# Ignore build artifacts
+target/
+
+# Ignore Git-related files
+.git/
+.gitignore
+
+# Ignore Docker-related files
+Dockerfile*
+.dockerignore
+
+# Ignore IDE and editor settings
+.idea/
+.vscode/
+
