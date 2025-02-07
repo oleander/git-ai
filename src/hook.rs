@@ -3,6 +3,7 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::fs::File;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use structopt::StructOpt;
 use git2::{Diff, DiffFormat, DiffOptions, Repository, Tree};
@@ -143,11 +144,11 @@ impl PatchDiff for Diff<'_> {
       .expect("Arc still has multiple owners")
       .into_inner();
 
-    let mut result = String::with_capacity(files.values().map(|s| s.len()).sum());
-    let mut remaining_tokens = max_tokens;
     let total_files = files.len();
+    let remaining_tokens = Arc::new(AtomicUsize::new(max_tokens));
+    let result_chunks = Arc::new(Mutex::new(Vec::with_capacity(total_files)));
 
-    // Step 3: Parallel processing of file chunks
+    // Step 3: Parallel processing of files
     {
       profile!("Processing and truncating diffs");
       let model = Arc::new(model);
@@ -155,57 +156,82 @@ impl PatchDiff for Diff<'_> {
       // Process files in parallel chunks
       const CHUNK_SIZE: usize = 10;
       let chunks: Vec<_> = files
-        .iter()
+        .into_iter() // Convert to owned chunks
         .collect::<Vec<_>>()
         .chunks(CHUNK_SIZE)
         .map(|chunk| chunk.to_vec())
         .collect();
 
-      // Pre-compute token counts in parallel
-      let file_tokens: HashMap<PathBuf, usize> = thread_pool.install(|| {
-        chunks
-          .par_iter()
-          .flat_map(|chunk| {
-            chunk
-              .par_iter()
-              .map(|(path, content)| {
-                let model = Arc::clone(&model);
-                let count = model.count_tokens(content).unwrap_or_default();
-                ((*path).clone(), count)
-              })
-              .collect::<Vec<_>>()
-          })
-          .collect()
+      // Process chunks in parallel
+      let processing_result: Result<()> = thread_pool.install(|| {
+        chunks.par_iter().try_for_each(|chunk| {
+          // Pre-compute token counts for the chunk
+          let token_counts: Vec<_> = chunk
+            .par_iter()
+            .map(|(path, content)| {
+              let model = Arc::clone(&model);
+              let count = model.count_tokens(content).unwrap_or_default();
+              (path.clone(), count)
+            })
+            .collect();
+
+          // Process files in the chunk
+          let mut chunk_results = Vec::with_capacity(chunk.len());
+          for (idx, ((path, content), (_, token_count))) in chunk.iter().zip(token_counts.iter()).enumerate() {
+            // Calculate token budget atomically
+            let total_remaining = remaining_tokens.load(Ordering::Relaxed);
+            let files_remaining = total_files.saturating_sub(idx);
+            let max_tokens_per_file = total_remaining.saturating_div(files_remaining);
+
+            if max_tokens_per_file == 0 {
+              continue; // Skip this file if no tokens left
+            }
+
+            let token_count = *token_count;
+            let allocated_tokens = token_count.min(max_tokens_per_file);
+
+            // Try to claim tokens atomically
+            let old_remaining = remaining_tokens.fetch_sub(allocated_tokens, Ordering::Relaxed);
+            if old_remaining < allocated_tokens {
+              // Restore tokens if we couldn't claim them
+              remaining_tokens.fetch_add(allocated_tokens, Ordering::Relaxed);
+              continue;
+            }
+
+            // Process the file with allocated tokens
+            let processed_content = if token_count > allocated_tokens {
+              model.truncate(content, allocated_tokens)?
+            } else {
+              content.clone()
+            };
+
+            chunk_results.push((path.clone(), processed_content));
+          }
+
+          // Store results in order
+          if !chunk_results.is_empty() {
+            result_chunks.lock().extend(chunk_results);
+          }
+          Ok(())
+        })
       });
 
-      // Process files sequentially to maintain token budget
-      for (index, (path, diff)) in files.iter().enumerate() {
-        let files_remaining = total_files.saturating_sub(index);
-        let max_tokens_per_file = remaining_tokens.saturating_div(files_remaining);
-
-        if max_tokens_per_file == 0 {
-          bail!("No tokens left to generate commit message. Try increasing the max-tokens configuration option using `git ai config set max-tokens <value>`");
-        }
-
-        let file_token_count = file_tokens.get(path).copied().unwrap_or_default();
-        let file_allocated_tokens = file_token_count.min(max_tokens_per_file);
-
-        // Parallel truncation if needed
-        let truncated_content = if file_token_count > file_allocated_tokens {
-          thread_pool.install(|| model.truncate(diff, file_allocated_tokens))?
-        } else {
-          diff.clone()
-        };
-
-        if !result.is_empty() {
-          result.push('\n');
-        }
-        result.push_str(&truncated_content);
-        remaining_tokens = remaining_tokens.saturating_sub(file_allocated_tokens);
-      }
+      // Handle any processing errors
+      processing_result?;
     }
 
-    Ok(result)
+    // Combine results in order
+    let results = result_chunks.lock();
+    let mut final_result = String::with_capacity(results.iter().map(|(_, content)| content.len()).sum());
+
+    for (_, content) in results.iter() {
+      if !final_result.is_empty() {
+        final_result.push('\n');
+      }
+      final_result.push_str(content);
+    }
+
+    Ok(final_result)
   }
 }
 
