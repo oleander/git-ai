@@ -51,7 +51,7 @@ impl App {
       .set_default("timeout", 30)?
       .set_default("max_commit_length", 72)?
       .set_default("max_tokens", 2024)?
-      .set_default("model", "gpt-4")?
+      .set_default("model", "gpt-4o-mini")?
       .set_default("openai_api_key", "<PLACE HOLDER FOR YOUR API KEY>")?
       .build()?;
 
