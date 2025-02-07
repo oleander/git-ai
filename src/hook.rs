@@ -16,7 +16,48 @@ use num_cpus;
 use crate::model::Model;
 use crate::profile;
 
-// String pool for reusing allocations
+// Constants
+const MAX_POOL_SIZE: usize = 100;
+const DEFAULT_STRING_CAPACITY: usize = 4096;
+const PARALLEL_CHUNK_SIZE: usize = 10;
+
+// Types
+type DiffData = Vec<(PathBuf, String, usize)>;
+
+// Error definitions
+#[derive(Error, Debug)]
+pub enum HookError {
+  #[error("Failed to open repository")]
+  OpenRepository,
+
+  #[error("Failed to get patch")]
+  GetPatch,
+
+  #[error("Empty diff output")]
+  EmptyDiffOutput,
+
+  #[error("Failed to write commit message")]
+  WriteCommitMessage,
+
+  #[error(transparent)]
+  Anyhow(#[from] anyhow::Error)
+}
+
+// CLI Arguments
+#[derive(StructOpt, Debug)]
+#[structopt(name = "commit-msg-hook", about = "A tool for generating commit messages.")]
+pub struct Args {
+  pub commit_msg_file: PathBuf,
+
+  #[structopt(short = "t", long = "type")]
+  pub commit_type: Option<String>,
+
+  #[structopt(short = "s", long = "sha1")]
+  pub sha1: Option<String>
+}
+
+// Memory management
+#[derive(Debug)]
 struct StringPool {
   strings:  Vec<String>,
   capacity: usize
@@ -36,13 +77,13 @@ impl StringPool {
 
   fn put(&mut self, mut string: String) {
     string.clear();
-    if self.strings.len() < 100 {
-      // Limit pool size
+    if self.strings.len() < MAX_POOL_SIZE {
       self.strings.push(string);
     }
   }
 }
 
+// File operations traits
 pub trait FilePath {
   fn is_empty(&self) -> Result<bool> {
     self.read().map(|s| s.is_empty())
@@ -54,19 +95,19 @@ pub trait FilePath {
 
 impl FilePath for PathBuf {
   fn write(&self, msg: String) -> Result<()> {
-    let mut file = File::create(self)?;
-    file.write_all(msg.as_bytes())?;
-    Ok(())
+    File::create(self)?
+      .write_all(msg.as_bytes())
+      .map_err(Into::into)
   }
 
   fn read(&self) -> Result<String> {
-    let mut file = File::open(self)?;
     let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
+    File::open(self)?.read_to_string(&mut contents)?;
     Ok(contents)
   }
 }
 
+// Git operations traits
 trait DiffDeltaPath {
   fn path(&self) -> PathBuf;
 }
@@ -82,6 +123,7 @@ impl DiffDeltaPath for git2::DiffDelta<'_> {
   }
 }
 
+// String conversion traits
 pub trait Utf8String {
   fn to_utf8(&self) -> String;
 }
@@ -98,55 +140,21 @@ impl Utf8String for [u8] {
   }
 }
 
+// Patch generation traits
 pub trait PatchDiff {
   fn to_patch(&self, max_token_count: usize, model: Model) -> Result<String>;
+  fn collect_diff_data(&self) -> Result<HashMap<PathBuf, String>>;
 }
 
 impl PatchDiff for Diff<'_> {
   fn to_patch(&self, max_tokens: usize, model: Model) -> Result<String> {
     profile!("Generating patch diff");
 
-    // Create thread pool for parallel operations
-    let thread_pool = rayon::ThreadPoolBuilder::new()
-      .num_threads(num_cpus::get())
-      .build()
-      .context("Failed to create thread pool")?;
+    // Step 1: Collect diff data (non-parallel)
+    let files = self.collect_diff_data()?;
 
-    // Step 1: Collect all diff data into thread-safe structures
-    let string_pool = Arc::new(Mutex::new(StringPool::new(4096)));
-    let files = Arc::new(Mutex::new(HashMap::new()));
-
-    {
-      profile!("Processing diff changes");
-      self.print(DiffFormat::Patch, |diff, _hunk, line| {
-        let content = line.content().to_utf8();
-        let mut line_content = string_pool.lock().get();
-        match line.origin() {
-          '+' | '-' => line_content.push_str(&content),
-          _ => {
-            line_content.push_str("context: ");
-            line_content.push_str(&content);
-          }
-        };
-
-        let mut files = files.lock();
-        let entry = files
-          .entry(diff.path())
-          .or_insert_with(|| String::with_capacity(4096));
-        entry.push_str(&line_content);
-        string_pool.lock().put(line_content);
-        true
-      })?;
-    }
-
-    // Step 2: Move data out of thread-safe containers and sort by token count
-    let files = Arc::try_unwrap(files)
-      .expect("Arc still has multiple owners")
-      .into_inner();
-
-    // Pre-compute token counts and sort files by size
-    let model = Arc::new(model);
-    let mut files_with_tokens: Vec<_> = files
+    // Step 2: Prepare files for processing
+    let mut files_with_tokens: DiffData = files
       .into_iter()
       .map(|(path, content)| {
         let token_count = model.count_tokens(&content).unwrap_or_default();
@@ -154,86 +162,40 @@ impl PatchDiff for Diff<'_> {
       })
       .collect();
 
-    // Sort by token count (smaller diffs first)
     files_with_tokens.sort_by_key(|(_, _, count)| *count);
+
+    // Step 3: Process files in parallel
+    let thread_pool = rayon::ThreadPoolBuilder::new()
+      .num_threads(num_cpus::get())
+      .build()
+      .context("Failed to create thread pool")?;
 
     let total_files = files_with_tokens.len();
     let remaining_tokens = Arc::new(AtomicUsize::new(max_tokens));
     let result_chunks = Arc::new(Mutex::new(Vec::with_capacity(total_files)));
     let processed_files = Arc::new(AtomicUsize::new(0));
 
-    // Step 3: Parallel processing of files
-    {
-      profile!("Processing and truncating diffs");
+    let chunks: Vec<_> = files_with_tokens
+      .chunks(PARALLEL_CHUNK_SIZE)
+      .map(|chunk| chunk.to_vec())
+      .collect();
 
-      // Process files in parallel chunks
-      const CHUNK_SIZE: usize = 10;
-      let chunks: Vec<_> = files_with_tokens
-        .chunks(CHUNK_SIZE)
-        .map(|chunk| chunk.to_vec())
-        .collect();
+    let model = Arc::new(model);
 
-      // Process chunks in parallel
-      let processing_result: Result<()> = thread_pool.install(|| {
-        chunks.par_iter().try_for_each(|chunk| {
-          let mut chunk_results = Vec::with_capacity(chunk.len());
+    thread_pool.install(|| {
+      chunks
+        .par_iter()
+        .try_for_each(|chunk| process_chunk(chunk, &model, total_files, &processed_files, &remaining_tokens, &result_chunks))
+    })?;
 
-          for (path, content, token_count) in chunk {
-            // Calculate global file position and remaining files atomically
-            let current_file_num = processed_files.fetch_add(1, Ordering::SeqCst);
-            let files_remaining = total_files.saturating_sub(current_file_num);
-
-            if files_remaining == 0 {
-              continue;
-            }
-
-            // Calculate token budget with proper synchronization
-            let total_remaining = remaining_tokens.load(Ordering::SeqCst);
-            let max_tokens_per_file = total_remaining.saturating_div(files_remaining);
-
-            if max_tokens_per_file == 0 {
-              continue;
-            }
-
-            let token_count = *token_count;
-            let allocated_tokens = token_count.min(max_tokens_per_file);
-
-            // Try to claim tokens atomically with proper ordering
-            match remaining_tokens.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
-              if current >= allocated_tokens {
-                Some(current - allocated_tokens)
-              } else {
-                None
-              }
-            }) {
-              Ok(_) => {
-                // Process the file with allocated tokens
-                let processed_content = if token_count > allocated_tokens {
-                  model.truncate(content, allocated_tokens)?
-                } else {
-                  content.clone()
-                };
-                chunk_results.push((path.clone(), processed_content));
-              }
-              Err(_) => continue // Skip if we couldn't claim tokens
-            }
-          }
-
-          // Store results in order
-          if !chunk_results.is_empty() {
-            result_chunks.lock().extend(chunk_results);
-          }
-          Ok(())
-        })
-      });
-
-      // Handle any processing errors
-      processing_result?;
-    }
-
-    // Combine results in order
+    // Step 4: Combine results
     let results = result_chunks.lock();
-    let mut final_result = String::with_capacity(results.iter().map(|(_, content)| content.len()).sum());
+    let mut final_result = String::with_capacity(
+      results
+        .iter()
+        .map(|(_, content): &(PathBuf, String)| content.len())
+        .sum()
+    );
 
     for (_, content) in results.iter() {
       if !final_result.is_empty() {
@@ -244,24 +206,114 @@ impl PatchDiff for Diff<'_> {
 
     Ok(final_result)
   }
+
+  fn collect_diff_data(&self) -> Result<HashMap<PathBuf, String>> {
+    profile!("Processing diff changes");
+
+    let string_pool = Arc::new(Mutex::new(StringPool::new(DEFAULT_STRING_CAPACITY)));
+    let files = Arc::new(Mutex::new(HashMap::new()));
+
+    self.print(DiffFormat::Patch, |diff, _hunk, line| {
+      let content = line.content().to_utf8();
+      let mut line_content = string_pool.lock().get();
+
+      match line.origin() {
+        '+' | '-' => line_content.push_str(&content),
+        _ => {
+          line_content.push_str("context: ");
+          line_content.push_str(&content);
+        }
+      };
+
+      let mut files = files.lock();
+      let entry = files
+        .entry(diff.path())
+        .or_insert_with(|| String::with_capacity(DEFAULT_STRING_CAPACITY));
+      entry.push_str(&line_content);
+      string_pool.lock().put(line_content);
+      true
+    })?;
+
+    Ok(
+      Arc::try_unwrap(files)
+        .expect("Arc still has multiple owners")
+        .into_inner()
+    )
+  }
+}
+
+fn process_chunk(
+  chunk: &[(PathBuf, String, usize)], model: &Arc<Model>, total_files: usize, processed_files: &AtomicUsize,
+  remaining_tokens: &AtomicUsize, result_chunks: &Arc<Mutex<Vec<(PathBuf, String)>>>
+) -> Result<()> {
+  let mut chunk_results = Vec::with_capacity(chunk.len());
+
+  for (path, content, token_count) in chunk {
+    let current_file_num = processed_files.fetch_add(1, Ordering::SeqCst);
+    let files_remaining = total_files.saturating_sub(current_file_num);
+
+    if files_remaining == 0 {
+      continue;
+    }
+
+    let total_remaining = remaining_tokens.load(Ordering::SeqCst);
+    let max_tokens_per_file = total_remaining.saturating_div(files_remaining);
+
+    if max_tokens_per_file == 0 {
+      continue;
+    }
+
+    let token_count = *token_count;
+    let allocated_tokens = token_count.min(max_tokens_per_file);
+
+    if remaining_tokens
+      .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+        if current >= allocated_tokens {
+          Some(current - allocated_tokens)
+        } else {
+          None
+        }
+      })
+      .is_ok()
+    {
+      let processed_content = if token_count > allocated_tokens {
+        model.truncate(content, allocated_tokens)?
+      } else {
+        content.clone()
+      };
+      chunk_results.push((path.clone(), processed_content));
+    }
+  }
+
+  if !chunk_results.is_empty() {
+    result_chunks.lock().extend(chunk_results);
+  }
+  Ok(())
 }
 
 pub trait PatchRepository {
   fn to_patch(&self, tree: Option<Tree<'_>>, max_token_count: usize, model: Model) -> Result<String>;
   fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>>;
+  fn configure_diff_options(&self, opts: &mut DiffOptions);
 }
 
 impl PatchRepository for Repository {
   fn to_patch(&self, tree: Option<Tree>, max_token_count: usize, model: Model) -> Result<String> {
     profile!("Repository patch generation");
-    // Generate diff and process it
-    let diff = self.to_diff(tree)?;
-    diff.to_patch(max_token_count, model)
+    self.to_diff(tree)?.to_patch(max_token_count, model)
   }
 
   fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>> {
     profile!("Git diff generation");
     let mut opts = DiffOptions::new();
+    self.configure_diff_options(&mut opts);
+
+    self
+      .diff_tree_to_index(tree.as_ref(), None, Some(&mut opts))
+      .context("Failed to get diff")
+  }
+
+  fn configure_diff_options(&self, opts: &mut DiffOptions) {
     opts
       .ignore_whitespace_change(true)
       .recurse_untracked_dirs(false)
@@ -277,42 +329,7 @@ impl PatchRepository for Repository {
       .context_lines(0)
       .patience(true)
       .minimal(true);
-
-    self
-      .diff_tree_to_index(tree.as_ref(), None, Some(&mut opts))
-      .context("Failed to get diff")
   }
-}
-
-#[derive(StructOpt, Debug)]
-#[structopt(name = "commit-msg-hook", about = "A tool for generating commit messages.")]
-pub struct Args {
-  pub commit_msg_file: PathBuf,
-
-  #[structopt(short = "t", long = "type")]
-  pub commit_type: Option<String>,
-
-  #[structopt(short = "s", long = "sha1")]
-  pub sha1: Option<String>
-}
-
-#[derive(Error, Debug)]
-pub enum HookError {
-  #[error("Failed to open repository")]
-  OpenRepository,
-
-  #[error("Failed to get patch")]
-  GetPatch,
-
-  #[error("Empty diff output")]
-  EmptyDiffOutput,
-
-  #[error("Failed to write commit message")]
-  WriteCommitMessage,
-
-  // anyhow
-  #[error(transparent)]
-  Anyhow(#[from] anyhow::Error)
 }
 
 #[cfg(test)]
@@ -337,21 +354,15 @@ mod tests {
   #[test]
   fn test_string_pool_put_and_get() {
     let mut pool = StringPool::new(10);
-
-    // Put a string in the pool
     let mut s1 = String::with_capacity(10);
     s1.push_str("test");
     pool.put(s1);
 
-    // The pool should have one string
     assert_eq!(pool.strings.len(), 1);
 
-    // Get should return the pooled string
     let s2 = pool.get();
     assert_eq!(s2.capacity(), 10);
-    assert_eq!(s2.len(), 0); // String should be cleared
-
-    // Pool should be empty now
+    assert_eq!(s2.len(), 0);
     assert_eq!(pool.strings.len(), 0);
   }
 
@@ -359,12 +370,10 @@ mod tests {
   fn test_string_pool_limit() {
     let mut pool = StringPool::new(10);
 
-    // Add more than 100 strings
     for _ in 0..150 {
       pool.put(String::with_capacity(10));
     }
 
-    // Pool should be limited to 100 strings
-    assert_eq!(pool.strings.len(), 100);
+    assert_eq!(pool.strings.len(), MAX_POOL_SIZE);
   }
 }
