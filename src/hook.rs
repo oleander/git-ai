@@ -139,25 +139,36 @@ impl PatchDiff for Diff<'_> {
       })?;
     }
 
-    // Step 2: Move data out of thread-safe containers
+    // Step 2: Move data out of thread-safe containers and sort by token count
     let files = Arc::try_unwrap(files)
       .expect("Arc still has multiple owners")
       .into_inner();
 
-    let total_files = files.len();
+    // Pre-compute token counts and sort files by size
+    let model = Arc::new(model);
+    let mut files_with_tokens: Vec<_> = files
+      .into_iter()
+      .map(|(path, content)| {
+        let token_count = model.count_tokens(&content).unwrap_or_default();
+        (path, content, token_count)
+      })
+      .collect();
+
+    // Sort by token count (smaller diffs first)
+    files_with_tokens.sort_by_key(|(_, _, count)| *count);
+
+    let total_files = files_with_tokens.len();
     let remaining_tokens = Arc::new(AtomicUsize::new(max_tokens));
     let result_chunks = Arc::new(Mutex::new(Vec::with_capacity(total_files)));
+    let processed_files = Arc::new(AtomicUsize::new(0));
 
     // Step 3: Parallel processing of files
     {
       profile!("Processing and truncating diffs");
-      let model = Arc::new(model);
 
       // Process files in parallel chunks
       const CHUNK_SIZE: usize = 10;
-      let chunks: Vec<_> = files
-        .into_iter() // Convert to owned chunks
-        .collect::<Vec<_>>()
+      let chunks: Vec<_> = files_with_tokens
         .chunks(CHUNK_SIZE)
         .map(|chunk| chunk.to_vec())
         .collect();
@@ -165,47 +176,47 @@ impl PatchDiff for Diff<'_> {
       // Process chunks in parallel
       let processing_result: Result<()> = thread_pool.install(|| {
         chunks.par_iter().try_for_each(|chunk| {
-          // Pre-compute token counts for the chunk
-          let token_counts: Vec<_> = chunk
-            .par_iter()
-            .map(|(path, content)| {
-              let model = Arc::clone(&model);
-              let count = model.count_tokens(content).unwrap_or_default();
-              (path.clone(), count)
-            })
-            .collect();
-
-          // Process files in the chunk
           let mut chunk_results = Vec::with_capacity(chunk.len());
-          for (idx, ((path, content), (_, token_count))) in chunk.iter().zip(token_counts.iter()).enumerate() {
-            // Calculate token budget atomically
-            let total_remaining = remaining_tokens.load(Ordering::Relaxed);
-            let files_remaining = total_files.saturating_sub(idx);
+
+          for (path, content, token_count) in chunk {
+            // Calculate global file position and remaining files atomically
+            let current_file_num = processed_files.fetch_add(1, Ordering::SeqCst);
+            let files_remaining = total_files.saturating_sub(current_file_num);
+
+            if files_remaining == 0 {
+              continue;
+            }
+
+            // Calculate token budget with proper synchronization
+            let total_remaining = remaining_tokens.load(Ordering::SeqCst);
             let max_tokens_per_file = total_remaining.saturating_div(files_remaining);
 
             if max_tokens_per_file == 0 {
-              continue; // Skip this file if no tokens left
+              continue;
             }
 
             let token_count = *token_count;
             let allocated_tokens = token_count.min(max_tokens_per_file);
 
-            // Try to claim tokens atomically
-            let old_remaining = remaining_tokens.fetch_sub(allocated_tokens, Ordering::Relaxed);
-            if old_remaining < allocated_tokens {
-              // Restore tokens if we couldn't claim them
-              remaining_tokens.fetch_add(allocated_tokens, Ordering::Relaxed);
-              continue;
+            // Try to claim tokens atomically with proper ordering
+            match remaining_tokens.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+              if current >= allocated_tokens {
+                Some(current - allocated_tokens)
+              } else {
+                None
+              }
+            }) {
+              Ok(_) => {
+                // Process the file with allocated tokens
+                let processed_content = if token_count > allocated_tokens {
+                  model.truncate(content, allocated_tokens)?
+                } else {
+                  content.clone()
+                };
+                chunk_results.push((path.clone(), processed_content));
+              }
+              Err(_) => continue // Skip if we couldn't claim tokens
             }
-
-            // Process the file with allocated tokens
-            let processed_content = if token_count > allocated_tokens {
-              model.truncate(content, allocated_tokens)?
-            } else {
-              content.clone()
-            };
-
-            chunk_results.push((path.clone(), processed_content));
           }
 
           // Store results in order
