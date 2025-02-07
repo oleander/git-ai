@@ -1,9 +1,6 @@
-use std::io::Write;
 use std::path::PathBuf;
-use std::fs::File;
 
 use serde::{Deserialize, Serialize};
-use config::{Config, FileFormat};
 use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use console::Emoji;
@@ -50,42 +47,6 @@ lazy_static! {
   pub static ref CONFIG_DIR: PathBuf = home::home_dir().unwrap().join(".config/git-ai");
   pub static ref APP: AppConfig = load_config().unwrap_or_default();
   pub static ref CONFIG_PATH: PathBuf = CONFIG_DIR.join("config.ini");
-}
-
-impl AppConfig {
-  pub fn new() -> Result<Self> {
-    dotenv::dotenv().ok();
-
-    if !CONFIG_DIR.exists() {
-      std::fs::create_dir_all(CONFIG_DIR.to_str().unwrap()).context("Failed to create config directory")?;
-      File::create(CONFIG_PATH.to_str().unwrap()).context("Failed to create config file")?;
-    } else if !CONFIG_PATH.exists() {
-      File::create(CONFIG_PATH.to_str().unwrap()).context("Failed to create config file")?;
-    }
-
-    let config = Config::builder()
-      .add_source(config::Environment::with_prefix("APP").try_parsing(true))
-      .add_source(config::File::new(CONFIG_PATH.to_str().unwrap(), FileFormat::Ini))
-      .set_default("language", "en")?
-      .set_default("timeout", 30)?
-      .set_default("max_commit_length", 72)?
-      .set_default("max_tokens", 2024)?
-      .set_default("model", "gpt-4o")?
-      .set_default("openai_api_key", "<PLACE HOLDER FOR YOUR API KEY>")?
-      .build()?;
-
-    config
-      .try_deserialize()
-      .context("Failed to deserialize existing config. Please run `git ai config reset` and try again")
-  }
-
-  pub fn save(&self) -> Result<()> {
-    let contents = serde_ini::to_string(&self).context(format!("Failed to serialize config: {:?}", self))?;
-    let mut file = File::create(CONFIG_PATH.to_str().unwrap()).context("Failed to create config file")?;
-    file
-      .write_all(contents.as_bytes())
-      .context("Failed to write config file")
-  }
 }
 
 pub fn run_reset() -> Result<()> {
