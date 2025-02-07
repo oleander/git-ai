@@ -314,3 +314,57 @@ pub enum HookError {
   #[error(transparent)]
   Anyhow(#[from] anyhow::Error)
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_string_pool_new() {
+    let pool = StringPool::new(100);
+    assert_eq!(pool.strings.len(), 0);
+    assert_eq!(pool.capacity, 100);
+  }
+
+  #[test]
+  fn test_string_pool_get() {
+    let mut pool = StringPool::new(10);
+    let s1 = pool.get();
+    assert_eq!(s1.capacity(), 10);
+    assert_eq!(s1.len(), 0);
+  }
+
+  #[test]
+  fn test_string_pool_put_and_get() {
+    let mut pool = StringPool::new(10);
+
+    // Put a string in the pool
+    let mut s1 = String::with_capacity(10);
+    s1.push_str("test");
+    pool.put(s1);
+
+    // The pool should have one string
+    assert_eq!(pool.strings.len(), 1);
+
+    // Get should return the pooled string
+    let s2 = pool.get();
+    assert_eq!(s2.capacity(), 10);
+    assert_eq!(s2.len(), 0); // String should be cleared
+
+    // Pool should be empty now
+    assert_eq!(pool.strings.len(), 0);
+  }
+
+  #[test]
+  fn test_string_pool_limit() {
+    let mut pool = StringPool::new(10);
+
+    // Add more than 100 strings
+    for _ in 0..150 {
+      pool.put(String::with_capacity(10));
+    }
+
+    // Pool should be limited to 100 strings
+    assert_eq!(pool.strings.len(), 100);
+  }
+}
