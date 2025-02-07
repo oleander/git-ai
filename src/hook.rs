@@ -10,6 +10,7 @@ use anyhow::{bail, Context, Result};
 use thiserror::Error;
 use rayon::prelude::*;
 use parking_lot::Mutex;
+use num_cpus;
 
 use crate::model::Model;
 use crate::profile;
@@ -103,14 +104,22 @@ pub trait PatchDiff {
 impl PatchDiff for Diff<'_> {
   fn to_patch(&self, max_tokens: usize, model: Model) -> Result<String> {
     profile!("Generating patch diff");
-    let pool = Arc::new(Mutex::new(StringPool::new(4096)));
+
+    // Create thread pool for parallel operations
+    let thread_pool = rayon::ThreadPoolBuilder::new()
+      .num_threads(num_cpus::get())
+      .build()
+      .unwrap();
+
+    // Step 1: Collect all diff data into thread-safe structures
+    let string_pool = Arc::new(Mutex::new(StringPool::new(4096)));
     let files = Arc::new(Mutex::new(HashMap::new()));
 
     {
       profile!("Processing diff changes");
       self.print(DiffFormat::Patch, |diff, _hunk, line| {
         let content = line.content().to_utf8();
-        let mut line_content = pool.lock().get();
+        let mut line_content = string_pool.lock().get();
         match line.origin() {
           '+' | '-' => line_content.push_str(&content),
           _ => {
@@ -124,12 +133,12 @@ impl PatchDiff for Diff<'_> {
           .entry(diff.path())
           .or_insert_with(|| String::with_capacity(4096));
         entry.push_str(&line_content);
-        pool.lock().put(line_content);
+        string_pool.lock().put(line_content);
         true
       })?;
     }
 
-    // Get the files out of Arc<Mutex>
+    // Step 2: Move data out of thread-safe containers
     let files = Arc::try_unwrap(files)
       .expect("Arc still has multiple owners")
       .into_inner();
@@ -138,13 +147,12 @@ impl PatchDiff for Diff<'_> {
     let mut remaining_tokens = max_tokens;
     let total_files = files.len();
 
+    // Step 3: Parallel processing of file chunks
     {
       profile!("Processing and truncating diffs");
-
-      // Convert model to Arc for thread-safe sharing
       let model = Arc::new(model);
 
-      // Process files in chunks to maintain better memory usage
+      // Process files in parallel chunks
       const CHUNK_SIZE: usize = 10;
       let chunks: Vec<_> = files
         .iter()
@@ -153,22 +161,24 @@ impl PatchDiff for Diff<'_> {
         .map(|chunk| chunk.to_vec())
         .collect();
 
-      // Pre-compute token counts in parallel by chunks
-      let file_tokens: HashMap<PathBuf, usize> = chunks
-        .par_iter()
-        .flat_map(|chunk| {
-          chunk
-            .par_iter()
-            .map(|(path, content)| {
-              let model = Arc::clone(&model);
-              let count = model.count_tokens(content).unwrap_or_default();
-              ((*path).clone(), count)
-            })
-            .collect::<Vec<_>>()
-        })
-        .collect();
+      // Pre-compute token counts in parallel
+      let file_tokens: HashMap<PathBuf, usize> = thread_pool.install(|| {
+        chunks
+          .par_iter()
+          .flat_map(|chunk| {
+            chunk
+              .par_iter()
+              .map(|(path, content)| {
+                let model = Arc::clone(&model);
+                let count = model.count_tokens(content).unwrap_or_default();
+                ((*path).clone(), count)
+              })
+              .collect::<Vec<_>>()
+          })
+          .collect()
+      });
 
-      // Process files sequentially since we need to maintain token budget
+      // Process files sequentially to maintain token budget
       for (index, (path, diff)) in files.iter().enumerate() {
         let files_remaining = total_files.saturating_sub(index);
         let max_tokens_per_file = remaining_tokens.saturating_div(files_remaining);
@@ -180,8 +190,9 @@ impl PatchDiff for Diff<'_> {
         let file_token_count = file_tokens.get(path).copied().unwrap_or_default();
         let file_allocated_tokens = file_token_count.min(max_tokens_per_file);
 
+        // Parallel truncation if needed
         let truncated_content = if file_token_count > file_allocated_tokens {
-          model.truncate(diff, file_allocated_tokens)?
+          thread_pool.install(|| model.truncate(diff, file_allocated_tokens))?
         } else {
           diff.clone()
         };
@@ -206,7 +217,9 @@ pub trait PatchRepository {
 impl PatchRepository for Repository {
   fn to_patch(&self, tree: Option<Tree>, max_token_count: usize, model: Model) -> Result<String> {
     profile!("Repository patch generation");
-    self.to_diff(tree)?.to_patch(max_token_count, model)
+    // Generate diff and process it
+    let diff = self.to_diff(tree)?;
+    diff.to_patch(max_token_count, model)
   }
 
   fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>> {
