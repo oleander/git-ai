@@ -105,7 +105,7 @@ impl Args {
       bail!("No changes to commit");
     }
 
-    let response = commit::generate(patch.to_string(), remaining_tokens, model).await?;
+    let response = commit::generate_commit_message(patch.to_string(), remaining_tokens, model).await?;
     std::fs::write(&self.commit_msg_file, response.response.trim())?;
     pb.finish_and_clear();
 
@@ -124,7 +124,7 @@ impl Args {
           .clone()
           .unwrap_or("gpt-4o".to_string())
           .into();
-        let used_tokens = commit::token_used(&model)?;
+        let used_tokens = commit::get_instruction_token_count(&model)?;
         let max_tokens = config::APP.max_tokens.unwrap_or(model.context_size());
         let remaining_tokens = max_tokens.saturating_sub(used_tokens);
 

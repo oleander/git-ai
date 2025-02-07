@@ -9,10 +9,10 @@ use tiktoken_rs::model::get_context_size;
 
 use crate::profile;
 
-// Model identifiers
-const GPT4: &str = "gpt-4";
-const GPT4O: &str = "gpt-4o";
-const GPT4OMINI: &str = "gpt-4o-mini";
+// Model identifiers - using screaming case for constants
+const MODEL_GPT4: &str = "gpt-4";
+const MODEL_GPT4_OPTIMIZED: &str = "gpt-4o";
+const MODEL_GPT4_MINI: &str = "gpt-4o-mini";
 
 /// Represents the available AI models for commit message generation.
 /// Each model has different capabilities and token limits.
@@ -20,9 +20,9 @@ const GPT4OMINI: &str = "gpt-4o-mini";
 pub enum Model {
   /// Standard GPT-4 model
   GPT4,
-  /// Optimized GPT-4 model
+  /// Optimized GPT-4 model for better performance
   GPT4o,
-  /// Default model - Mini version of optimized GPT-4
+  /// Default model - Mini version of optimized GPT-4 for faster processing
   #[default]
   GPT4oMini
 }
@@ -38,10 +38,11 @@ impl Model {
   /// * `Result<usize>` - The number of tokens or an error
   pub fn count_tokens(&self, text: &str) -> Result<usize> {
     profile!("Count tokens");
+    let model_str: &str = self.into();
     Ok(
       self
         .context_size()
-        .saturating_sub(get_completion_max_tokens(self.into(), text)?)
+        .saturating_sub(get_completion_max_tokens(model_str, text)?)
     )
   }
 
@@ -51,52 +52,54 @@ impl Model {
   /// * `usize` - The maximum number of tokens the model can process
   pub fn context_size(&self) -> usize {
     profile!("Get context size");
-    get_context_size(self.into())
+    let model_str: &str = self.into();
+    get_context_size(model_str)
   }
 
   /// Truncates the given text to fit within the specified token limit.
   ///
   /// # Arguments
-  /// * `diff` - The text to truncate
+  /// * `text` - The text to truncate
   /// * `max_tokens` - The maximum number of tokens allowed
   ///
   /// # Returns
   /// * `Result<String>` - The truncated text or an error
-  pub(crate) fn truncate(&self, diff: &str, max_tokens: usize) -> Result<String> {
+  pub(crate) fn truncate(&self, text: &str, max_tokens: usize) -> Result<String> {
     profile!("Truncate text");
-    self.walk_truncate(diff, max_tokens, usize::MAX)
+    self.walk_truncate(text, max_tokens, usize::MAX)
   }
 
   /// Recursively truncates text to fit within token limits while maintaining coherence.
+  /// Uses a binary search-like approach to find the optimal truncation point.
   ///
   /// # Arguments
-  /// * `diff` - The text to truncate
+  /// * `text` - The text to truncate
   /// * `max_tokens` - The maximum number of tokens allowed
   /// * `within` - The maximum allowed deviation from target token count
   ///
   /// # Returns
   /// * `Result<String>` - The truncated text or an error
-  pub(crate) fn walk_truncate(&self, diff: &str, max_tokens: usize, within: usize) -> Result<String> {
+  pub(crate) fn walk_truncate(&self, text: &str, max_tokens: usize, within: usize) -> Result<String> {
     profile!("Walk truncate iteration");
-    log::debug!("max_tokens: {}", max_tokens);
-    log::debug!("diff: {}", diff);
-    log::debug!("within: {}", within);
+    log::debug!("max_tokens: {}, within: {}", max_tokens, within);
 
-    let str = {
+    let truncated = {
       profile!("Split and join text");
-      diff
+      text
         .split_whitespace()
         .take(max_tokens)
         .collect::<Vec<&str>>()
         .join(" ")
     };
 
-    let offset = self.count_tokens(&str)?.saturating_sub(max_tokens);
+    let token_count = self.count_tokens(&truncated)?;
+    let offset = token_count.saturating_sub(max_tokens);
 
     if offset > within || offset == 0 {
-      Ok(str)
+      Ok(truncated)
     } else {
-      self.walk_truncate(diff, max_tokens + offset, within)
+      // Recursively adjust token count to get closer to target
+      self.walk_truncate(text, max_tokens + offset, within)
     }
   }
 }
@@ -104,9 +107,9 @@ impl Model {
 impl From<&Model> for &str {
   fn from(model: &Model) -> Self {
     match model {
-      Model::GPT4o => GPT4O,
-      Model::GPT4 => GPT4,
-      Model::GPT4oMini => GPT4OMINI
+      Model::GPT4o => MODEL_GPT4_OPTIMIZED,
+      Model::GPT4 => MODEL_GPT4,
+      Model::GPT4oMini => MODEL_GPT4_MINI
     }
   }
 }
@@ -116,10 +119,10 @@ impl FromStr for Model {
 
   fn from_str(s: &str) -> Result<Self> {
     match s.trim().to_lowercase().as_str() {
-      GPT4O => Ok(Model::GPT4o),
-      GPT4 => Ok(Model::GPT4),
-      GPT4OMINI => Ok(Model::GPT4oMini),
-      model => bail!("Invalid model: {}", model)
+      MODEL_GPT4_OPTIMIZED => Ok(Model::GPT4o),
+      MODEL_GPT4 => Ok(Model::GPT4),
+      MODEL_GPT4_MINI => Ok(Model::GPT4oMini),
+      model => bail!("Invalid model name: {}", model)
     }
   }
 }
@@ -130,6 +133,7 @@ impl Display for Model {
   }
 }
 
+// Implement conversion from string types to Model with fallback to default
 impl From<&str> for Model {
   fn from(s: &str) -> Self {
     s.parse().unwrap_or_default()
