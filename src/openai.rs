@@ -3,7 +3,7 @@ use async_openai::config::OpenAIConfig;
 use async_openai::Client;
 use anyhow::{Context, Result};
 
-use crate::config;
+use crate::{config, profile};
 use crate::model::Model;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -20,6 +20,7 @@ pub struct Request {
 }
 
 pub async fn call(request: Request) -> Result<Response> {
+  profile!("OpenAI API call");
   let api_key = config::APP
     .openai_api_key
     .clone()
@@ -29,8 +30,8 @@ pub async fn call(request: Request) -> Result<Response> {
   let client = Client::with_config(config);
 
   let request = CreateChatCompletionRequestArgs::default()
-    .model(request.model.to_string())
     .max_tokens(request.max_tokens)
+    .model(request.model.to_string())
     .messages([
       ChatCompletionRequestSystemMessageArgs::default()
         .content(request.system)
@@ -43,18 +44,23 @@ pub async fn call(request: Request) -> Result<Response> {
     ])
     .build()?;
 
-  let chat = client.chat().create(request).await?;
+  {
+    profile!("OpenAI request/response");
+    let response = client
+      .chat()
+      .create(request)
+      .await
+      .context("Failed to create chat completion")?;
 
-  let choise = chat
-    .choices
-    .first()
-    .context(format!("Failed to get response: {:?}", chat))?;
+    let content = response
+      .choices
+      .first()
+      .context("No choices returned")?
+      .message
+      .content
+      .clone()
+      .context("No content returned")?;
 
-  let response = choise
-    .message
-    .content
-    .clone()
-    .context("Failed to get response text")?;
-
-  Ok(Response { response })
+    Ok(Response { response: content })
+  }
 }

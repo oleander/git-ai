@@ -9,6 +9,7 @@ use anyhow::{bail, Context, Result};
 use thiserror::Error;
 
 use crate::model::Model;
+use crate::profile;
 
 pub trait FilePath {
   fn is_empty(&self) -> Result<bool> {
@@ -71,80 +72,87 @@ pub trait PatchDiff {
 
 impl PatchDiff for Diff<'_> {
   fn to_patch(&self, max_tokens: usize, model: Model) -> Result<String> {
+    profile!("Generating patch diff");
     let mut files: HashMap<PathBuf, String> = HashMap::new();
 
-    self
-      .print(DiffFormat::Patch, |diff, _hunk, line| {
-        let content = line.content();
-        let string = content.to_utf8();
+    {
+      profile!("Processing diff changes");
+      self
+        .print(DiffFormat::Patch, |diff, _hunk, line| {
+          let content = line.content();
+          let string = content.to_utf8();
 
-        // Include both changes and context, but prefix context lines with "context: "
-        // This helps the model understand the context while still identifying actual changes
-        let line_content = match line.origin() {
-          '+' | '-' => string,
-          _ => format!("context: {}", string)
-        };
+          // Include both changes and context, but prefix context lines with "context: "
+          // This helps the model understand the context while still identifying actual changes
+          let line_content = match line.origin() {
+            '+' | '-' => string,
+            _ => format!("context: {}", string)
+          };
 
-        match files.get(&diff.path()) {
-          Some(file_acc) => {
-            files.insert(diff.path(), file_acc.to_owned() + &line_content);
+          match files.get(&diff.path()) {
+            Some(file_acc) => {
+              files.insert(diff.path(), file_acc.to_owned() + &line_content);
+            }
+            None => {
+              files.insert(diff.path(), line_content);
+            }
           }
-          None => {
-            files.insert(diff.path(), line_content);
-          }
-        }
 
-        true
-      })
-      .context("Failed to print diff")?;
+          true
+        })
+        .context("Failed to print diff")?;
+    }
 
     let mut diffs: Vec<_> = files.values().collect();
 
-    // TODO: No unwrap
-    diffs.sort_by_key(|diff| model.count_tokens(diff).unwrap());
+    {
+      profile!("Sorting and truncating diffs");
+      // TODO: No unwrap
+      diffs.sort_by_key(|diff| model.count_tokens(diff).unwrap());
 
-    diffs
-      .iter()
-      .enumerate()
-      .try_fold(
-        (max_tokens, String::new(), files.len()),
-        |(remaining_tokens, mut final_diff, total_files), (index, diff)| {
-          let files_remaining = total_files.saturating_sub(index);
-          let max_tokens_per_file = remaining_tokens.saturating_div(files_remaining);
+      diffs
+        .iter()
+        .enumerate()
+        .try_fold(
+          (max_tokens, String::new(), files.len()),
+          |(remaining_tokens, mut final_diff, total_files), (index, diff)| {
+            let files_remaining = total_files.saturating_sub(index);
+            let max_tokens_per_file = remaining_tokens.saturating_div(files_remaining);
 
-          log::debug!("max_tokens_per_file: {}", max_tokens_per_file);
-          log::debug!("remaining_tokens: {}", remaining_tokens);
-          log::debug!("total_files: {}", total_files);
-          log::debug!("index: {}", index);
+            log::debug!("max_tokens_per_file: {}", max_tokens_per_file);
+            log::debug!("remaining_tokens: {}", remaining_tokens);
+            log::debug!("total_files: {}", total_files);
+            log::debug!("index: {}", index);
 
-          if max_tokens_per_file == 0 {
-            bail!("No tokens left to generate commit message. Try increasing the max-tokens configuration option using `git ai config set max-tokens <value>`");
+            if max_tokens_per_file == 0 {
+              bail!("No tokens left to generate commit message. Try increasing the max-tokens configuration option using `git ai config set max-tokens <value>`");
+            }
+
+            let file_token_count = model.count_tokens(diff).context("Failed to count diff tokens")?;
+            let token_limits = [file_token_count, max_tokens_per_file];
+            let file_allocated_tokens = token_limits.iter().min().unwrap();
+
+            // We have reached the token limit for the file: truncate
+            let truncated_diff = if file_token_count > *file_allocated_tokens {
+              model.truncate(diff, *file_allocated_tokens)
+            } else {
+              Ok((*diff).clone().to_owned()) // TODO: Better way?
+            };
+
+            log::debug!("file_token_count: {}", file_token_count);
+            log::debug!("file_allocated_tokens: {}", file_allocated_tokens);
+            log::debug!("diff: {}", diff);
+            log::debug!("truncated_diff: {:?}", truncated_diff);
+            log::debug!("remaining_tokens: {}", remaining_tokens);
+            log::debug!("final_diff: {}", final_diff);
+
+            final_diff += &("\n".to_owned() + &truncated_diff.context("Failed to truncate diff")?);
+
+            Ok((remaining_tokens.saturating_sub(*file_allocated_tokens), final_diff, total_files))
           }
-
-          let file_token_count = model.count_tokens(diff).context("Failed to count diff tokens")?;
-          let token_limits = [file_token_count, max_tokens_per_file];
-          let file_allocated_tokens = token_limits.iter().min().unwrap();
-
-          // We have reached the token limit for the file: truncate
-          let truncated_diff = if file_token_count > *file_allocated_tokens {
-            model.truncate(diff, *file_allocated_tokens)
-          } else {
-            Ok((*diff).clone().to_owned()) // TODO: Better way?
-          };
-
-          log::debug!("file_token_count: {}", file_token_count);
-          log::debug!("file_allocated_tokens: {}", file_allocated_tokens);
-          log::debug!("diff: {}", diff);
-          log::debug!("truncated_diff: {:?}", truncated_diff);
-          log::debug!("remaining_tokens: {}", remaining_tokens);
-          log::debug!("final_diff: {}", final_diff);
-
-          final_diff += &("\n".to_owned() + &truncated_diff.context("Failed to truncate diff")?);
-
-          Ok((remaining_tokens.saturating_sub(*file_allocated_tokens), final_diff, total_files))
-        }
-      )
-      .map(|(_, final_diff, _)| final_diff)
+        )
+        .map(|(_, final_diff, _)| final_diff)
+    }
   }
 }
 
@@ -155,10 +163,12 @@ pub trait PatchRepository {
 
 impl PatchRepository for Repository {
   fn to_patch(&self, tree: Option<Tree>, max_token_count: usize, model: Model) -> Result<String> {
+    profile!("Repository patch generation");
     self.to_diff(tree)?.to_patch(max_token_count, model)
   }
 
   fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>> {
+    profile!("Git diff generation");
     let mut opts = DiffOptions::new();
     opts
       .ignore_whitespace_change(true)
