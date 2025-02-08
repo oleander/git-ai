@@ -1,6 +1,7 @@
 #!/usr/bin/env fish
 
 set -x fish_trace 1
+set model "tavernari/git-commit-message:latest"
 
 # Load environment variables from .env.local if it exists
 if test -f .env.local
@@ -85,7 +86,7 @@ git-ai hook reinstall || fail "Hook reinstall failed"
 git-ai config reset
 git-ai config || echo "As expected"
 git-ai config set || echo "As expected"
-git-ai config set model gpt-4 || fail "Setting model failed"
+git-ai config set model $model || fail "Setting model failed"
 git-ai config set max-tokens 512 || fail "Setting max tokens failed"
 git-ai config set max-commit-length 1024 || fail "Setting max commit length failed"
 git-ai config set openai-api-key "$OPENAI_API_KEY" || fail "Setting OpenAI API key failed"

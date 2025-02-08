@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use serde_json;
 
 use crate::model::Model;
 use crate::ollama::OllamaClient;

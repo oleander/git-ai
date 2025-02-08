@@ -51,13 +51,12 @@ use structopt::StructOpt;
 use indicatif::ProgressBar;
 use anyhow::{bail, Context, Result};
 use git2::{Oid, Repository};
-use ai::commit;
+use ai::{commit, config};
 use ai::hook::*;
 use ai::model::Model;
-use ai::config;
 
 #[derive(Debug, PartialEq)]
-enum Source {
+pub enum Source {
   Message,
   Template,
   Merge,
@@ -86,25 +85,28 @@ pub struct Args {
   /// Path to the commit message file
   pub commit_msg_file: PathBuf,
 
-  /// Type of commit message to generate
-  #[structopt(short = "t", long = "type")]
-  pub commit_type: Option<String>,
+  /// Source of the commit message (message, template, merge, squash, commit)
+  #[structopt(name = "source")]
+  pub source: Option<String>,
 
   /// SHA1 of the commit to generate message for
-  #[structopt(short = "s", long = "sha1")]
+  #[structopt(name = "commit")]
   pub sha1: Option<String>
 }
 
 impl Args {
   pub async fn handle(&self) -> Result<()> {
+    // If source is "message", we should not generate a commit message
+    if self.source.as_deref() == Some("message") {
+      return Ok(());
+    }
+
     let repo = Repository::open_from_env().context("Failed to open repository")?;
     let pb = ProgressBar::new_spinner();
     pb.enable_steady_tick(Duration::from_millis(100));
 
     let app = config::App::new()?;
-    let model = app.model.as_deref()
-      .map(Model::from)
-      .unwrap_or_default();
+    let model = app.model.as_deref().map(Model::from).unwrap_or_default();
     let remaining_tokens = commit::token_used(&model)?;
 
     self
