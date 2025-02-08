@@ -270,7 +270,8 @@ fn process_chunk(
     };
 
     if max_tokens_per_file == 0 {
-      continue;
+      // Return early since no tokens are left for any remaining files
+      return Ok(());
     }
 
     let token_count = *token_count;
