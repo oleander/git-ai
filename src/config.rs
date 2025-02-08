@@ -109,31 +109,3 @@ impl App {
     self.save()
   }
 }
-
-// Public interface functions
-pub fn run_model(value: String) -> Result<()> {
-  App::new()?.update_model(value)
-}
-
-pub fn run_max_tokens(max_tokens: usize) -> Result<()> {
-  App::new()?.update_max_tokens(max_tokens)
-}
-
-pub fn run_max_commit_length(max_commit_length: usize) -> Result<()> {
-  App::new()?.update_max_commit_length(max_commit_length)
-}
-
-pub fn run_openai_api_key(value: String) -> Result<()> {
-  App::new()?.update_openai_api_key(value)
-}
-
-pub fn run_reset() -> Result<()> {
-  if !PATHS.file.exists() {
-    eprintln!("{} Configuration file does not exist!", Emoji("🤷", ":-)"));
-    return Ok(());
-  }
-
-  std::fs::remove_file(PATHS.file.to_str().unwrap()).context("Failed to remove config file")?;
-  println!("{} Configuration reset!", Emoji("✨", ":-)"));
-  Ok(())
-}

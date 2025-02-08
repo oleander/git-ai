@@ -105,7 +105,7 @@ impl Args {
       bail!("No changes to commit");
     }
 
-    let response = commit::generate_commit_message(patch.to_string(), remaining_tokens, model).await?;
+    let response = commit::generate(patch.to_string(), remaining_tokens, model).await?;
     std::fs::write(&self.commit_msg_file, response.response.trim())?;
     pb.finish_and_clear();
 
@@ -124,7 +124,7 @@ impl Args {
           .clone()
           .unwrap_or("gpt-4o".to_string())
           .into();
-        let used_tokens = commit::get_instruction_token_count(&model)?;
+        let used_tokens = commit::token_used(&model)?;
         let max_tokens = config::APP.max_tokens.unwrap_or(model.context_size());
         let remaining_tokens = max_tokens.saturating_sub(used_tokens);
 
@@ -153,16 +153,21 @@ impl Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-  env_logger::init();
+  if std::env::var("RUST_LOG").is_ok() {
+    env_logger::init();
+  }
 
   let time = std::time::Instant::now();
   let args = Args::from_args();
 
-  log::debug!("Arguments: {:?}", args);
+  if log::log_enabled!(log::Level::Debug) {
+    log::debug!("Arguments: {:?}", args);
+  }
+
   if let Err(err) = args.execute().await {
     eprintln!("{} ({:?})", err, time.elapsed());
     exit(1);
-  } else {
+  } else if log::log_enabled!(log::Level::Debug) {
     log::debug!("Completed in {:?}", time.elapsed());
   }
 

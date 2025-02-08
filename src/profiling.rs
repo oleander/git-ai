@@ -19,8 +19,10 @@ impl Profile {
 
 impl Drop for Profile {
   fn drop(&mut self) {
-    let duration = self.elapsed();
-    eprintln!("{}: {:.2?}", self.name.blue(), duration);
+    if log::log_enabled!(log::Level::Debug) {
+      let duration = self.elapsed();
+      eprintln!("{}: {:.2?}", self.name.blue(), duration);
+    }
   }
 }
 

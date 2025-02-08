@@ -3,8 +3,10 @@ use anyhow::Result;
 use ai::filesystem::Filesystem;
 use colored::*;
 
+#[allow(dead_code)]
 const EMOJI: Emoji<'_, '_> = Emoji("🔗", "");
 
+#[allow(dead_code)]
 pub fn run() -> Result<()> {
   let fs = Filesystem::new()?;
   let hook_bin = fs.git_ai_hook_bin_path()?;

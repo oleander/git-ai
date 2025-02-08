@@ -4,4 +4,6 @@ http-cacache/*
 .secrets
 .env.local
 ${env:TMPDIR}
-bin/
+tmp/
+finetune_verify.jsonl
+finetune_train.jsonl

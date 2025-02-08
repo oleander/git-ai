@@ -1,6 +1,7 @@
 use anyhow::{bail, Result};
 use ai::filesystem::Filesystem;
 
+#[allow(dead_code)]
 pub fn run() -> Result<()> {
   let fs = Filesystem::new()?;
   let hook_bin = fs.git_ai_hook_bin_path()?;

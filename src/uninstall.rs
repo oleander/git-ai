@@ -9,6 +9,7 @@ use git2::{Repository, RepositoryOpenFlags as Flags};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
+#[allow(dead_code)]
 pub enum InstallError {
   #[error("Failed to get current directory")]
   CurrentDir,
@@ -18,8 +19,10 @@ pub enum InstallError {
   HookExists(PathBuf)
 }
 
+#[allow(dead_code)]
 const EMOJI: Emoji<'_, '_> = Emoji("🔗", "");
 
+#[allow(dead_code)]
 pub fn run() -> Result<()> {
   let current_dir = env::current_dir().context(InstallError::CurrentDir)?;
   let repo = Repository::open_ext(current_dir, Flags::empty(), Vec::<&Path>::new()).context(InstallError::OpenRepo)?;
