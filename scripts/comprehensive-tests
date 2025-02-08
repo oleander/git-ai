@@ -164,7 +164,7 @@ last_commit | grep "$prev_commit" || fail "Amended commit message not found"
 # 5.2 Commit with template
 echo "Commit from template" >template.txt
 git add template.txt
-git commit -t template.txt --no-edit || true
+git commit -F template.txt || fail "Template commit failed"
 
 # 5.3 Squash commits
 echo "Squash test" >squash.txt
@@ -279,18 +279,28 @@ git commit -a --no-edit || fail "Directory to file commit failed"
 test_step "Bulk Operations"
 
 # 11.1 Many files
+echo "Creating and staging many files..."
 for i in (seq 1 100)
     echo "Content $i" >"file$i.txt"
 end
-git add .
-git commit -a --no-edit || fail "Many files commit failed"
+git add . || fail "Failed to add many files"
+git status --porcelain | grep -q "^A" || fail "No new files were staged"
+git commit --no-edit || fail "Many files commit failed"
+git status --porcelain | grep -q "^A" && fail "Files were not committed"
 
 # 11.2 Many changes
+echo "Creating and modifying large file..."
+echo "Initial content" >large_changes.txt
+git add large_changes.txt || fail "Failed to add initial large file"
+git commit -m "Initial large file" || fail "Failed to commit initial large file"
+
 for i in (seq 1 1000)
     echo "Line $i" >>large_changes.txt
 end
-git add large_changes.txt
-git commit -a --no-edit || fail "Many changes commit failed"
+git add large_changes.txt || fail "Failed to add large changes"
+git status --porcelain | grep -q "^M" || fail "No modifications were staged"
+git commit --no-edit || fail "Many changes commit failed"
+git status --porcelain | grep -q "^M" && fail "Changes were not committed"
 
 # Test 12: Source Type Handling
 test_step "Source Type Handling"
@@ -302,10 +312,10 @@ git commit -m "Explicit message" || fail "Message source commit failed"
 last_commit | grep "Explicit message" || fail "Message source was not respected"
 
 # 12.2 Template source (should not generate)
-echo "Template message" >template_msg.txt
-git add template_msg.txt
-git commit -t template.txt --no-edit || true
-last_commit | grep "Commit from template" || fail "Template source was not respected"
+echo "Template message" >template.txt
+git add template.txt
+git commit -F template.txt || fail "Template commit failed"
+last_commit | grep "Template message" || fail "Template source was not respected"
 
 # 12.3 Merge source (should not generate)
 git checkout -b test-merge-source || fail "Failed to create merge test branch"

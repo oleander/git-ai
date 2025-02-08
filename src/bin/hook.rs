@@ -42,13 +42,13 @@
 // Args { commit_msg_file: PathBuf::from(".git/COMMIT_EDITMSG"), source: Some(Source::Commit), sha1: Some("HEAD") }
 // Outcome: Opens the default text editor to allow modification of the most recent commit message. No new commit message is generated automatically; it depends on user input.
 
+use std::process::exit;
 use std::str::FromStr;
 use std::time::Duration;
 use std::path::PathBuf;
-use std::process;
 
 use structopt::StructOpt;
-use indicatif::ProgressBar;
+use indicatif::{ProgressBar, ProgressStyle};
 use anyhow::{bail, Context, Result};
 use git2::{Oid, Repository};
 use ai::{commit, config};
@@ -56,7 +56,7 @@ use ai::hook::*;
 use ai::model::Model;
 
 #[derive(Debug, PartialEq)]
-pub enum Source {
+enum Source {
   Message,
   Template,
   Merge,
@@ -80,46 +80,15 @@ impl FromStr for Source {
 }
 
 #[derive(StructOpt, Debug)]
-#[structopt(name = "git-ai-hook")]
-pub struct Args {
-  /// Path to the commit message file
-  pub commit_msg_file: PathBuf,
-
-  /// Source of the commit message (message, template, merge, squash, commit)
-  #[structopt(name = "source")]
-  pub source: Option<String>,
-
-  /// SHA1 of the commit to generate message for
-  #[structopt(name = "commit")]
-  pub sha1: Option<String>
+#[structopt(name = "commit-msg-hook")]
+struct Args {
+  #[structopt(parse(from_os_str))]
+  commit_msg_file: PathBuf,
+  source:          Option<Source>,
+  sha1:            Option<String>
 }
 
 impl Args {
-  pub async fn handle(&self) -> Result<()> {
-    // Parse the source string into our Source enum
-    let source = self.source.as_deref().map(Source::from_str).transpose()?;
-
-    // If source is Message, Template, Merge, or Squash, we should not generate a commit message
-    match source {
-      Some(Source::Message) | Some(Source::Template) | Some(Source::Merge) | Some(Source::Squash) => return Ok(()),
-      Some(Source::Commit) | None => {}
-    }
-
-    let repo = Repository::open_from_env().context("Failed to open repository")?;
-    let pb = ProgressBar::new_spinner();
-    pb.enable_steady_tick(Duration::from_millis(100));
-
-    let app = config::App::new()?;
-    let model = app.model.as_deref().map(Model::from).unwrap_or_default();
-    let remaining_tokens = commit::token_used(&model)?;
-
-    self
-      .handle_commit(&repo, &pb, model, remaining_tokens)
-      .await?;
-    pb.finish_and_clear();
-    Ok(())
-  }
-
   async fn handle_commit(&self, repo: &Repository, pb: &ProgressBar, model: Model, remaining_tokens: usize) -> Result<()> {
     let tree = match self.sha1.as_deref() {
       Some("HEAD") | None => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
@@ -147,30 +116,111 @@ impl Args {
     }
 
     let patch = repo
-      .to_commit_diff(tree)?
-      .to_patch(remaining_tokens, model)
-      .context("Failed to generate patch")?;
+      .to_patch(tree, remaining_tokens, model)
+      .context("Failed to get patch")?;
 
-    if patch.is_empty() {
+    let response = commit::generate(patch.to_string(), remaining_tokens, model).await?;
+    std::fs::write(&self.commit_msg_file, response.response.trim())?;
+
+    pb.finish_and_clear();
+
+    Ok(())
+  }
+
+  async fn execute(&self) -> Result<()> {
+    use Source::*;
+
+    if matches!(self.source, Some(Message) | Some(Template) | Some(Merge) | Some(Squash)) {
+      return Ok(());
+    }
+
+    let repo = Repository::open_from_env().context("Failed to open repository")?;
+    let model = config::APP
+      .model
+      .clone()
+      .unwrap_or("gpt-4o-mini".to_string())
+      .into();
+
+    let used_tokens = commit::token_used(&model)?;
+    let max_tokens = config::APP.max_tokens.unwrap_or(model.context_size());
+    let remaining_tokens = max_tokens.saturating_sub(used_tokens).max(512);
+
+    let tree = match self.sha1.as_deref() {
+      Some("HEAD") | None => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
+      Some(sha1) => {
+        // Try to resolve the reference first
+        if let Ok(obj) = repo.revparse_single(sha1) {
+          obj.peel_to_tree().ok()
+        } else {
+          // If not a reference, try as direct OID
+          repo
+            .find_object(Oid::from_str(sha1)?, None)
+            .ok()
+            .and_then(|obj| obj.peel_to_tree().ok())
+        }
+      }
+    };
+
+    let diff = repo.to_diff(tree.clone())?;
+    if diff.is_empty()? {
+      if self.source == Some(Commit) {
+        // For amend operations, we want to keep the existing message
+        return Ok(());
+      }
       bail!("No changes to commit");
     }
 
-    pb.set_message("Generating commit message...");
-    let response = commit::generate(patch, remaining_tokens, model).await?;
-    pb.set_message("Writing commit message...");
+    let pb = ProgressBar::new_spinner();
+    let style = ProgressStyle::default_spinner()
+      .tick_strings(&["-", "\\", "|", "/"])
+      .template("{spinner:.blue} {msg}")
+      .context("Failed to create progress bar style")?;
 
-    self.commit_msg_file.write(response.response)?;
+    pb.set_style(style);
+    pb.set_message("Generating commit message...");
+    pb.enable_steady_tick(Duration::from_millis(150));
+
+    if !std::fs::read_to_string(&self.commit_msg_file)?
+      .trim()
+      .is_empty()
+    {
+      log::debug!("A commit message has already been provided");
+      pb.finish_and_clear();
+      return Ok(());
+    }
+
+    let patch = repo
+      .to_patch(tree, remaining_tokens, model)
+      .context("Failed to get patch")?;
+
+    let response = commit::generate(patch.to_string(), remaining_tokens, model).await?;
+    std::fs::write(&self.commit_msg_file, response.response.trim())?;
+
+    pb.finish_and_clear();
+
     Ok(())
   }
 }
 
 #[tokio::main]
-async fn main() {
-  env_logger::init();
+async fn main() -> Result<()> {
+  if std::env::var("RUST_LOG").is_ok() {
+    env_logger::init();
+  }
+
+  let time = std::time::Instant::now();
   let args = Args::from_args();
 
-  if let Err(e) = args.handle().await {
-    eprintln!("Error: {}", e);
-    process::exit(1);
+  if log::log_enabled!(log::Level::Debug) {
+    log::debug!("Arguments: {:?}", args);
   }
+
+  if let Err(err) = args.execute().await {
+    eprintln!("{} ({:?})", err, time.elapsed());
+    exit(1);
+  } else if log::log_enabled!(log::Level::Debug) {
+    log::debug!("Completed in {:?}", time.elapsed());
+  }
+
+  Ok(())
 }

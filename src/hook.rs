@@ -215,12 +215,26 @@ impl PatchDiff for Diff<'_> {
     let string_pool = Arc::new(Mutex::new(StringPool::new(DEFAULT_STRING_CAPACITY)));
     let files = Arc::new(Mutex::new(HashMap::new()));
 
-    self.print(DiffFormat::Patch, |diff, _hunk, line| {
+    self.print(DiffFormat::Patch, |diff, hunk, line| {
       let content = line.content().to_utf8();
       let mut line_content = string_pool.lock().get();
 
+      // Add file status information
+      if let Some(hunk) = hunk {
+        if hunk.new_lines() > 0 && hunk.old_lines() == 0 {
+          line_content.push_str("new file: ");
+        }
+      }
+
       match line.origin() {
-        '+' | '-' => line_content.push_str(&content),
+        '+' => {
+          line_content.push('+');
+          line_content.push_str(&content);
+        }
+        '-' => {
+          line_content.push('-');
+          line_content.push_str(&content);
+        }
         _ => {
           line_content.push_str("context: ");
           line_content.push_str(&content);
@@ -235,6 +249,22 @@ impl PatchDiff for Diff<'_> {
       string_pool.lock().put(line_content);
       true
     })?;
+
+    // Handle empty files or files with no content changes
+    self.foreach(
+      &mut |delta, _| {
+        let mut files = files.lock();
+        if !files.contains_key(&delta.path()) {
+          if delta.status() == git2::Delta::Added {
+            files.insert(delta.path(), String::from("new empty file"));
+          }
+        }
+        true
+      },
+      None,
+      None,
+      None
+    )?;
 
     Ok(
       Arc::try_unwrap(files)
@@ -366,7 +396,7 @@ impl PatchRepository for Repository {
 
   fn configure_diff_options(&self, opts: &mut DiffOptions) {
     opts
-      .ignore_whitespace_change(true)
+      .ignore_whitespace_change(false)
       .recurse_untracked_dirs(true)
       .recurse_ignored_dirs(false)
       .ignore_whitespace_eol(true)
@@ -376,28 +406,28 @@ impl PatchRepository for Repository {
       .indent_heuristic(false)
       .ignore_submodules(true)
       .include_ignored(false)
-      .interhunk_lines(0)
-      .context_lines(0)
+      // .interhunk_lines(0)
+      // .context_lines(0)
       .patience(true)
-      .minimal(true);
+      .minimal(false);
   }
 
   fn configure_commit_diff_options(&self, opts: &mut DiffOptions) {
     opts
       .ignore_whitespace_change(false)
-      .recurse_untracked_dirs(false)
+      .recurse_untracked_dirs(true)
       .recurse_ignored_dirs(false)
-      .ignore_whitespace_eol(true)
-      .ignore_blank_lines(true)
+      .ignore_whitespace_eol(false)
+      .ignore_blank_lines(false)
       .include_untracked(false)
-      .ignore_whitespace(true)
-      .indent_heuristic(false)
+      .ignore_whitespace(false)
+      .indent_heuristic(true)
       .ignore_submodules(true)
       .include_ignored(false)
-      .interhunk_lines(0)
-      .context_lines(0)
+      // .interhunk_lines(1)
+      // .context_lines(3)
       .patience(true)
-      .minimal(true);
+      .minimal(false);
   }
 }
 
