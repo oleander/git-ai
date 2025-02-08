@@ -96,9 +96,13 @@ pub struct Args {
 
 impl Args {
   pub async fn handle(&self) -> Result<()> {
-    // If source is "message" or "merge", we should not generate a commit message
-    if self.source.as_deref() == Some("message") || self.source.as_deref() == Some("merge") {
-      return Ok(());
+    // Parse the source string into our Source enum
+    let source = self.source.as_deref().map(Source::from_str).transpose()?;
+
+    // If source is Message, Template, Merge, or Squash, we should not generate a commit message
+    match source {
+      Some(Source::Message) | Some(Source::Template) | Some(Source::Merge) | Some(Source::Squash) => return Ok(()),
+      Some(Source::Commit) | None => {}
     }
 
     let repo = Repository::open_from_env().context("Failed to open repository")?;

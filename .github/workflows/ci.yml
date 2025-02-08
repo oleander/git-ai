@@ -88,14 +88,20 @@ jobs:
         run: curl -fsSL https://ollama.com/install.sh | sh
 
       - name: Run ollama
+        if: startsWith(matrix.os, 'linux')
         run: |
           ollama serve &
           ollama pull SlyOtis/git-auto-message:latest
 
-      - name: Run integration tests
+      - name: Run comprehensive tests
         run: |
-          ./scripts/integration-tests
           cargo build --release
           cargo test --release
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Run integration tests (linux)
+        if: startsWith(matrix.os, 'linux')
+        run: ./scripts/integration-tests
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
