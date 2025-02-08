@@ -1,6 +1,6 @@
 [package]
 name = "git-ai"
-version = "0.2.57"
+version = "0.2.60"
 edition = "2021"
 description = "Git AI: Automates commit messages using ChatGPT. Stage your files, and Git AI generates the messages."
 license = "MIT"
@@ -26,11 +26,12 @@ path = "src/bin/hook.rs"
 
 [dependencies]
 # Core functionality
-anyhow = "1.0.95"
+anyhow = { version = "1.0.95", features = ["backtrace"] }
 thiserror = "2.0.11"
 tokio = { version = "1.43", features = ["full"] }
 futures = "0.3"
 parking_lot = "0.12.3"
+maplit = "1.0.2"
 
 # CLI and UI
 structopt = "0.3.26"
@@ -39,6 +40,7 @@ console = { version = "0.15.10", default-features = false }
 indicatif = { version = "0.17.11", default-features = false }
 log = "0.4.25"
 env_logger = { version = "0.11.6", default-features = false }
+tracing = "0.1"
 
 # Git integration
 git2 = { version = "0.20.0", default-features = false }
@@ -73,6 +75,7 @@ syntect = { version = "5.2", default-features = false, features = [
 pulldown-cmark = "0.12"
 comrak = "0.35"
 textwrap = "0.16"
+mustache = "0.9.0"
 
 [dev-dependencies]
 tempfile = "3.16.0"

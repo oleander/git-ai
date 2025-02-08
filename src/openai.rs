@@ -1,9 +1,7 @@
 use async_openai::types::{ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs};
 use async_openai::config::OpenAIConfig;
 use async_openai::Client;
-use async_openai::error::OpenAIError;
 use anyhow::{anyhow, Context, Result};
-use colored::*;
 
 use crate::{config, profile};
 use crate::model::Model;
@@ -47,7 +45,7 @@ pub async fn generate_commit_message(diff: &str, prompt: &str, file_context: &st
   })
   .await?;
 
-  Ok(response.response.trim().to_string())
+  Ok(response.trim().to_string())
 }
 
 /// Scores a commit message against the original using AI evaluation
@@ -70,7 +68,7 @@ pub async fn score_commit_message(message: &str, original: &str) -> Result<f32> 
   .await?;
 
   // Parse the JSON response to get the overall score
-  let parsed: serde_json::Value = serde_json::from_str(&response.response).context("Failed to parse scoring response as JSON")?;
+  let parsed: serde_json::Value = serde_json::from_str(&response).context("Failed to parse scoring response as JSON")?;
 
   let accuracy = parsed["accuracy"].as_f64().unwrap_or(0.0) as f32;
   let clarity = parsed["clarity"].as_f64().unwrap_or(0.0) as f32;
@@ -100,7 +98,7 @@ pub async fn optimize_prompt(current_prompt: &str, performance_metrics: &str) ->
   })
   .await?;
 
-  Ok(response.response.trim().to_string())
+  Ok(response.trim().to_string())
 }
 
 fn truncate_to_fit(text: &str, max_tokens: usize, model: &Model) -> Result<String> {
@@ -110,19 +108,25 @@ fn truncate_to_fit(text: &str, max_tokens: usize, model: &Model) -> Result<Strin
   }
 
   let lines: Vec<&str> = text.lines().collect();
+  if lines.is_empty() {
+    return Ok(String::new());
+  }
 
   // Try increasingly aggressive truncation until we fit
   for attempt in 0..MAX_ATTEMPTS {
-    let portion_size = match attempt {
-      0 => lines.len() / 8,  // First try: Keep 25% (12.5% each end)
-      1 => lines.len() / 12, // Second try: Keep ~16% (8% each end)
-      _ => lines.len() / 20  // Final try: Keep 10% (5% each end)
+    let keep_lines = match attempt {
+      0 => lines.len() * 3 / 4, // First try: Keep 75%
+      1 => lines.len() / 2,     // Second try: Keep 50%
+      _ => lines.len() / 4      // Final try: Keep 25%
     };
 
+    if keep_lines == 0 {
+      break;
+    }
+
     let mut truncated = Vec::new();
-    truncated.extend(lines.iter().take(portion_size));
+    truncated.extend(lines.iter().take(keep_lines));
     truncated.push("... (truncated for length) ...");
-    truncated.extend(lines.iter().rev().take(portion_size).rev());
 
     let result = truncated.join("\n");
     let new_token_count = model.count_tokens(&result)?;
@@ -132,24 +136,63 @@ fn truncate_to_fit(text: &str, max_tokens: usize, model: &Model) -> Result<Strin
     }
   }
 
-  // If all attempts failed, return a minimal version
+  // If standard truncation failed, do minimal version with iterative reduction
   let mut minimal = Vec::new();
-  minimal.extend(lines.iter().take(lines.len() / 50));
-  minimal.push("... (severely truncated for length) ...");
-  minimal.extend(lines.iter().rev().take(lines.len() / 50).rev());
-  Ok(minimal.join("\n"))
+  let mut current_size = lines.len() / 50; // Start with 2% of lines
+
+  while current_size > 0 {
+    minimal.clear();
+    minimal.extend(lines.iter().take(current_size));
+    minimal.push("... (severely truncated for length) ...");
+
+    let result = minimal.join("\n");
+    let new_token_count = model.count_tokens(&result)?;
+
+    if new_token_count <= max_tokens {
+      return Ok(result);
+    }
+
+    current_size /= 2; // Halve the size each time
+  }
+
+  // If everything fails, return just the truncation message
+  Ok("... (content too large, completely truncated) ...".to_string())
 }
 
-pub async fn call(request: Request) -> Result<Response> {
+/// Calls the OpenAI API with the given request
+///
+/// # Arguments
+/// * `request` - The request to send to the API
+///
+/// # Returns
+/// * `Result<String>` - The response from the API or an error
+pub async fn call(request: Request) -> Result<String> {
   profile!("OpenAI API call");
-  let api_key = config::APP.openai_api_key.clone().context(format!(
-    "{} OpenAI API key not found.\n    Run: {}",
-    "ERROR:".bold().bright_red(),
-    "git-ai config set openai-api-key <your-key>".yellow()
-  ))?;
+
+  let api_key = config::APP
+    .openai_api_key
+    .as_ref()
+    .ok_or_else(|| anyhow!("OpenAI API key not found. Please set OPENAI_API_KEY environment variable."))?;
 
   let config = OpenAIConfig::new().with_api_key(api_key);
   let client = Client::with_config(config);
+
+  for attempt in 1..=MAX_ATTEMPTS {
+    match try_call(&client, &request).await {
+      Ok(response) => return Ok(response),
+      Err(e) if attempt < MAX_ATTEMPTS => {
+        log::warn!("Attempt {} failed: {}. Retrying...", attempt, e);
+        continue;
+      }
+      Err(e) => return Err(e)
+    }
+  }
+
+  Err(anyhow!("Failed after {} attempts", MAX_ATTEMPTS))
+}
+
+pub async fn try_call<C: async_openai::config::Config>(client: &Client<C>, request: &Request) -> Result<String> {
+  profile!("OpenAI request/response");
 
   // Calculate available tokens for content
   let system_tokens = request.model.count_tokens(&request.system)?;
@@ -163,7 +206,7 @@ pub async fn call(request: Request) -> Result<Response> {
     .model(request.model.to_string())
     .messages([
       ChatCompletionRequestSystemMessageArgs::default()
-        .content(request.system)
+        .content(request.system.clone())
         .build()?
         .into(),
       ChatCompletionRequestUserMessageArgs::default()
@@ -173,55 +216,16 @@ pub async fn call(request: Request) -> Result<Response> {
     ])
     .build()?;
 
-  {
-    profile!("OpenAI request/response");
-    let response = match client.chat().create(request).await {
-      Ok(response) => response,
-      Err(err) => {
-        let error_msg = match err {
-          OpenAIError::ApiError(e) =>
-            format!(
-              "{} {}\n    {}\n\nDetails:\n    {}\n\nSuggested Actions:\n    1. {}\n    2. {}\n    3. {}",
-              "ERROR:".bold().bright_red(),
-              "OpenAI API error:".bright_white(),
-              e.message.dimmed(),
-              "Failed to create chat completion.".dimmed(),
-              "Ensure your OpenAI API key is valid".yellow(),
-              "Check your account credits".yellow(),
-              "Verify OpenAI service availability".yellow()
-            ),
-          OpenAIError::Reqwest(e) =>
-            format!(
-              "{} {}\n    {}\n\nDetails:\n    {}\n\nSuggested Actions:\n    1. {}\n    2. {}",
-              "ERROR:".bold().bright_red(),
-              "Network error:".bright_white(),
-              e.to_string().dimmed(),
-              "Failed to connect to OpenAI service.".dimmed(),
-              "Check your internet connection".yellow(),
-              "Verify OpenAI service is not experiencing downtime".yellow()
-            ),
-          _ =>
-            format!(
-              "{} {}\n    {}\n\nDetails:\n    {}",
-              "ERROR:".bold().bright_red(),
-              "Unexpected error:".bright_white(),
-              err.to_string().dimmed(),
-              "An unexpected error occurred while communicating with OpenAI.".dimmed()
-            ),
-        };
-        return Err(anyhow!(error_msg));
-      }
-    };
+  let response = client.chat().create(request).await?;
 
-    let content = response
-      .choices
-      .first()
-      .context("No choices returned")?
-      .message
-      .content
-      .clone()
-      .context("No content returned")?;
+  let content = response
+    .choices
+    .first()
+    .context("No response choices available")?
+    .message
+    .content
+    .clone()
+    .context("Response content is empty")?;
 
-    Ok(Response { response: content })
-  }
+  Ok(content)
 }

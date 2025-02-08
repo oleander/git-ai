@@ -1,34 +1,26 @@
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
-use colored::Colorize;
+use tracing::debug;
 
 pub struct Profile {
-  start: Instant,
-  name:  String
+  name:  String,
+  start: Instant
 }
 
 impl Profile {
-  pub fn new(name: impl Into<String>) -> Self {
-    Self { start: Instant::now(), name: name.into() }
-  }
-
-  pub fn elapsed(&self) -> Duration {
-    self.start.elapsed()
+  pub fn new(name: &str) -> Self {
+    Self { name: name.to_string(), start: Instant::now() }
   }
 }
 
 impl Drop for Profile {
   fn drop(&mut self) {
-    if log::log_enabled!(log::Level::Debug) {
-      let duration = self.elapsed();
-      eprintln!("{}: {:.2?}", self.name.blue(), duration);
-    }
+    let elapsed = self.start.elapsed();
+    debug!("{} took {:?}", self.name, elapsed);
   }
 }
 
-#[macro_export]
-macro_rules! profile {
-  ($name:expr) => {
-    let _profile = $crate::Profile::new($name);
-  };
+pub fn span(name: &str) -> Profile {
+  debug!("Starting {}", name);
+  Profile::new(name)
 }

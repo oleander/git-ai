@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -144,6 +145,7 @@ impl Utf8String for [u8] {
 pub trait PatchDiff {
   fn to_patch(&self, max_token_count: usize, model: Model) -> Result<String>;
   fn collect_diff_data(&self) -> Result<HashMap<PathBuf, String>>;
+  fn is_empty(&self) -> Result<bool>;
 }
 
 impl PatchDiff for Diff<'_> {
@@ -240,6 +242,22 @@ impl PatchDiff for Diff<'_> {
         .into_inner()
     )
   }
+
+  fn is_empty(&self) -> Result<bool> {
+    let mut has_changes = false;
+
+    self.foreach(
+      &mut |_file, _progress| {
+        has_changes = true;
+        true
+      },
+      None,
+      None,
+      None
+    )?;
+
+    Ok(!has_changes)
+  }
 }
 
 fn process_chunk(
@@ -252,12 +270,13 @@ fn process_chunk(
     let current_file_num = processed_files.fetch_add(1, Ordering::SeqCst);
     let files_remaining = total_files.saturating_sub(current_file_num);
 
-    if files_remaining == 0 {
-      continue;
-    }
-
+    // Calculate max_tokens_per_file based on actual remaining files
     let total_remaining = remaining_tokens.load(Ordering::SeqCst);
-    let max_tokens_per_file = total_remaining.saturating_div(files_remaining);
+    let max_tokens_per_file = if files_remaining > 0 {
+      total_remaining.saturating_div(files_remaining)
+    } else {
+      total_remaining
+    };
 
     if max_tokens_per_file == 0 {
       continue;
@@ -294,13 +313,15 @@ fn process_chunk(
 pub trait PatchRepository {
   fn to_patch(&self, tree: Option<Tree<'_>>, max_token_count: usize, model: Model) -> Result<String>;
   fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>>;
+  fn to_commit_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>>;
   fn configure_diff_options(&self, opts: &mut DiffOptions);
+  fn configure_commit_diff_options(&self, opts: &mut DiffOptions);
 }
 
 impl PatchRepository for Repository {
   fn to_patch(&self, tree: Option<Tree>, max_token_count: usize, model: Model) -> Result<String> {
     profile!("Repository patch generation");
-    self.to_diff(tree)?.to_patch(max_token_count, model)
+    self.to_commit_diff(tree)?.to_patch(max_token_count, model)
   }
 
   fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>> {
@@ -308,14 +329,62 @@ impl PatchRepository for Repository {
     let mut opts = DiffOptions::new();
     self.configure_diff_options(&mut opts);
 
-    self
-      .diff_tree_to_index(tree.as_ref(), None, Some(&mut opts))
-      .context("Failed to get diff")
+    match tree {
+      Some(tree) => {
+        // Get the diff between tree and working directory, including staged changes
+        self.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))
+      }
+      None => {
+        // If there's no HEAD yet, compare against an empty tree
+        let empty_tree = self.find_tree(self.treebuilder(None)?.write()?)?;
+        // Get the diff between empty tree and working directory, including staged changes
+        self.diff_tree_to_workdir_with_index(Some(&empty_tree), Some(&mut opts))
+      }
+    }
+    .context("Failed to get diff")
+  }
+
+  fn to_commit_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>> {
+    profile!("Git commit diff generation");
+    let mut opts = DiffOptions::new();
+    self.configure_commit_diff_options(&mut opts);
+
+    match tree {
+      Some(tree) => {
+        // Get the diff between tree and index (staged changes only)
+        self.diff_tree_to_index(Some(&tree), None, Some(&mut opts))
+      }
+      None => {
+        // If there's no HEAD yet, compare against an empty tree
+        let empty_tree = self.find_tree(self.treebuilder(None)?.write()?)?;
+        // Get the diff between empty tree and index (staged changes only)
+        self.diff_tree_to_index(Some(&empty_tree), None, Some(&mut opts))
+      }
+    }
+    .context("Failed to get diff")
   }
 
   fn configure_diff_options(&self, opts: &mut DiffOptions) {
     opts
       .ignore_whitespace_change(true)
+      .recurse_untracked_dirs(true)
+      .recurse_ignored_dirs(false)
+      .ignore_whitespace_eol(true)
+      .ignore_blank_lines(true)
+      .include_untracked(true)
+      .ignore_whitespace(true)
+      .indent_heuristic(false)
+      .ignore_submodules(true)
+      .include_ignored(false)
+      .interhunk_lines(0)
+      .context_lines(0)
+      .patience(true)
+      .minimal(true);
+  }
+
+  fn configure_commit_diff_options(&self, opts: &mut DiffOptions) {
+    opts
+      .ignore_whitespace_change(false)
       .recurse_untracked_dirs(false)
       .recurse_ignored_dirs(false)
       .ignore_whitespace_eol(true)

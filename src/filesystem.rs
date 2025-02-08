@@ -1,11 +1,11 @@
+#![allow(dead_code)]
+
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 use std::os::unix::fs::symlink as symlink_unix;
 
 use anyhow::{bail, Context, Result};
 use git2::{Repository, RepositoryOpenFlags as Flags};
-
-use crate::profile;
 
 /// Error messages for filesystem operations
 const ERR_CURRENT_DIR: &str = "Failed to get current directory";
@@ -39,7 +39,6 @@ impl File {
   /// # Returns
   /// * `bool` - true if the file exists, false otherwise
   pub fn exists(&self) -> bool {
-    profile!("Check file exists");
     self.path.exists()
   }
 
@@ -48,7 +47,6 @@ impl File {
   /// # Returns
   /// * `Result<()>` - Success or an error if deletion fails
   pub fn delete(&self) -> Result<()> {
-    profile!("Delete file");
     log::debug!("Removing file at {}", self);
     fs::remove_file(&self.path).with_context(|| format!("Failed to remove file at {}", self))
   }
@@ -61,7 +59,6 @@ impl File {
   /// # Returns
   /// * `Result<()>` - Success or an error if link creation fails
   pub fn symlink(&self, target: &File) -> Result<()> {
-    profile!("Create symlink");
     log::debug!("Symlinking {} to {}", target, self);
     symlink_unix(&target.path, &self.path).with_context(|| format!("Failed to symlink {} to {}", target, self))
   }
@@ -71,7 +68,6 @@ impl File {
   /// # Returns
   /// * `Result<Dir>` - The relative path as a Dir or an error
   pub fn relative_path(&self) -> Result<Dir> {
-    profile!("Get relative file path");
     let current_dir = env::current_dir().context(ERR_CURRENT_DIR)?;
     let relative = self
       .path
@@ -86,7 +82,6 @@ impl File {
   /// # Returns
   /// * `Dir` - The parent directory
   pub fn parent(&self) -> Dir {
-    profile!("Get parent directory");
     Dir::new(self.path.parent().unwrap_or(Path::new("")).to_path_buf())
   }
 }
@@ -131,7 +126,6 @@ impl Dir {
   /// # Returns
   /// * `bool` - true if the directory exists, false otherwise
   pub fn exists(&self) -> bool {
-    profile!("Check directory exists");
     self.path.exists()
   }
 
@@ -140,7 +134,6 @@ impl Dir {
   /// # Returns
   /// * `Result<()>` - Success or an error if creation fails
   pub fn create_dir_all(&self) -> Result<()> {
-    profile!("Create directory recursively");
     log::debug!("Creating directory at {}", self);
     fs::create_dir_all(&self.path).with_context(|| format!("Failed to create directory at {}", self))
   }
@@ -150,7 +143,6 @@ impl Dir {
   /// # Returns
   /// * `Result<Self>` - The relative path or an error
   pub fn relative_path(&self) -> Result<Self> {
-    profile!("Get relative directory path");
     let current_dir = env::current_dir().context(ERR_CURRENT_DIR)?;
     let relative = self
       .path
@@ -180,23 +172,14 @@ impl Filesystem {
   /// # Returns
   /// * `Result<Self>` - The initialized filesystem or an error
   pub fn new() -> Result<Self> {
-    profile!("Initialize filesystem");
-
     // Get current directory
-    let current_dir = {
-      profile!("Get current directory");
-      env::current_dir().context(ERR_CURRENT_DIR)?
-    };
+    let current_dir = { env::current_dir().context(ERR_CURRENT_DIR)? };
 
     // Get executable path
-    let git_ai_bin_path = {
-      profile!("Get executable path");
-      env::current_exe().context("Failed to get current executable")?
-    };
+    let git_ai_bin_path = { env::current_exe().context("Failed to get current executable")? };
 
     // Open git repository
     let repo = {
-      profile!("Open git repository");
       Repository::open_ext(&current_dir, Flags::empty(), Vec::<&Path>::new())
         .with_context(|| format!("Failed to open repository at {}", current_dir.display()))?
     };
@@ -205,7 +188,6 @@ impl Filesystem {
     let git_path = {
       let mut path = repo.path().to_path_buf();
       if path.is_relative() {
-        profile!("Convert relative git path to absolute");
         path = current_dir.join(path);
       }
       path
@@ -213,7 +195,6 @@ impl Filesystem {
 
     // Get hook binary path
     let git_ai_hook_bin_path = {
-      profile!("Get hook binary path");
       let hook_path = git_ai_bin_path
         .parent()
         .with_context(|| format!("Failed to get parent directory of {}", git_ai_bin_path.display()))?
@@ -236,7 +217,6 @@ impl Filesystem {
   /// # Returns
   /// * `Result<File>` - The hook binary path or an error
   pub fn git_ai_hook_bin_path(&self) -> Result<File> {
-    profile!("Get hook binary file");
     Ok(File::new(self.git_ai_hook_bin_path.clone()))
   }
 
@@ -245,7 +225,6 @@ impl Filesystem {
   /// # Returns
   /// * `Dir` - The hooks directory path
   pub fn git_hooks_path(&self) -> Dir {
-    profile!("Get hooks directory");
     Dir::new(self.git_hooks_path.clone())
   }
 
@@ -254,7 +233,6 @@ impl Filesystem {
   /// # Returns
   /// * `Result<File>` - The hook path or an error
   pub fn prepare_commit_msg_path(&self) -> Result<File> {
-    profile!("Get prepare-commit-msg hook path");
     if !self.git_hooks_path.exists() {
       bail!("Hooks directory not found at {}", self.git_hooks_path.display());
     }

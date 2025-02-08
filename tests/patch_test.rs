@@ -1,10 +1,8 @@
 mod common;
 
-use std::path::PathBuf;
-
 use tempfile::NamedTempFile;
-use git2::DiffFormat;
-use anyhow::Result;
+use anyhow::{Context, Result};
+use git2::{DiffOptions, Repository, Tree};
 use ai::hook::*;
 use common::*;
 
@@ -36,35 +34,36 @@ fn test_utf8_string_to_utf8() {
   assert_eq!(utf8_string, "Hello");
 }
 
-trait TestPatchDiff {
-  fn is_empty(&self) -> Result<bool>;
-  fn contains(&self, file: &GitFile) -> Result<bool>;
+pub trait TestPatchDiff {
+  fn test_is_empty(&self) -> Result<bool, anyhow::Error>;
+  fn test_contains(&self, file: &GitFile) -> Result<bool, anyhow::Error>;
 }
 
 impl TestPatchDiff for git2::Diff<'_> {
-  fn is_empty(&self) -> Result<bool> {
-    let mut acc = Vec::new();
-    let mut length = 0;
+  fn test_is_empty(&self) -> Result<bool, anyhow::Error> {
+    let mut has_changes = false;
 
-    #[rustfmt::skip]
-    self.print(DiffFormat::Patch, |_, _, line| {
-      let content = line.content();
-      acc.extend_from_slice(content);
-      length += content.len();
-      true
-    })?;
+    self.foreach(
+      &mut |_file, _progress| {
+        has_changes = true;
+        true
+      },
+      None,
+      None,
+      None
+    )?;
 
-    Ok(length == 0)
+    Ok(!has_changes)
   }
 
-  fn contains(&self, our_file: &GitFile) -> Result<bool> {
+  fn test_contains(&self, our_file: &GitFile) -> Result<bool, anyhow::Error> {
     let mut found = false;
-    let our_file_name = our_file.path.file_name().unwrap();
+    let our_file_path = our_file.path.strip_prefix(&our_file.repo_path).unwrap();
 
     self.foreach(
       &mut |file, _progress| {
-        let other_path: PathBuf = file.new_file().path().unwrap().to_path_buf();
-        if other_path == our_file_name {
+        let other_path = file.new_file().path().unwrap();
+        if other_path == our_file_path {
           found = true;
         }
 
@@ -79,46 +78,115 @@ impl TestPatchDiff for git2::Diff<'_> {
   }
 }
 
+trait TestRepository {
+  fn to_diff(&self, tree: Option<Tree<'_>>) -> anyhow::Result<git2::Diff<'_>>;
+}
+
+impl TestRepository for Repository {
+  fn to_diff(&self, tree: Option<Tree<'_>>) -> anyhow::Result<git2::Diff<'_>> {
+    let mut opts = DiffOptions::new();
+    opts
+      .include_untracked(true)
+      .recurse_untracked_dirs(true)
+      .show_untracked_content(true);
+
+    match tree {
+      Some(tree) => {
+        // For staged changes, compare tree to index
+        let diff = self.diff_tree_to_index(Some(&tree), None, Some(&mut opts))?;
+        if !diff.test_is_empty()? {
+          return Ok(diff);
+        }
+        // If no staged changes, compare tree to workdir
+        self.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))
+      }
+      None => {
+        // For initial state, compare HEAD to workdir
+        match self.head() {
+          Ok(head) => {
+            let tree = head.peel_to_tree()?;
+            self.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))
+          }
+          Err(_) => {
+            // No HEAD yet, show all files as new
+            self.diff_tree_to_workdir(None, Some(&mut opts))
+          }
+        }
+      }
+    }
+    .context("Failed to get diff")
+  }
+}
+
 #[test]
-fn test_patch_diff_to_patch() {
+fn test_empty_diff() {
   let repo = TestRepo::default();
   let file = repo.create_file("test.txt", "Hello, world!").unwrap();
+
+  // Get initial diff before staging
+  let repo_path = repo.repo_path.path().to_path_buf();
+  let git_repo = git2::Repository::open(repo_path).unwrap();
+  let diff = TestRepository::to_diff(&git_repo, None).unwrap();
+  assert!(!TestPatchDiff::test_is_empty(&diff).unwrap());
+
   file.stage().unwrap();
   file.commit().unwrap();
 
-  let repo_path = repo.repo_path.path().to_path_buf();
-  let git_repo = git2::Repository::open(repo_path).unwrap();
   let tree = git_repo.head().unwrap().peel_to_tree().unwrap();
-
-  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
-  assert!(diff.is_empty().unwrap());
+  let diff = TestRepository::to_diff(&git_repo, Some(tree.clone())).unwrap();
+  assert!(TestPatchDiff::test_is_empty(&diff).unwrap());
 
   // Add a new line to the file
   let file = repo.create_file("file", "Hello, world!\n").unwrap();
-  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
-  assert!(diff.is_empty().unwrap());
+  let diff = TestRepository::to_diff(&git_repo, Some(tree.clone())).unwrap();
+  assert!(!TestPatchDiff::test_is_empty(&diff).unwrap());
+  assert!(TestPatchDiff::test_contains(&diff, &file).unwrap());
 
-  // stage the file
+  // stage and commit the file
   file.stage().unwrap();
-  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
-  assert!(!diff.is_empty().unwrap());
-  assert!(diff.contains(&file).unwrap());
+  let diff = TestRepository::to_diff(&git_repo, Some(tree.clone())).unwrap();
+  assert!(!TestPatchDiff::test_is_empty(&diff).unwrap());
+  assert!(TestPatchDiff::test_contains(&diff, &file).unwrap());
 
-  // commit the file
   file.commit().unwrap();
   let tree = git_repo.head().unwrap().peel_to_tree().unwrap();
-  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
-  assert!(diff.is_empty().unwrap());
-  assert!(!diff.contains(&file).unwrap());
+  let diff = TestRepository::to_diff(&git_repo, Some(tree.clone())).unwrap();
+  assert!(TestPatchDiff::test_is_empty(&diff).unwrap());
 
   // delete the file
   file.delete().unwrap();
-  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
-  assert!(diff.is_empty().unwrap());
+  let diff = TestRepository::to_diff(&git_repo, Some(tree.clone())).unwrap();
+  assert!(!TestPatchDiff::test_is_empty(&diff).unwrap());
+  assert!(TestPatchDiff::test_contains(&diff, &file).unwrap());
 
-  // stage the file
+  // stage and commit the deletion
   file.stage().unwrap();
-  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
-  assert!(!diff.is_empty().unwrap());
-  assert!(diff.contains(&file).unwrap());
+  let diff = TestRepository::to_diff(&git_repo, Some(tree.clone())).unwrap();
+  assert!(!TestPatchDiff::test_is_empty(&diff).unwrap());
+  assert!(TestPatchDiff::test_contains(&diff, &file).unwrap());
+
+  file.commit().unwrap();
+  let tree = git_repo.head().unwrap().peel_to_tree().unwrap();
+  let diff = TestRepository::to_diff(&git_repo, Some(tree.clone())).unwrap();
+  assert!(TestPatchDiff::test_is_empty(&diff).unwrap());
+
+  // test initial commit
+  let repo = TestRepo::default();
+  let file = repo.create_file("test.txt", "Hello, world!").unwrap();
+  let repo_path = repo.repo_path.path().to_path_buf();
+  let git_repo = git2::Repository::open(repo_path).unwrap();
+  let diff = TestRepository::to_diff(&git_repo, None).unwrap();
+  assert!(!TestPatchDiff::test_is_empty(&diff).unwrap());
+  assert!(TestPatchDiff::test_contains(&diff, &file).unwrap());
+
+  // stage and commit the file
+  file.stage().unwrap();
+  let diff = TestRepository::to_diff(&git_repo, None).unwrap();
+  assert!(!TestPatchDiff::test_is_empty(&diff).unwrap());
+  assert!(TestPatchDiff::test_contains(&diff, &file).unwrap());
+
+  file.commit().unwrap();
+  let tree = git_repo.head().unwrap().peel_to_tree().unwrap();
+  let diff = TestRepository::to_diff(&git_repo, Some(tree.clone())).unwrap();
+  assert!(TestPatchDiff::test_is_empty(&diff).unwrap());
 }

@@ -6,14 +6,16 @@ use std::collections::HashSet;
 use anyhow::{Context, Result};
 use colored::*;
 use git2::{DiffOptions, Repository};
+use indicatif::{ProgressBar, ProgressStyle};
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 use tokio::sync::{mpsc, Mutex};
 use tokio::task;
-use indicatif::{ProgressBar, ProgressStyle};
-use ai::model::Model;
-use ai::openai;
+use num_cpus;
+
+use crate::model::Model;
+use crate::openai;
 
 /// Represents command-line arguments for fine-tuning
 #[derive(Debug, Clone, Deserialize, Serialize, StructOpt)]
@@ -347,7 +349,6 @@ Your task is to:\n\
   };
   let response = openai::call(req).await?;
   let cleaned = response
-    .response
     .trim()
     .trim_start_matches("```")
     .trim_end_matches("```")
@@ -423,7 +424,7 @@ Return ONLY a number between 0.0 and 1.0";
     model: Model::GPT4oMini
   };
   let response = openai::call(req).await?;
-  let score = response.response.trim().parse::<f32>().unwrap_or(0.0);
+  let score = response.trim().parse::<f32>().unwrap_or(0.0);
   Ok(score.clamp(0.0, 1.0))
 }
 
@@ -439,6 +440,6 @@ You are an expert at evaluating cleaned git commit messages. Rate the quality of
     model: Model::GPT4oMini
   };
   let response = openai::call(req).await?;
-  let score = response.response.trim().parse::<f32>().unwrap_or(0.0);
+  let score = response.trim().parse::<f32>().unwrap_or(0.0);
   Ok(score.clamp(0.0, 1.0))
 }
