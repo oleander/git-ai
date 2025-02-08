@@ -57,6 +57,12 @@ enum SetSubcommand {
   OpenaiApiKey {
     #[structopt(help = "The OpenAI API key", name = "VALUE")]
     value: String
+  },
+
+  #[structopt(about = "Sets the OpenAI host URL")]
+  Url {
+    #[structopt(default_value = "https://api.openai.com/v1", env = "OPENAI_URL", help = "The OpenAI host URL", name = "VALUE")]
+    value: String
   }
 }
 
@@ -181,6 +187,13 @@ fn run_config_openai_api_key(value: String) -> Result<()> {
   Ok(())
 }
 
+fn run_config_openai_host(value: String) -> Result<()> {
+  let mut app = App::new()?;
+  app.update_openai_host(value)?;
+  println!("✅ OpenAI host URL updated");
+  Ok(())
+}
+
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
   dotenv().ok();
@@ -219,6 +232,9 @@ async fn main() -> Result<()> {
             }
             SetSubcommand::OpenaiApiKey { value } => {
               run_config_openai_api_key(value)?;
+            }
+            SetSubcommand::Url { value } => {
+              run_config_openai_host(value)?;
             }
           },
       },

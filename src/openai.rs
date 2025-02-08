@@ -96,7 +96,8 @@ pub async fn call(request: Request) -> Result<Response> {
     "git-ai config set openai-api-key <your-key>".yellow()
   ))?;
 
-  let config = OpenAIConfig::new().with_api_key(api_key);
+  let openai_host = config::APP.openai.host.into());
+  let config = OpenAIConfig::new().with_api_key(api_key).with_base_url(openai_host);
   let client = Client::with_config(config);
 
   // Calculate available tokens using model's context size

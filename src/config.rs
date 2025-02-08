@@ -14,6 +14,7 @@ const DEFAULT_MAX_COMMIT_LENGTH: i64 = 72;
 const DEFAULT_MAX_TOKENS: i64 = 2024;
 const DEFAULT_MODEL: &str = "gpt-4o-mini";
 const DEFAULT_API_KEY: &str = "<PLACE HOLDER FOR YOUR API KEY>";
+const DEFAULT_OPENAI_HOST: &str = "https://api.openai.com/v1";
 
 #[derive(Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct App {
@@ -21,7 +22,8 @@ pub struct App {
   pub model:             Option<String>,
   pub max_tokens:        Option<usize>,
   pub max_commit_length: Option<usize>,
-  pub timeout:           Option<usize>
+  pub timeout:           Option<usize>,
+  pub openai_host:       Option<String>
 }
 
 #[derive(Debug)]
@@ -45,10 +47,10 @@ impl ConfigPaths {
   }
 
   fn ensure_exists(&self) -> Result<()> {
-    if !self.dir.exists() {
+    if (!self.dir.exists()) {
       std::fs::create_dir_all(&self.dir).with_context(|| format!("Failed to create config directory at {:?}", self.dir))?;
     }
-    if !self.file.exists() {
+    if (!self.file.exists()) {
       File::create(&self.file).with_context(|| format!("Failed to create config file at {:?}", self.file))?;
     }
     Ok(())
@@ -69,6 +71,7 @@ impl App {
       .set_default("max_tokens", DEFAULT_MAX_TOKENS)?
       .set_default("model", DEFAULT_MODEL)?
       .set_default("openai_api_key", DEFAULT_API_KEY)?
+      .set_default("openai_host", DEFAULT_OPENAI_HOST)?
       .build()?;
 
     config
@@ -102,6 +105,11 @@ impl App {
   pub fn update_openai_api_key(&mut self, value: String) -> Result<()> {
     self.openai_api_key = Some(value);
     self.save_with_message("openai-api-key")
+  }
+
+  pub fn update_openai_host(&mut self, value: String) -> Result<()> {
+    self.openai_host = Some(value);
+    self.save_with_message("openai-host")
   }
 
   fn save_with_message(&self, option: &str) -> Result<()> {
