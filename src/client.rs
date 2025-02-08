@@ -23,22 +23,16 @@ pub async fn call(request: Request) -> Result<Response> {
     Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 | Model::Tavernari => {
       let client = OllamaClient::new()?;
 
-      let template = commit::get_instruction_template()?;
-      let full_prompt = format!("### System:\n{}\n\n### User:\n{}\n\n### Assistant:\n", template, request.prompt);
-
-      let response = client.generate(request.model, &full_prompt).await?;
+      let prompt = commit::get_instruction_template()?;
+      let response = client.generate(request.model, &prompt).await?;
 
       // Log the raw response for debugging
       log::debug!("Raw Ollama response: {}", response);
 
-      // Take the first non-empty line as the commit message
-      let commit_message = response
-        .lines()
-        .find(|line| !line.trim().is_empty())
-        .map(|line| line.trim().to_string())
-        .with_context(|| format!("Could not find commit message in response: {}", response))?;
+      // Take the first non-empty line as the commit message, trimming any whitespace
+      let commit_message = response.trim().to_string();
 
-      if commit_message.trim().is_empty() {
+      if commit_message.is_empty() {
         bail!("Model returned an empty response");
       }
 
