@@ -7,6 +7,11 @@ pub fn run() -> Result<()> {
   let hook_bin = fs.git_ai_hook_bin_path()?;
   let hook_file = fs.prepare_commit_msg_path()?;
 
+  // Ensure hooks directory exists
+  if !fs.git_hooks_path().exists() {
+    fs.git_hooks_path().create_dir_all()?;
+  }
+
   if hook_file.exists() {
     bail!("Hook already exists at {}, please run 'git ai hook reinstall'", hook_file);
   }
