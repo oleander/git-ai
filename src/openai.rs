@@ -108,19 +108,25 @@ fn truncate_to_fit(text: &str, max_tokens: usize, model: &Model) -> Result<Strin
   }
 
   let lines: Vec<&str> = text.lines().collect();
+  if lines.is_empty() {
+    return Ok(String::new());
+  }
 
   // Try increasingly aggressive truncation until we fit
   for attempt in 0..MAX_ATTEMPTS {
-    let portion_size = match attempt {
-      0 => lines.len() / 8,  // First try: Keep 25% (12.5% each end)
-      1 => lines.len() / 12, // Second try: Keep ~16% (8% each end)
-      _ => lines.len() / 20  // Final try: Keep 10% (5% each end)
+    let keep_lines = match attempt {
+      0 => lines.len() * 3 / 4, // First try: Keep 75%
+      1 => lines.len() / 2,     // Second try: Keep 50%
+      _ => lines.len() / 4      // Final try: Keep 25%
     };
 
+    if keep_lines == 0 {
+      break;
+    }
+
     let mut truncated = Vec::new();
-    truncated.extend(lines.iter().take(portion_size));
+    truncated.extend(lines.iter().take(keep_lines));
     truncated.push("... (truncated for length) ...");
-    truncated.extend(lines.iter().rev().take(portion_size).rev());
 
     let result = truncated.join("\n");
     let new_token_count = model.count_tokens(&result)?;
@@ -130,12 +136,27 @@ fn truncate_to_fit(text: &str, max_tokens: usize, model: &Model) -> Result<Strin
     }
   }
 
-  // If all attempts failed, return a minimal version
+  // If standard truncation failed, do minimal version with iterative reduction
   let mut minimal = Vec::new();
-  minimal.extend(lines.iter().take(lines.len() / 50));
-  minimal.push("... (severely truncated for length) ...");
-  minimal.extend(lines.iter().rev().take(lines.len() / 50).rev());
-  Ok(minimal.join("\n"))
+  let mut current_size = lines.len() / 50; // Start with 2% of lines
+
+  while current_size > 0 {
+    minimal.clear();
+    minimal.extend(lines.iter().take(current_size));
+    minimal.push("... (severely truncated for length) ...");
+
+    let result = minimal.join("\n");
+    let new_token_count = model.count_tokens(&result)?;
+
+    if new_token_count <= max_tokens {
+      return Ok(result);
+    }
+
+    current_size = current_size / 2; // Halve the size each time
+  }
+
+  // If everything fails, return just the truncation message
+  Ok("... (content too large, completely truncated) ...".to_string())
 }
 
 pub async fn call(request: Request) -> Result<Response> {
