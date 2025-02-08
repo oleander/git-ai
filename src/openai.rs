@@ -152,7 +152,7 @@ fn truncate_to_fit(text: &str, max_tokens: usize, model: &Model) -> Result<Strin
       return Ok(result);
     }
 
-    current_size = current_size / 2; // Halve the size each time
+    current_size /= 2; // Halve the size each time
   }
 
   // If everything fails, return just the truncation message
