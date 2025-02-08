@@ -2,14 +2,14 @@ mod uninstall;
 mod install;
 mod reinstall;
 mod config;
-
-use std::path::PathBuf;
+mod filesystem;
 
 use structopt::StructOpt;
 use anyhow::Result;
 use dotenv::dotenv;
 
 use crate::config::App;
+use crate::filesystem::Filesystem;
 
 mod finetune;
 use crate::finetune::FinetuneArgs;
@@ -111,28 +111,29 @@ pub enum Command {
 
 // Hook installation functions
 fn run_install() -> Result<()> {
-  let hook_path = PathBuf::from(".git/hooks/prepare-commit-msg");
-  let current_exe = std::env::current_exe()?;
-  let hook_binary = current_exe.parent().unwrap().join("git-ai-hook");
+  let fs = Filesystem::new()?;
+  let hook_bin = fs.git_ai_hook_bin_path()?;
+  let hook_file = fs.prepare_commit_msg_path()?;
 
-  if hook_path.exists() {
-    std::fs::remove_file(&hook_path)?;
+  if hook_file.exists() {
+    hook_file.delete()?;
   }
 
-  std::os::unix::fs::symlink(&hook_binary, &hook_path)?;
-  println!("🔗 Hook symlinked successfully to \x1B[3m{}\x1B[0m", hook_path.display());
+  hook_file.symlink(&hook_bin)?;
+  println!("🔗 Hook symlinked successfully to \x1B[3m{}\x1B[0m", hook_file);
 
   Ok(())
 }
 
 fn run_uninstall() -> Result<()> {
-  let hook_path = PathBuf::from(".git/hooks/prepare-commit-msg");
+  let fs = Filesystem::new()?;
+  let hook_file = fs.prepare_commit_msg_path()?;
 
-  if hook_path.exists() {
-    std::fs::remove_file(&hook_path)?;
-    println!("🗑️  Hook uninstalled successfully from \x1B[3m{}\x1B[0m", hook_path.display());
+  if hook_file.exists() {
+    hook_file.delete()?;
+    println!("🗑️  Hook uninstalled successfully from \x1B[3m{}\x1B[0m", hook_file);
   } else {
-    println!("⚠️  No hook found at \x1B[3m{}\x1B[0m", hook_path.display());
+    println!("⚠️  No hook found at \x1B[3m{}\x1B[0m", hook_file);
   }
 
   Ok(())
