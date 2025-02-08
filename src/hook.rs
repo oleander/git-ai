@@ -161,7 +161,7 @@ impl PatchRepository for Repository {
   fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>> {
     let mut opts = DiffOptions::new();
     opts
-      .ignore_whitespace_change(true)
+      .ignore_whitespace_change(false)
       .recurse_untracked_dirs(false)
       .recurse_ignored_dirs(false)
       .ignore_whitespace_eol(true)
