@@ -1,6 +1,7 @@
 mod common;
 
 use std::path::PathBuf;
+
 use tempfile::NamedTempFile;
 use anyhow::Context;
 use git2::{DiffOptions, Repository, Tree};
