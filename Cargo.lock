@@ -588,7 +588,7 @@ checksum = "40ecd4077b5ae9fd2e9e169b102c6c330d0605168eb0e8bf79952b256dbefffd"
 
 [[package]]
 name = "git-ai"
-version = "0.2.56"
+version = "0.2.57"
 dependencies = [
  "anyhow",
  "async-openai",
@@ -615,6 +615,7 @@ dependencies = [
  "thiserror",
  "tiktoken-rs",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

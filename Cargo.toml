@@ -47,6 +47,7 @@ structopt = "0.3.26"
 thiserror = "1.0.61"
 tokio = { version = "1.38.0", features = ["rt-multi-thread"] }
 tiktoken-rs = { version = "0.5.9" }
+tracing = "0.1"
 openssl-sys = { version = "0.9.102", features = ["vendored"] }
 
 [dev-dependencies]
