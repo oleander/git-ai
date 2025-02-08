@@ -32,6 +32,7 @@ tokio = { version = "1.43", features = ["full"] }
 futures = "0.3"
 parking_lot = "0.12.3"
 async-trait = "0.1"
+tracing = "0.1"
 
 # CLI and UI
 structopt = "0.3.26"
@@ -56,6 +57,7 @@ async-openai = { version = "0.27.2", default-features = false }
 ollama-rs = { version = "0.1", features = ["stream"] }
 tiktoken-rs = "0.6.0"
 reqwest = { version = "0.12.12", default-features = true }
+
 # System utilities
 openssl-sys = { version = "0.9.105", features = ["vendored"] }
 rayon = "1.10.0"
@@ -65,13 +67,15 @@ ctrlc = "3.4.5"
 lazy_static = "1.5.0"
 home = "0.5.11"
 dirs = "6.0"
+
 # Syntax highlighting and markdown rendering
-syntect = { version = "5.2", default-features = false, features = [
-  "default-fancy",
-] }
+syntect = { version = "5.2", default-features = false, features = ["default-fancy"] }
 pulldown-cmark = "0.12"
 comrak = "0.35"
 textwrap = "0.16"
+mustache = "0.9.0"
+maplit = "1.0.2"
+
 [dev-dependencies]
 tempfile = "3.16.0"
 
