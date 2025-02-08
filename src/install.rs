@@ -1,14 +1,23 @@
 use anyhow::{bail, Result};
 use colored::Colorize;
 use console::Emoji;
-
-use crate::filesystem::Filesystem;
+use ai::filesystem::Filesystem;
 
 const EMOJI: Emoji<'_, '_> = Emoji("🔗", "");
 
+pub fn run() -> Result<()> {
+  let fs = Filesystem::new()?;
+
+  if !fs.git_hooks_path().exists() {
+    fs.git_hooks_path().create_dir_all()?;
+  }
+
+  install(&fs)
+}
+
 pub fn install(fs: &Filesystem) -> Result<()> {
-  let hook_bin = fs.hook_bin()?;
-  let hook_file = fs.hook_file()?;
+  let hook_bin = fs.git_ai_hook_bin_path()?;
+  let hook_file = fs.prepare_commit_msg_path()?;
 
   if hook_file.exists() {
     bail!(
