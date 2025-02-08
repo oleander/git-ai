@@ -3,6 +3,7 @@ mod common;
 use tempfile::NamedTempFile;
 use anyhow::Context;
 use git2::{DiffOptions, Repository, Tree};
+use anyhow::{Context, Result};
 use ai::hook::*;
 use common::*;
 
