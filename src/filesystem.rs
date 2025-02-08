@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 use std::os::unix::fs::symlink as symlink_unix;
