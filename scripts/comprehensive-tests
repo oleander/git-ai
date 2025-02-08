@@ -34,7 +34,7 @@ end
 
 function on_exit --on-event fish_exit
     if test -d $TEST_DIR
-        # rm -rf $TEST_DIR
+        rm -rf $TEST_DIR
     end
 end
 
