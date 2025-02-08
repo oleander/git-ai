@@ -366,7 +366,7 @@ impl PatchRepository for Repository {
 
   fn configure_diff_options(&self, opts: &mut DiffOptions) {
     opts
-      .ignore_whitespace_change(true)
+      .ignore_whitespace_change(false)
       .recurse_untracked_dirs(true)
       .recurse_ignored_dirs(false)
       .ignore_whitespace_eol(true)
