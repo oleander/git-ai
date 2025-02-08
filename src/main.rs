@@ -106,7 +106,7 @@ pub enum Command {
 
     #[structopt(long)]
     verbose: bool
-  } // ... other commands ...
+  }
 }
 
 // Hook installation functions
