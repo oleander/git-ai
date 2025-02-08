@@ -8,8 +8,6 @@ use colored::*;
 use crate::{config, profile};
 use crate::model::Model;
 
-const MAX_CONTEXT_LENGTH: usize = 128000;
-const BUFFER_TOKENS: usize = 30000; // Large buffer for safety
 const MAX_ATTEMPTS: usize = 3;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -151,9 +149,10 @@ pub async fn call(request: Request) -> Result<Response> {
   let config = OpenAIConfig::new().with_api_key(api_key);
   let client = Client::with_config(config);
 
-  // Calculate available tokens for content
+  // Calculate available tokens using model's context size
   let system_tokens = request.model.count_tokens(&request.system)?;
-  let available_tokens = MAX_CONTEXT_LENGTH.saturating_sub(system_tokens + BUFFER_TOKENS + request.max_tokens as usize);
+  let model_context_size = request.model.context_size();
+  let available_tokens = model_context_size.saturating_sub(system_tokens + request.max_tokens as usize);
 
   // Truncate prompt if needed
   let truncated_prompt = truncate_to_fit(&request.prompt, available_tokens, &request.model)?;
