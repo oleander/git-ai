@@ -360,9 +360,10 @@ impl PatchRepository for Repository {
         self.diff_tree_to_index(Some(&tree), None, Some(&mut opts))
       }
       None => {
-        // If there's no HEAD yet, just get the index diff (staged changes only)
-        let index = self.index()?;
-        self.diff_index_to_index(&index, &index, Some(&mut opts))
+        // If there's no HEAD yet, compare against an empty tree
+        let empty_tree = self.find_tree(self.treebuilder(None)?.write()?)?;
+        // Get the diff between empty tree and index (staged changes only)
+        self.diff_tree_to_index(Some(&empty_tree), None, Some(&mut opts))
       }
     }
     .context("Failed to get diff")
@@ -407,6 +408,8 @@ impl PatchRepository for Repository {
 
 #[cfg(test)]
 mod tests {
+  use tempfile::TempDir;
+
   use super::*;
 
   #[test]
@@ -524,5 +527,77 @@ mod tests {
     assert_eq!(results.len(), 6);
     assert_eq!(remaining_tokens_main.load(Ordering::SeqCst), 0);
     assert_eq!(processed_files_main.load(Ordering::SeqCst), 6);
+  }
+
+  #[test]
+  fn test_to_commit_diff_with_head() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let repo = Repository::init(temp_dir.path())?;
+    let mut index = repo.index()?;
+
+    // Create a file and stage it
+    let file_path = temp_dir.path().join("test.txt");
+    std::fs::write(&file_path, "initial content")?;
+    index.add_path(file_path.strip_prefix(temp_dir.path())?)?;
+    index.write()?;
+
+    // Create initial commit
+    let tree_id = index.write_tree()?;
+    let tree = repo.find_tree(tree_id)?;
+    let signature = git2::Signature::now("test", "test@example.com")?;
+    repo.commit(Some("HEAD"), &signature, &signature, "Initial commit", &tree, &[])?;
+
+    // Modify and stage the file
+    std::fs::write(&file_path, "modified content")?;
+    index.add_path(file_path.strip_prefix(temp_dir.path())?)?;
+    index.write()?;
+
+    // Get HEAD tree
+    let head = repo.head()?.peel_to_tree()?;
+
+    // Get diff
+    let diff = repo.to_commit_diff(Some(head))?;
+
+    // Verify diff shows only staged changes
+    let mut diff_found = false;
+    diff.print(DiffFormat::Patch, |_delta, _hunk, line| {
+      let content = line.content().to_utf8();
+      if line.origin() == '+' && content.contains("modified content") {
+        diff_found = true;
+      }
+      true
+    })?;
+
+    assert!(diff_found, "Expected to find staged changes in diff");
+    Ok(())
+  }
+
+  #[test]
+  fn test_to_commit_diff_without_head() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let repo = Repository::init(temp_dir.path())?;
+    let mut index = repo.index()?;
+
+    // Create and stage a new file
+    let file_path = temp_dir.path().join("test.txt");
+    std::fs::write(&file_path, "test content")?;
+    index.add_path(file_path.strip_prefix(temp_dir.path())?)?;
+    index.write()?;
+
+    // Get diff (no HEAD exists yet)
+    let diff = repo.to_commit_diff(None)?;
+
+    // Verify diff shows staged changes
+    let mut diff_found = false;
+    diff.print(DiffFormat::Patch, |_delta, _hunk, line| {
+      let content = line.content().to_utf8();
+      if line.origin() == '+' && content.contains("test content") {
+        diff_found = true;
+      }
+      true
+    })?;
+
+    assert!(diff_found, "Expected to find staged changes in diff");
+    Ok(())
   }
 }
