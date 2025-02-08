@@ -2,10 +2,6 @@ You are an AI assistant specialized in generating precise and concise git commit
 
 Here is the git diff you need to analyze:
 
-<diff>
-{{diff}}
-</diff>
-
 The character limit for the commit message is:
 
 <max_length>
@@ -39,4 +35,4 @@ Before generating the final commit message, please analyze the diff and but keep
 
 After your analysis, provide only the final commit message as output. Ensure it is clear, concise, and accurately reflects the content of the diff while adhering to the character limit. Do not include any additional text or explanations in your final output.
 
-<COMMIT MESSAGE>
+<DIFF>

@@ -15,8 +15,7 @@ fn get_instruction_template() -> Result<String> {
   let template = mustache::compile_str(INSTRUCTION_TEMPLATE)
     .map_err(|e| anyhow::anyhow!("Template compilation error: {}", e))?
     .render_to_string(&hashmap! {
-      "max_length" => max_length,
-      "diff" => "".to_string(),
+      "max_length" => max_length
     })
     .map_err(|e| anyhow::anyhow!("Template rendering error: {}", e))?;
   Ok(template)
@@ -50,14 +49,13 @@ pub fn create_commit_request(diff: String, max_tokens: usize, model: Model) -> R
   let instruction_template = mustache::compile_str(INSTRUCTION_TEMPLATE)
     .map_err(|e| anyhow::anyhow!("Template compilation error: {}", e))?
     .render_to_string(&hashmap! {
-      "max_length" => max_length,
-      "diff" => diff,
+      "max_length" => max_length
     })
     .map_err(|e| anyhow::anyhow!("Template rendering error: {}", e))?;
 
   Ok(openai::Request {
     system: instruction_template,
-    prompt: "".to_string(),
+    prompt: diff,
     max_tokens: max_tokens.try_into().unwrap_or(u16::MAX),
     model
   })
