@@ -1,10 +1,8 @@
 mod common;
 
-use std::path::PathBuf;
-
 use tempfile::NamedTempFile;
-use git2::DiffFormat;
-use anyhow::Result;
+use git2::{DiffOptions, Repository, Tree};
+use anyhow::{Context, Result};
 use ai::hook::*;
 use common::*;
 
@@ -80,17 +78,61 @@ impl TestPatchDiff for git2::Diff<'_> {
   }
 }
 
+trait TestRepository {
+  fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>>;
+}
+
+impl TestRepository for Repository {
+  fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>> {
+    let mut opts = DiffOptions::new();
+    opts
+      .include_untracked(true)
+      .recurse_untracked_dirs(true)
+      .show_untracked_content(true);
+
+    match tree {
+      Some(tree) => {
+        // For staged changes, compare tree to index
+        let diff = self.diff_tree_to_index(Some(&tree), None, Some(&mut opts))?;
+        if !diff.is_empty()? {
+          return Ok(diff);
+        }
+        // If no staged changes, compare tree to workdir
+        self.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))
+      }
+      None => {
+        // For initial state, compare HEAD to workdir
+        match self.head() {
+          Ok(head) => {
+            let tree = head.peel_to_tree()?;
+            self.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))
+          }
+          Err(_) => {
+            // No HEAD yet, show all files as new
+            self.diff_tree_to_workdir(None, Some(&mut opts))
+          }
+        }
+      }
+    }
+    .context("Failed to get diff")
+  }
+}
+
 #[test]
 fn test_patch_diff_to_patch() {
   let repo = TestRepo::default();
   let file = repo.create_file("test.txt", "Hello, world!").unwrap();
+
+  // Get initial diff before staging
+  let repo_path = repo.repo_path.path().to_path_buf();
+  let git_repo = git2::Repository::open(repo_path).unwrap();
+  let diff = TestRepository::to_diff(&git_repo, None).unwrap();
+  assert!(!TestPatchDiff::is_empty(&diff).unwrap());
+
   file.stage().unwrap();
   file.commit().unwrap();
 
-  let repo_path = repo.repo_path.path().to_path_buf();
-  let git_repo = git2::Repository::open(repo_path).unwrap();
   let tree = git_repo.head().unwrap().peel_to_tree().unwrap();
-
   let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
   assert!(TestPatchDiff::is_empty(&diff).unwrap());
 

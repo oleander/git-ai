@@ -90,6 +90,9 @@ name = "anyhow"
 version = "1.0.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34ac096ce696dc2fcabef30516bb13c0a68a11d30131d3df6f04711467681b04"
+dependencies = [
+ "backtrace",
+]
 
 [[package]]
 name = "async-openai"
@@ -663,7 +666,7 @@ version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "186e05a59d4c50738528153b83b0b0194d3a29507dfec16eccd4b342903397d0"
 dependencies = [
- "log",
+ "log 0.4.25",
 ]
 
 [[package]]
@@ -673,7 +676,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcaee3d8e3cfc3fd92428d477bc97fc29ec8716d180c0d74c643bb26166660e0"
 dependencies = [
  "env_filter",
- "log",
+ "log 0.4.25",
 ]
 
 [[package]]
@@ -922,7 +925,9 @@ dependencies = [
  "home",
  "indicatif",
  "lazy_static",
- "log",
+ "log 0.4.25",
+ "maplit",
+ "mustache",
  "num_cpus",
  "openssl-sys",
  "parking_lot",
@@ -941,6 +946,7 @@ dependencies = [
  "thiserror 2.0.11",
  "tiktoken-rs",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -952,7 +958,7 @@ dependencies = [
  "bitflags 2.8.0",
  "libc",
  "libgit2-sys",
- "log",
+ "log 0.4.25",
  "url",
 ]
 
@@ -1427,9 +1433,24 @@ dependencies = [
 
 [[package]]
 name = "log"
+version = "0.3.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e19e8d5c34a3e0e2223db8e060f9e8264aeeb5c5fc64a4ee9965c062211c024b"
+dependencies = [
+ "log 0.4.25",
+]
+
+[[package]]
+name = "log"
 version = "0.4.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04cbf5b083de1c7e0222a7a51dbfdba1cbe1c6ab0b15e29fff3f6c077fd9cd9f"
+
+[[package]]
+name = "maplit"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
 
 [[package]]
 name = "memchr"
@@ -1480,13 +1501,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "mustache"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "51956ef1c5d20a1384524d91e616fb44dfc7d8f249bf696d49c97dd3289ecab5"
+dependencies = [
+ "log 0.3.9",
+ "serde",
+]
+
+[[package]]
 name = "native-tls"
 version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0dab59f8e050d5df8e4dd87d9206fb6f65a483e20ac9fda365ade4fab353196c"
 dependencies = [
  "libc",
- "log",
+ "log 0.4.25",
  "openssl",
  "openssl-probe",
  "openssl-sys",
@@ -1965,7 +1996,7 @@ dependencies = [
  "hyper-util",
  "ipnet",
  "js-sys",
- "log",
+ "log 0.4.25",
  "mime",
  "mime_guess",
  "native-tls",
@@ -2900,7 +2931,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2f0a0651a5c2bc21487bde11ee802ccaf4c51935d0d3d42a6101f98161700bc6"
 dependencies = [
  "bumpalo",
- "log",
+ "log 0.4.25",
  "proc-macro2",
  "quote",
  "syn 2.0.98",
