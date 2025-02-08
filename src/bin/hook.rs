@@ -127,7 +127,21 @@ impl Args {
           .into();
         let used_tokens = commit::token_used(&model)?;
         let max_tokens = config::APP.max_tokens.unwrap_or(model.context_size());
-        let remaining_tokens = max_tokens.saturating_sub(used_tokens);
+        let remaining_tokens = max_tokens.saturating_sub(used_tokens).max(512);
+
+        let tree = match self.sha1.as_deref() {
+          Some("HEAD") | None => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
+          Some(sha1) =>
+            repo
+              .find_object(Oid::from_str(sha1)?, None)
+              .ok()
+              .and_then(|obj| obj.peel_to_tree().ok()),
+        };
+
+        let diff = repo.to_diff(tree.clone())?;
+        if diff.is_empty()? {
+          bail!("No changes to commit");
+        }
 
         let pb = ProgressBar::new_spinner();
         let style = ProgressStyle::default_spinner()
@@ -139,14 +153,16 @@ impl Args {
         pb.set_message("Generating commit message...");
         pb.enable_steady_tick(Duration::from_millis(150));
 
-        if !self.commit_msg_file.is_empty().unwrap_or_default() {
-          log::debug!("A commit message has already been provided");
-          return Ok(());
-        }
+        let patch = repo
+          .to_patch(tree, remaining_tokens, model)
+          .context("Failed to get patch")?;
 
-        self
-          .handle_commit(&repo, &pb, model, remaining_tokens)
-          .await
+        let response = commit::generate(patch.to_string(), remaining_tokens, model).await?;
+        std::fs::write(&self.commit_msg_file, response.response.trim())?;
+
+        pb.finish_and_clear();
+
+        Ok(())
       }
     }
   }

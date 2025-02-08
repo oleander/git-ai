@@ -60,7 +60,7 @@ end
 set TEST_DIR /tmp/git-ai-test-(date +%s)
 
 # Install git-ai
-cargo install --force --path . || fail "Cargo installation failed"
+cargo install --force --debug --path . || fail "Cargo installation failed"
 
 # Setup test repository
 rm -rf $TEST_DIR
@@ -96,7 +96,9 @@ test_step "Basic Git Operations"
 # 2.1 Initial commit
 echo "Hello World 0" >README.md
 git add README.md
-git commit --no-edit || fail "Initial commit failed"
+git status --porcelain || fail "Git status failed before initial commit"
+test -f README.md || fail "README.md was not created"
+git commit -m "Initial commit: Add README.md" || fail "Initial commit failed"
 git status --porcelain || fail "Git status failed after initial commit"
 
 # 2.2 Commit with message

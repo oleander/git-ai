@@ -144,6 +144,7 @@ impl Utf8String for [u8] {
 pub trait PatchDiff {
   fn to_patch(&self, max_token_count: usize, model: Model) -> Result<String>;
   fn collect_diff_data(&self) -> Result<HashMap<PathBuf, String>>;
+  fn is_empty(&self) -> Result<bool>;
 }
 
 impl PatchDiff for Diff<'_> {
@@ -240,6 +241,22 @@ impl PatchDiff for Diff<'_> {
         .into_inner()
     )
   }
+
+  fn is_empty(&self) -> Result<bool> {
+    let mut has_changes = false;
+
+    self.foreach(
+      &mut |_file, _progress| {
+        has_changes = true;
+        true
+      },
+      None,
+      None,
+      None
+    )?;
+
+    Ok(!has_changes)
+  }
 }
 
 fn process_chunk(
@@ -308,19 +325,29 @@ impl PatchRepository for Repository {
     let mut opts = DiffOptions::new();
     self.configure_diff_options(&mut opts);
 
-    self
-      .diff_tree_to_index(tree.as_ref(), None, Some(&mut opts))
-      .context("Failed to get diff")
+    match tree {
+      Some(tree) => {
+        // Get the diff between tree and working directory, including staged changes
+        self.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))
+      }
+      None => {
+        // If there's no HEAD yet, compare against an empty tree
+        let empty_tree = self.find_tree(self.treebuilder(None)?.write()?)?;
+        // Get the diff between empty tree and working directory, including staged changes
+        self.diff_tree_to_workdir_with_index(Some(&empty_tree), Some(&mut opts))
+      }
+    }
+    .context("Failed to get diff")
   }
 
   fn configure_diff_options(&self, opts: &mut DiffOptions) {
     opts
       .ignore_whitespace_change(true)
-      .recurse_untracked_dirs(false)
+      .recurse_untracked_dirs(true)
       .recurse_ignored_dirs(false)
       .ignore_whitespace_eol(true)
       .ignore_blank_lines(true)
-      .include_untracked(false)
+      .include_untracked(true)
       .ignore_whitespace(true)
       .indent_heuristic(false)
       .ignore_submodules(true)
