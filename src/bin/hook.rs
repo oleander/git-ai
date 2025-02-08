@@ -92,18 +92,11 @@ impl Args {
   async fn handle_commit(&self, repo: &Repository, pb: &ProgressBar, model: Model, remaining_tokens: usize) -> Result<()> {
     let tree = match self.sha1.as_deref() {
       Some("HEAD") | None => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
-      Some(sha1) => {
-        // First try to resolve as a reference (handles HEAD~1, HEAD^, etc)
-        if let Ok(obj) = repo.revparse_single(sha1) {
-          obj.peel_to_tree().ok()
-        } else {
-          // If not a reference, try as raw SHA1
-          repo
-            .find_object(Oid::from_str(sha1)?, None)
-            .ok()
-            .and_then(|obj| obj.peel_to_tree().ok())
-        }
-      }
+      Some(sha1) =>
+        repo
+          .find_object(Oid::from_str(sha1)?, None)
+          .ok()
+          .and_then(|obj| obj.peel_to_tree().ok()),
     };
 
     let diff = repo.to_diff(tree.clone())?;
@@ -145,18 +138,11 @@ impl Args {
 
         let tree = match self.sha1.as_deref() {
           Some("HEAD") | None => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
-          Some(sha1) => {
-            // First try to resolve as a reference (handles HEAD~1, HEAD^, etc)
-            if let Ok(obj) = repo.revparse_single(sha1) {
-              obj.peel_to_tree().ok()
-            } else {
-              // If not a reference, try as raw SHA1
-              repo
-                .find_object(Oid::from_str(sha1)?, None)
-                .ok()
-                .and_then(|obj| obj.peel_to_tree().ok())
-            }
-          }
+          Some(sha1) =>
+            repo
+              .find_object(Oid::from_str(sha1)?, None)
+              .ok()
+              .and_then(|obj| obj.peel_to_tree().ok()),
         };
 
         let diff = repo.to_diff(tree.clone())?;

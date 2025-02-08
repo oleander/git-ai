@@ -94,7 +94,7 @@ impl TestRepository for Repository {
       Some(tree) => {
         // For staged changes, compare tree to index
         let diff = self.diff_tree_to_index(Some(&tree), None, Some(&mut opts))?;
-        if !TestPatchDiff::is_empty(&diff)? {
+        if !diff.test_is_empty()? {
           return Ok(diff);
         }
         // If no staged changes, compare tree to workdir
