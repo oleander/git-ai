@@ -286,6 +286,7 @@ fn process_chunk(
     let token_count = *token_count;
     let allocated_tokens = token_count.min(max_tokens_per_file);
 
+    // Attempt to atomically update remaining tokens
     match remaining_tokens.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
       if current >= allocated_tokens {
         Some(current - allocated_tokens)
@@ -474,5 +475,55 @@ mod tests {
     assert_eq!(results.len(), 3);
     assert_eq!(remaining_tokens.load(Ordering::SeqCst), 0);
     assert_eq!(processed_files.load(Ordering::SeqCst), 3);
+  }
+
+  #[test]
+  fn test_process_chunk_concurrent_safety() {
+    use std::thread;
+
+    let model = Arc::new(Model::default());
+    let total_files = 6;
+    let processed_files = Arc::new(AtomicUsize::new(0));
+    let remaining_tokens = Arc::new(AtomicUsize::new(100));
+    let result_chunks = Arc::new(Mutex::new(Vec::new()));
+
+    let chunk1 = vec![
+      (PathBuf::from("file1.txt"), "content1".to_string(), 20),
+      (PathBuf::from("file2.txt"), "content2".to_string(), 20),
+      (PathBuf::from("file3.txt"), "content3".to_string(), 20),
+    ];
+
+    let chunk2 = vec![
+      (PathBuf::from("file4.txt"), "content4".to_string(), 20),
+      (PathBuf::from("file5.txt"), "content5".to_string(), 20),
+      (PathBuf::from("file6.txt"), "content6".to_string(), 20),
+    ];
+
+    // Clone values for thread 2
+    let model2 = model.clone();
+    let processed_files2 = processed_files.clone();
+    let remaining_tokens2 = remaining_tokens.clone();
+    let result_chunks2 = result_chunks.clone();
+
+    // Clone values for main thread access after threads complete
+    let processed_files_main = processed_files.clone();
+    let remaining_tokens_main = remaining_tokens.clone();
+    let result_chunks_main = result_chunks.clone();
+
+    let t1 = thread::spawn(move || {
+      process_chunk(&chunk1, &model, total_files, &processed_files, &remaining_tokens, &result_chunks).unwrap();
+    });
+
+    let t2 = thread::spawn(move || {
+      process_chunk(&chunk2, &model2, total_files, &processed_files2, &remaining_tokens2, &result_chunks2).unwrap();
+    });
+
+    t1.join().unwrap();
+    t2.join().unwrap();
+
+    let results = result_chunks_main.lock();
+    assert_eq!(results.len(), 6);
+    assert_eq!(remaining_tokens_main.load(Ordering::SeqCst), 0);
+    assert_eq!(processed_files_main.load(Ordering::SeqCst), 6);
   }
 }
