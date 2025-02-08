@@ -1,0 +1,241 @@
+#!/usr/bin/env fish
+
+set -x fish_trace 1
+set -Ux OPENAI_API_KEY $OPENAI_API_KEY
+set -x RUST_LOG debug
+
+if not test -n "$OPENAI_API_KEY"
+    echo "Please set the OPENAI_API_KEY environment variable."
+    exit 1
+end
+
+function on_exit --on-event fish_exit
+    if test -d $TEST_DIR
+        rm -rf $TEST_DIR
+    end
+end
+
+function generate_random_content
+    set size $argv[1]
+    head -c $size /dev/urandom | base64
+end
+
+function fail
+    echo "Test failed: $argv"
+    exit 1
+end
+
+function test_step
+    set description $argv[1]
+    echo "=== Testing: $description ==="
+end
+
+set TEST_DIR /tmp/git-ai-hook-test-(date +%s)
+
+# Install git-ai
+cargo install --force --path . || fail "Failed to install git-ai"
+
+# Setup test repository
+rm -rf $TEST_DIR
+mkdir -p $TEST_DIR
+cd $TEST_DIR
+
+git init || fail "Git init failed"
+git config user.name "Test User"
+git config user.email "test@example.com"
+git config --global init.defaultBranch main
+
+# Install the hook
+git-ai hook install || fail "Hook installation failed"
+
+# Test 1: File Creation Permutations
+test_step "File Creation Permutations"
+
+# 1.1 Empty file
+touch empty_file.txt
+git add empty_file.txt
+git commit -a --no-edit || fail "Empty file commit failed"
+
+# 1.2 Multiple empty files
+touch empty1.txt empty2.txt empty3.txt
+git add .
+git commit -a --no-edit || fail "Multiple empty files commit failed"
+
+# 1.3 Files with different content types
+echo "Normal text" > normal.txt
+echo -e "Line 1\nLine 2\nLine 3" > multiline.txt
+echo -n "No newline" > no_newline.txt
+echo "Tab	Space Space  End" > whitespace.txt
+git add .
+git commit -a --no-edit || fail "Different content types commit failed"
+
+# Test 2: File Modification Permutations
+test_step "File Modification Permutations"
+
+# 2.1 Modify start of file
+echo "Modified start + Normal text" > normal.txt
+git commit -a --no-edit || fail "Start modification commit failed"
+
+# 2.2 Modify end of file
+echo -e "Line 1\nLine 2\nLine 3\nLine 4" > multiline.txt
+git commit -a --no-edit || fail "End modification commit failed"
+
+# 2.3 Modify middle of file
+echo -e "Line 1\nNew Line\nLine 3\nLine 4" > multiline.txt
+git commit -a --no-edit || fail "Middle modification commit failed"
+
+# 2.4 Multiple file modifications
+echo "Modified 1" > empty1.txt
+echo "Modified 2" > empty2.txt
+echo "Modified 3" > empty3.txt
+git commit -a --no-edit || fail "Multiple modifications commit failed"
+
+# Test 3: File Deletion Permutations
+test_step "File Deletion Permutations"
+
+# 3.1 Single file deletion
+rm empty_file.txt
+git add --all
+git commit -a --no-edit || fail "Single deletion commit failed"
+
+# 3.2 Multiple file deletions
+rm empty1.txt empty2.txt
+git add --all
+git commit -a --no-edit || fail "Multiple deletions commit failed"
+
+# Test 4: Mixed Operations
+test_step "Mixed Operations"
+
+# 4.1 Add + Delete + Modify
+touch new_file1.txt
+rm empty3.txt
+echo "Modified again" > normal.txt
+git add --all
+git commit -a --no-edit || fail "Mixed operations commit failed"
+
+# 4.2 Complex changes
+mkdir -p dir1/dir2
+echo "Nested file" > dir1/dir2/nested.txt
+rm multiline.txt
+echo "Changed" > whitespace.txt
+touch dir1/empty.txt
+git add --all
+git commit -a --no-edit || fail "Complex changes commit failed"
+
+# Test 5: File Renaming and Moving
+test_step "File Renaming and Moving"
+
+# 5.1 Simple rename
+git mv normal.txt renamed.txt
+git commit -a --no-edit || fail "Simple rename commit failed"
+
+# 5.2 Move file to directory
+git mv renamed.txt dir1/
+git commit -a --no-edit || fail "Move to directory commit failed"
+
+# 5.3 Move and rename
+git mv dir1/renamed.txt dir1/dir2/final.txt
+git commit -a --no-edit || fail "Move and rename commit failed"
+
+# Test 6: Permission Changes
+test_step "Permission Changes"
+
+# 6.1 Make file executable
+chmod +x dir1/dir2/final.txt
+git add --all
+git commit -a --no-edit || fail "Permission change commit failed"
+
+# Test 7: Symlink Operations
+test_step "Symlink Operations"
+
+# 7.1 Add symlink
+ln -s dir1/dir2/final.txt symlink.txt
+git add symlink.txt
+git commit -a --no-edit || fail "Symlink creation commit failed"
+
+# 7.2 Modify symlink target
+rm symlink.txt
+ln -s dir1/dir2/nested.txt symlink.txt
+git add --all
+git commit -a --no-edit || fail "Symlink modification commit failed"
+
+# Test 8: Special Content
+test_step "Special Content"
+
+# 8.1 File with null bytes
+printf "Before\0After" > null_file.txt
+git add null_file.txt
+git commit -a --no-edit || fail "Null byte commit failed"
+
+# 8.2 File with special characters
+echo "Special chars: ¡™£¢∞§¶•ªº" > special_chars.txt
+git add special_chars.txt
+git commit -a --no-edit || fail "Special chars commit failed"
+
+# 8.3 File with escape sequences
+echo -e "\033[31mRed\033[0m \033[32mGreen\033[0m" > ansi_colors.txt
+git add ansi_colors.txt
+git commit -a --no-edit || fail "ANSI escape sequences commit failed"
+
+# Test 9: Large Changes
+test_step "Large Changes"
+
+# 9.1 Many files in one commit
+for i in (seq 1 100)
+    echo "Content $i" > "file$i.txt"
+end
+git add .
+git commit -a --no-edit || fail "Many files commit failed"
+
+# 9.2 Many changes to one file
+for i in (seq 1 1000)
+    echo "Line $i" >> large_changes.txt
+end
+git add large_changes.txt
+git commit -a --no-edit || fail "Many changes commit failed"
+
+# Test 10: Edge Cases
+test_step "Edge Cases"
+
+# 10.1 File with only whitespace changes
+echo "Line	with	tabs" > whitespace_changes.txt
+git add whitespace_changes.txt
+git commit -a --no-edit || fail "Initial whitespace commit failed"
+echo "Line with spaces" > whitespace_changes.txt
+git commit -a --no-edit || fail "Whitespace change commit failed"
+
+# 10.2 Rename with case change only
+echo "Case sensitive" > case.txt
+git add case.txt
+git commit -a --no-edit || fail "Case file commit failed"
+git mv case.txt CASE.txt
+git commit -a --no-edit || fail "Case rename commit failed"
+
+# 10.3 Files with same content
+echo "Duplicate content" > dup1.txt
+echo "Duplicate content" > dup2.txt
+git add dup1.txt dup2.txt
+git commit -a --no-edit || fail "Duplicate content commit failed"
+
+# 10.4 Move directory with contents
+mkdir -p src/nested/deep
+echo "Moving file" > src/nested/deep/file.txt
+git add src
+git commit -a --no-edit || fail "Initial directory commit failed"
+git mv src dst
+git commit -a --no-edit || fail "Directory move commit failed"
+
+# 10.5 Replace file with directory
+rm dst/nested/deep/file.txt
+mkdir dst/nested/deep/file.txt
+echo "Now a directory" > dst/nested/deep/file.txt/content.txt
+git add --all
+git commit -a --no-edit || fail "File to directory commit failed"
+
+# 10.6 Replace directory with file
+rm -rf dst/nested/deep/file.txt
+echo "Now a file again" > dst/nested/deep/file.txt
+git add --all
+git commit -a --no-edit || fail "Directory to file commit failed"
+
+echo "All permutation tests completed successfully!"
