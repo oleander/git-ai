@@ -5,3 +5,4 @@ http-cacache/*
 .env.local
 ${env:TMPDIR}
 bin/
+tmp/
