@@ -1,9 +1,8 @@
 mod common;
 
 use tempfile::NamedTempFile;
-use anyhow::Context;
-use git2::{DiffOptions, Repository, Tree};
 use anyhow::{Context, Result};
+use git2::{DiffOptions, Repository, Tree};
 use ai::hook::*;
 use common::*;
 
