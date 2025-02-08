@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 // .git/hooks/prepare-commit-msg
 //
 // git commit --amend --no-edit
@@ -90,23 +92,36 @@ impl Args {
   async fn handle_commit(&self, repo: &Repository, pb: &ProgressBar, model: Model, remaining_tokens: usize) -> Result<()> {
     let tree = match self.sha1.as_deref() {
       Some("HEAD") | None => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
-      Some(sha1) =>
-        repo
-          .find_object(Oid::from_str(sha1)?, None)
-          .ok()
-          .and_then(|obj| obj.peel_to_tree().ok()),
+      Some(sha1) => {
+        // Try to resolve the reference first
+        if let Ok(obj) = repo.revparse_single(sha1) {
+          obj.peel_to_tree().ok()
+        } else {
+          // If not a reference, try as direct OID
+          repo
+            .find_object(Oid::from_str(sha1)?, None)
+            .ok()
+            .and_then(|obj| obj.peel_to_tree().ok())
+        }
+      }
     };
+
+    let diff = repo.to_diff(tree.clone())?;
+    if diff.is_empty()? {
+      if self.sha1.as_deref() == Some("HEAD") {
+        // For amend operations, we want to keep the existing message
+        return Ok(());
+      }
+      bail!("No changes to commit");
+    }
 
     let patch = repo
       .to_patch(tree, remaining_tokens, model)
       .context("Failed to get patch")?;
 
-    if patch.is_empty() {
-      bail!("No changes to commit");
-    }
-
     let response = commit::generate(patch.to_string(), remaining_tokens, model).await?;
     std::fs::write(&self.commit_msg_file, response.response.trim())?;
+
     pb.finish_and_clear();
 
     Ok(())
@@ -122,11 +137,36 @@ impl Args {
         let model = config::APP
           .model
           .clone()
-          .unwrap_or("gpt-4o".to_string())
+          .unwrap_or("gpt-4o-mini".to_string())
           .into();
         let used_tokens = commit::token_used(&model)?;
         let max_tokens = config::APP.max_tokens.unwrap_or(model.context_size());
-        let remaining_tokens = max_tokens.saturating_sub(used_tokens);
+        let remaining_tokens = max_tokens.saturating_sub(used_tokens).max(512); // Ensure minimum 512 tokens
+
+        let tree = match self.sha1.as_deref() {
+          Some("HEAD") | None => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
+          Some(sha1) => {
+            // Try to resolve the reference first
+            if let Ok(obj) = repo.revparse_single(sha1) {
+              obj.peel_to_tree().ok()
+            } else {
+              // If not a reference, try as direct OID
+              repo
+                .find_object(Oid::from_str(sha1)?, None)
+                .ok()
+                .and_then(|obj| obj.peel_to_tree().ok())
+            }
+          }
+        };
+
+        let diff = repo.to_diff(tree.clone())?;
+        if diff.is_empty()? {
+          if self.source == Some(Commit) {
+            // For amend operations, we want to keep the existing message
+            return Ok(());
+          }
+          bail!("No changes to commit");
+        }
 
         let pb = ProgressBar::new_spinner();
         let style = ProgressStyle::default_spinner()
@@ -138,14 +178,26 @@ impl Args {
         pb.set_message("Generating commit message...");
         pb.enable_steady_tick(Duration::from_millis(150));
 
-        if !self.commit_msg_file.is_empty().unwrap_or_default() {
+        // Check if a commit message already exists and is not empty
+        if !std::fs::read_to_string(&self.commit_msg_file)?
+          .trim()
+          .is_empty()
+        {
           log::debug!("A commit message has already been provided");
+          pb.finish_and_clear();
           return Ok(());
         }
 
-        self
-          .handle_commit(&repo, &pb, model, remaining_tokens)
-          .await
+        let patch = repo
+          .to_patch(tree, remaining_tokens, model)
+          .context("Failed to get patch")?;
+
+        let response = commit::generate(patch.to_string(), remaining_tokens, model).await?;
+        std::fs::write(&self.commit_msg_file, response.response.trim())?;
+
+        pb.finish_and_clear();
+
+        Ok(())
       }
     }
   }
@@ -153,16 +205,21 @@ impl Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-  env_logger::init();
+  if std::env::var("RUST_LOG").is_ok() {
+    env_logger::init();
+  }
 
   let time = std::time::Instant::now();
   let args = Args::from_args();
 
-  log::debug!("Arguments: {:?}", args);
+  if log::log_enabled!(log::Level::Debug) {
+    log::debug!("Arguments: {:?}", args);
+  }
+
   if let Err(err) = args.execute().await {
     eprintln!("{} ({:?})", err, time.elapsed());
     exit(1);
-  } else {
+  } else if log::log_enabled!(log::Level::Debug) {
     log::debug!("Completed in {:?}", time.elapsed());
   }
 
