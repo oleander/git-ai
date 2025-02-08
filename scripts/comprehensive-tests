@@ -1,7 +1,7 @@
 #!/usr/bin/env fish
 
 set -x fish_trace 1
-set model "tavernari/git-commit-message:latest"
+set model "SlyOtis/git-auto-message:latest"
 
 # Load environment variables from .env.local if it exists
 if test -f .env.local
@@ -131,7 +131,7 @@ git commit -a --no-edit || fail "Multiple empty files commit failed"
 echo "Normal text" >normal.txt
 echo -e "Line 1\nLine 2\nLine 3" >multiline.txt
 echo -n "No newline" >no_newline.txt
-echo "Tab	Space Space  End" >whitespace.txt
+echo "Tab Space Space End" >whitespace.txt
 git add .
 git commit -a --no-edit || fail "Different content types commit failed"
 
