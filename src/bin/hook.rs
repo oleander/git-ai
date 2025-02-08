@@ -97,13 +97,18 @@ impl Args {
           .and_then(|obj| obj.peel_to_tree().ok()),
     };
 
+    let diff = repo.to_diff(tree.clone())?;
+    if diff.is_empty()? {
+      if self.sha1.as_deref() == Some("HEAD") {
+        // For amend operations, we want to keep the existing message
+        return Ok(());
+      }
+      bail!("No changes to commit");
+    }
+
     let patch = repo
       .to_patch(tree, remaining_tokens, model)
       .context("Failed to get patch")?;
-
-    if patch.is_empty() {
-      bail!("No changes to commit");
-    }
 
     let response = commit::generate(patch.to_string(), remaining_tokens, model).await?;
     std::fs::write(&self.commit_msg_file, response.response.trim())?;
@@ -127,7 +132,7 @@ impl Args {
           .into();
         let used_tokens = commit::token_used(&model)?;
         let max_tokens = config::APP.max_tokens.unwrap_or(model.context_size());
-        let remaining_tokens = max_tokens.saturating_sub(used_tokens).max(512);
+        let remaining_tokens = max_tokens.saturating_sub(used_tokens).max(512); // Ensure minimum 512 tokens
 
         let tree = match self.sha1.as_deref() {
           Some("HEAD") | None => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
@@ -140,6 +145,10 @@ impl Args {
 
         let diff = repo.to_diff(tree.clone())?;
         if diff.is_empty()? {
+          if self.source == Some(Commit) {
+            // For amend operations, we want to keep the existing message
+            return Ok(());
+          }
           bail!("No changes to commit");
         }
 
