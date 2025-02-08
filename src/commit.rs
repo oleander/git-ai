@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use mustache::MapBuilder;
+use maplit::hashmap;
 
 use crate::{config, openai, profile};
 use crate::model::Model;
@@ -9,12 +9,17 @@ const INSTRUCTION_TEMPLATE: &str = include_str!("../resources/prompt.md");
 
 /// Returns the instruction template for the AI model.
 /// This template guides the model in generating appropriate commit messages.
-fn get_instruction_template() -> String {
+fn get_instruction_template() -> Result<String> {
   profile!("Generate instruction template");
   let max_length = config::APP.max_commit_length.unwrap_or(72).to_string();
-  INSTRUCTION_TEMPLATE
-    .replace("{{max_length}}", &max_length)
-    .replace("{{diff}}", "")
+  let template = mustache::compile_str(INSTRUCTION_TEMPLATE)
+    .map_err(|e| anyhow::anyhow!("Template compilation error: {}", e))?
+    .render_to_string(&hashmap! {
+      "max_length" => max_length,
+      "diff" => "".to_string(),
+    })
+    .map_err(|e| anyhow::anyhow!("Template rendering error: {}", e))?;
+  Ok(template)
 }
 
 /// Calculates the number of tokens used by the instruction template.
@@ -26,7 +31,8 @@ fn get_instruction_template() -> String {
 /// * `Result<usize>` - The number of tokens used or an error
 pub fn get_instruction_token_count(model: &Model) -> Result<usize> {
   profile!("Calculate instruction tokens");
-  model.count_tokens(&get_instruction_template())
+  let template = get_instruction_template()?;
+  model.count_tokens(&template)
 }
 
 /// Creates an OpenAI request for commit message generation.
@@ -37,20 +43,24 @@ pub fn get_instruction_token_count(model: &Model) -> Result<usize> {
 /// * `model` - The AI model to use for generation
 ///
 /// # Returns
-/// * `openai::Request` - The prepared request
-pub fn create_commit_request(diff: String, max_tokens: usize, model: Model) -> openai::Request {
+/// * `Result<openai::Request>` - The prepared request
+pub fn create_commit_request(diff: String, max_tokens: usize, model: Model) -> Result<openai::Request> {
   profile!("Prepare OpenAI request");
   let max_length = config::APP.max_commit_length.unwrap_or(72).to_string();
-  let instruction_template = INSTRUCTION_TEMPLATE
-    .replace("{{max_length}}", &max_length)
-    .replace("{{diff}}", &diff);
+  let instruction_template = mustache::compile_str(INSTRUCTION_TEMPLATE)
+    .map_err(|e| anyhow::anyhow!("Template compilation error: {}", e))?
+    .render_to_string(&hashmap! {
+      "max_length" => max_length,
+      "diff" => diff,
+    })
+    .map_err(|e| anyhow::anyhow!("Template rendering error: {}", e))?;
 
-  openai::Request {
+  Ok(openai::Request {
     system: instruction_template,
     prompt: "".to_string(),
     max_tokens: max_tokens.try_into().unwrap_or(u16::MAX),
     model
-  }
+  })
 }
 
 /// Generates a commit message using the AI model.
@@ -74,7 +84,7 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model) -> R
     bail!("Maximum token count must be greater than zero")
   }
 
-  let request = create_commit_request(patch, remaining_tokens, model);
+  let request = create_commit_request(patch, remaining_tokens, model)?;
   openai::call(request).await
 }
 
