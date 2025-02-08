@@ -48,10 +48,16 @@ impl OllamaClient {
 #[async_trait]
 impl OllamaClientTrait for OllamaClient {
   async fn generate(&self, model: Model, prompt: &str) -> Result<String> {
-    self.generate(model, prompt).await
+    let model_name = <&str>::from(&model);
+    let request = GenerationRequest::new(model_name.to_string(), prompt.to_string());
+    let response = self.client.generate(request).await?;
+    Ok(response.response)
   }
 
   async fn is_available(&self, model: Model) -> bool {
-    self.is_available(model).await
+    let test_prompt = "test";
+    let model_name = <&str>::from(&model);
+    let request = GenerationRequest::new(model_name.to_string(), test_prompt.to_string());
+    self.client.generate(request).await.is_ok()
   }
 }
