@@ -40,10 +40,6 @@ You are an AI assistant that generates concise and precise git commit messages b
 
 - **Important**: The output will be used as a git commit message, so it must be a valid git commit message.
 
-I'll first inspect the contents of the uploaded file to extract three smaller diffs (3-5 lines each) and format them accordingly. Let me process the file.
-
-Here are three smaller diffs (3-5 lines) formatted as requested:
-
 ### EXAMPLE INPUT 1
 
     diff --git c/src/hook/mod.rs c/src/hook/mod.rs
@@ -63,11 +59,10 @@ Here are three smaller diffs (3-5 lines) formatted as requested:
 
     Remove 'assert_matches' feature flag from hook module
 
+---
+
 ### EXAMPLE INPUT 2
 
-    diff --git c/.github/workflows/rust.yml c/.github/workflows/rust.yml
-    index e167d7a..2f70ac0 100644
-    --- c/.github/workflows/rust.yml
     diff --git c/.github/workflows/rust.yml c/.github/workflows/rust.yml
     index e167d7a..2f70ac0 100644
     --- c/.github/workflows/rust.yml
@@ -92,6 +87,8 @@ Here are three smaller diffs (3-5 lines) formatted as requested:
 ### EXAMPLE OUTPUT 2
 
     Uncomment install hook and Clippy check in CI workflow
+
+---
 
 ### EXAMPLE INPUT 3
 
