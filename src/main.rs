@@ -1,6 +1,3 @@
-mod uninstall;
-mod install;
-mod reinstall;
 mod config;
 mod filesystem;
 
@@ -11,18 +8,13 @@ use dotenv::dotenv;
 use crate::config::App;
 use crate::filesystem::Filesystem;
 
-mod finetune;
-use crate::finetune::FinetuneArgs;
-
 #[derive(StructOpt)]
 #[structopt(name = "git-ai", about = "A git extension that uses OpenAI to generate commit messages")]
 enum Cli {
   #[structopt(about = "Installs the git-ai hook")]
   Hook(HookSubcommand),
   #[structopt(about = "Sets or gets configuration values")]
-  Config(ConfigSubcommand),
-  #[structopt(about = "Exports training data for fine-tuning")]
-  Finetune(FinetuneArgs)
+  Config(ConfigSubcommand)
 }
 
 #[derive(StructOpt)]
@@ -230,9 +222,6 @@ async fn main() -> Result<()> {
             }
           },
       },
-    Cli::Finetune(args) => {
-      finetune::run(args).await?;
-    }
   }
 
   Ok(())
