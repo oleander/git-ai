@@ -30,59 +30,6 @@ pub async fn generate_commit_message(diff: &str) -> Result<String> {
   Ok(response.response.trim().to_string())
 }
 
-/// Scores a commit message against the original using AI evaluation
-pub async fn score_commit_message(message: &str, original: &str) -> Result<f32> {
-  profile!("Score commit message");
-  let system_prompt = "You are an expert at evaluating git commit messages. Score the following commit message on these criteria:
-      - Accuracy (0-1): How well does it describe the actual changes?
-      - Clarity (0-1): How clear and understandable is the message?
-      - Brevity (0-1): Is it concise while being informative?
-      - Categorization (0-1): Does it properly categorize the type of change?
-
-      Return ONLY a JSON object containing these scores and brief feedback.";
-
-  let response = call(Request {
-    system:     system_prompt.to_string(),
-    prompt:     format!("Original commit message:\n{}\n\nGenerated commit message:\n{}", original, message),
-    max_tokens: 512,
-    model:      Model::GPT4oMini
-  })
-  .await?;
-
-  // Parse the JSON response to get the overall score
-  let parsed: serde_json::Value = serde_json::from_str(&response.response).context("Failed to parse scoring response as JSON")?;
-
-  let accuracy = parsed["accuracy"].as_f64().unwrap_or(0.0) as f32;
-  let clarity = parsed["clarity"].as_f64().unwrap_or(0.0) as f32;
-  let brevity = parsed["brevity"].as_f64().unwrap_or(0.0) as f32;
-  let categorization = parsed["categorization"].as_f64().unwrap_or(0.0) as f32;
-
-  Ok((accuracy + clarity + brevity + categorization) / 4.0)
-}
-
-/// Optimizes a prompt based on performance metrics
-pub async fn optimize_prompt(current_prompt: &str, performance_metrics: &str) -> Result<String> {
-  profile!("Optimize prompt");
-  let system_prompt = "You are an expert at optimizing prompts for AI systems. \
-      Your task is to improve a prompt used for generating git commit messages \
-      based on performance metrics. Return ONLY the improved prompt text.";
-
-  let response = call(Request {
-    system:     system_prompt.to_string(),
-    prompt:     format!(
-      "Current prompt:\n{}\n\nPerformance metrics:\n{}\n\n\
-       Suggest an improved version of this prompt that addresses any weaknesses \
-       shown in the metrics while maintaining its strengths.",
-      current_prompt, performance_metrics
-    ),
-    max_tokens: 1024,
-    model:      Model::GPT4oMini
-  })
-  .await?;
-
-  Ok(response.response.trim().to_string())
-}
-
 fn truncate_to_fit(text: &str, max_tokens: usize, model: &Model) -> Result<String> {
   let token_count = model.count_tokens(text)?;
   if token_count <= max_tokens {
