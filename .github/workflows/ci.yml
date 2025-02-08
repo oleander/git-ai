@@ -54,6 +54,11 @@ jobs:
         rust: [nightly, stable]
     runs-on: ${{ matrix.os }}
     continue-on-error: false
+    services:
+      fake-openai:
+        image: fake-openai:latest
+        ports:
+          - 8080:8080
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -91,3 +96,4 @@ jobs:
           cargo test --release
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_URL: http://localhost:8080
