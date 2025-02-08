@@ -1,4 +1,5 @@
 use anyhow::{bail, Result};
+use mustache::MapBuilder;
 
 use crate::{config, openai, profile};
 use crate::model::Model;
@@ -10,7 +11,10 @@ const INSTRUCTION_TEMPLATE: &str = include_str!("../resources/prompt.md");
 /// This template guides the model in generating appropriate commit messages.
 fn get_instruction_template() -> String {
   profile!("Generate instruction template");
-  INSTRUCTION_TEMPLATE.replace("{{max_commit_length}}", &config::APP.max_commit_length.unwrap_or(72).to_string())
+  let max_length = config::APP.max_commit_length.unwrap_or(72).to_string();
+  INSTRUCTION_TEMPLATE
+    .replace("{{max_length}}", &max_length)
+    .replace("{{diff}}", "")
 }
 
 /// Calculates the number of tokens used by the instruction template.
@@ -36,9 +40,14 @@ pub fn get_instruction_token_count(model: &Model) -> Result<usize> {
 /// * `openai::Request` - The prepared request
 pub fn create_commit_request(diff: String, max_tokens: usize, model: Model) -> openai::Request {
   profile!("Prepare OpenAI request");
+  let max_length = config::APP.max_commit_length.unwrap_or(72).to_string();
+  let instruction_template = INSTRUCTION_TEMPLATE
+    .replace("{{max_length}}", &max_length)
+    .replace("{{diff}}", &diff);
+
   openai::Request {
-    system: get_instruction_template(),
-    prompt: diff,
+    system: instruction_template,
+    prompt: "".to_string(),
     max_tokens: max_tokens.try_into().unwrap_or(u16::MAX),
     model
   }
