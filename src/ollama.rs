@@ -18,8 +18,7 @@ pub trait OllamaClientTrait {
 }
 
 impl OllamaClient {
-  pub fn new() -> Result<Self> {
-    // Default to localhost:11434 which is Ollama's default
+  pub async fn new() -> Result<Self> {
     let client = Ollama::default();
     Ok(Self { client })
   }

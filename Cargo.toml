@@ -54,8 +54,9 @@ serde_ini = "0.2.0"
 serde_json = "1.0"
 
 # OpenAI integration
-async-openai = { version = "0.27.2", default-features = false }
+
 ollama-rs = { version = "0.2.5", features = ["stream"] }
+async-openai = { version = "0.27.2", default-features = false }
 tiktoken-rs = "0.6.0"
 reqwest = { version = "0.12.12", default-features = true }
 

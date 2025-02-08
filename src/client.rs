@@ -21,7 +21,7 @@ pub struct Response {
 pub async fn call(request: Request) -> Result<Response> {
   match request.model {
     Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 | Model::Tavernari | Model::SlyOtis => {
-      let client = OllamaClient::new()?;
+      let client = OllamaClient::new().await?;
 
       let template = commit::get_instruction_template()?;
       let full_prompt = format!(
@@ -62,7 +62,7 @@ pub async fn call(request: Request) -> Result<Response> {
 pub async fn is_model_available(model: Model) -> bool {
   match model {
     Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 | Model::SlyOtis => {
-      if let Ok(client) = OllamaClient::new() {
+      if let Ok(client) = OllamaClient::new().await {
         return client.is_available(model).await;
       }
       false

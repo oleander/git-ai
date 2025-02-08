@@ -155,7 +155,7 @@ impl Args {
     let response = commit::generate(patch, remaining_tokens, model).await?;
     pb.set_message("Writing commit message...");
 
-    self.commit_msg_file.write(&response.response)?;
+    self.commit_msg_file.write(response.response)?;
     Ok(())
   }
 }

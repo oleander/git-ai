@@ -31,4 +31,6 @@ Before generating the final commit message, please analyze the diff and but keep
 9. Select the best summary that accurately reflects the most significant change and meets the character limit.
 10. Prefixes such as `refactor:`, `fix` should be removed
 
+After your analysis, provide only the final commit message as output. Ensure it is clear, concise, and accurately reflects the content of the diff while adhering to the character limit. Do not include any additional text or explanations in your final output.
+
 <DIFF>

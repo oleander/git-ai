@@ -22,6 +22,7 @@ pub struct Request {
   pub max_tokens: u16,
   pub model:      Model
 }
+
 /// Generates an improved commit message using the provided prompt and diff
 pub async fn generate_commit_message(diff: &str) -> Result<String> {
   profile!("Generate commit message");

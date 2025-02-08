@@ -3,7 +3,6 @@ use std::fmt::{self, Display};
 use std::str::FromStr;
 
 use anyhow::{bail, Result};
-use serde::{Deserialize, Serialize};
 use tiktoken_rs::get_completion_max_tokens;
 use tiktoken_rs::model::get_context_size;
 
@@ -24,7 +23,7 @@ const MODEL_SLYOTIS: &str = "SlyOtis/git-auto-message:latest";
 
 /// Represents the available AI models for commit message generation.
 /// Each model has different capabilities and token limits.
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Model {
   /// Standard GPT-4 model
   GPT4,
@@ -53,7 +52,6 @@ pub enum Model {
 
 impl Model {
   /// Counts the number of tokens in the given text for the current model.
-  /// This is used to ensure we stay within the model's token limits.
   ///
   /// # Arguments
   /// * `text` - The text to count tokens for
@@ -104,43 +102,24 @@ impl Model {
   ///
   /// # Returns
   /// * `Result<String>` - The truncated text or an error
-  pub(crate) fn truncate(&self, text: &str, max_tokens: usize) -> Result<String> {
+  pub fn truncate(&self, text: &str, max_tokens: usize) -> Result<String> {
     profile!("Truncate text");
-    self.walk_truncate(text, max_tokens, usize::MAX)
-  }
+    let mut truncated = String::new();
+    let mut current_tokens = 0;
 
-  /// Recursively truncates text to fit within token limits while maintaining coherence.
-  /// Uses a binary search-like approach to find the optimal truncation point.
-  ///
-  /// # Arguments
-  /// * `text` - The text to truncate
-  /// * `max_tokens` - The maximum number of tokens allowed
-  /// * `within` - The maximum allowed deviation from target token count
-  ///
-  /// # Returns
-  /// * `Result<String>` - The truncated text or an error
-  pub(crate) fn walk_truncate(&self, text: &str, max_tokens: usize, within: usize) -> Result<String> {
-    profile!("Walk truncate iteration");
-    log::debug!("max_tokens: {}, within: {}", max_tokens, within);
-
-    let truncated = {
-      profile!("Split and join text");
-      text
-        .split_whitespace()
-        .take(max_tokens)
-        .collect::<Vec<&str>>()
-        .join(" ")
-    };
-
-    let token_count = self.count_tokens(&truncated)?;
-    let offset = token_count.saturating_sub(max_tokens);
-
-    if offset > within || offset == 0 {
-      Ok(truncated)
-    } else {
-      // Recursively adjust token count to get closer to target
-      self.walk_truncate(text, max_tokens + offset, within)
+    for line in text.lines() {
+      let line_tokens = self.count_tokens(line)?;
+      if current_tokens + line_tokens > max_tokens {
+        break;
+      }
+      if !truncated.is_empty() {
+        truncated.push('\n');
+      }
+      truncated.push_str(line);
+      current_tokens += line_tokens;
     }
+
+    Ok(truncated)
   }
 }
 

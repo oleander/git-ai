@@ -1,8 +1,10 @@
 #![allow(dead_code)]
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::fs::File;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::io::{Read, Write};
 
 use structopt::StructOpt;
 use git2::{Diff, DiffFormat, DiffOptions, Repository, Tree};
@@ -88,17 +90,21 @@ pub trait FilePath {
     self.read().map(|s| s.is_empty())
   }
 
+  fn write(&self, msg: String) -> Result<()>;
   fn read(&self) -> Result<String>;
-  fn write(&self, content: &str) -> Result<()>;
 }
 
 impl FilePath for PathBuf {
-  fn read(&self) -> Result<String> {
-    std::fs::read_to_string(self).context("Failed to read file")
+  fn write(&self, msg: String) -> Result<()> {
+    File::create(self)?
+      .write_all(msg.as_bytes())
+      .map_err(Into::into)
   }
 
-  fn write(&self, content: &str) -> Result<()> {
-    std::fs::write(self, content).context("Failed to write file")
+  fn read(&self) -> Result<String> {
+    let mut contents = String::new();
+    File::open(self)?.read_to_string(&mut contents)?;
+    Ok(contents)
   }
 }
 
@@ -113,7 +119,7 @@ impl DiffDeltaPath for git2::DiffDelta<'_> {
       .new_file()
       .path()
       .or_else(|| self.old_file().path())
-      .map(|p| p.to_path_buf())
+      .map(PathBuf::from)
       .unwrap_or_default()
   }
 }
@@ -123,12 +129,15 @@ pub trait Utf8String {
   fn to_utf8(&self) -> String;
 }
 
+impl Utf8String for Vec<u8> {
+  fn to_utf8(&self) -> String {
+    String::from_utf8_lossy(self).into_owned()
+  }
+}
+
 impl Utf8String for [u8] {
   fn to_utf8(&self) -> String {
-    String::from_utf8_lossy(self)
-      .chars()
-      .filter(|c| !c.is_control() || *c == '\n' || *c == '\t')
-      .collect()
+    String::from_utf8_lossy(self).into_owned()
   }
 }
 
@@ -270,8 +279,7 @@ fn process_chunk(
     };
 
     if max_tokens_per_file == 0 {
-      // Return early since no tokens are left for any remaining files
-      return Ok(());
+      continue;
     }
 
     let token_count = *token_count;
@@ -303,6 +311,7 @@ fn process_chunk(
 }
 
 pub trait PatchRepository {
+  fn to_patch(&self, tree: Option<Tree<'_>>, max_token_count: usize, model: Model) -> Result<String>;
   fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>>;
   fn to_commit_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>>;
   fn configure_diff_options(&self, opts: &mut DiffOptions);
@@ -310,6 +319,11 @@ pub trait PatchRepository {
 }
 
 impl PatchRepository for Repository {
+  fn to_patch(&self, tree: Option<Tree>, max_token_count: usize, model: Model) -> Result<String> {
+    profile!("Repository patch generation");
+    self.to_commit_diff(tree)?.to_patch(max_token_count, model)
+  }
+
   fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>> {
     profile!("Git diff generation");
     let mut opts = DiffOptions::new();
