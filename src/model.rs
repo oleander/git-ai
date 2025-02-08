@@ -20,6 +20,7 @@ const MODEL_MISTRAL: &str = "mistral:latest";
 const MODEL_DEEPSEEK: &str = "deepseek-r1:7b";
 const MODEL_SMOLLM2: &str = "smollm2:135m";
 const MODEL_TAVERNARI: &str = "tavernari/git-commit-message:latest";
+const MODEL_SLYOTIS: &str = "SlyOtis/git-auto-message:latest";
 
 /// Represents the available AI models for commit message generation.
 /// Each model has different capabilities and token limits.
@@ -45,7 +46,9 @@ pub enum Model {
   /// Smol LM 2 135M model
   SmollM2,
   /// Tavernari Git Commit Message model
-  Tavernari
+  Tavernari,
+  /// SlyOtis Git Auto Message model
+  SlyOtis
 }
 
 impl Model {
@@ -60,7 +63,7 @@ impl Model {
   pub fn count_tokens(&self, text: &str) -> Result<usize> {
     profile!("Count tokens");
     match self {
-      Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 | Model::Tavernari => {
+      Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 | Model::Tavernari | Model::SlyOtis => {
         // For Ollama models, we'll estimate tokens based on word count
         // A rough approximation is that each word is about 1.3 tokens
         let word_count = text.split_whitespace().count();
@@ -84,7 +87,8 @@ impl Model {
   pub fn context_size(&self) -> usize {
     profile!("Get context size");
     match self {
-      Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 | Model::Tavernari => 4096_usize,
+      Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 | Model::Tavernari | Model::SlyOtis =>
+        4096_usize,
       _ => {
         let model_str: &str = self.into();
         get_context_size(model_str)
@@ -152,7 +156,8 @@ impl From<&Model> for &str {
       Model::Mistral => MODEL_MISTRAL,
       Model::DeepSeekR1_7B => MODEL_DEEPSEEK,
       Model::SmollM2 => MODEL_SMOLLM2,
-      Model::Tavernari => MODEL_TAVERNARI
+      Model::Tavernari => MODEL_TAVERNARI,
+      Model::SlyOtis => MODEL_SLYOTIS
     }
   }
 }
@@ -172,6 +177,7 @@ impl FromStr for Model {
       s if s.eq_ignore_ascii_case(MODEL_DEEPSEEK) => Ok(Model::DeepSeekR1_7B),
       s if s.eq_ignore_ascii_case(MODEL_SMOLLM2) => Ok(Model::SmollM2),
       s if s.eq_ignore_ascii_case(MODEL_TAVERNARI) => Ok(Model::Tavernari),
+      s if s.eq_ignore_ascii_case(MODEL_SLYOTIS) => Ok(Model::SlyOtis),
       model => bail!("Invalid model name: {}", model)
     }
   }
