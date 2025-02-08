@@ -1,7 +1,12 @@
 use anyhow::{bail, Result};
 
+<<<<<<< HEAD
 use crate::{config, openai, ollama};
 use crate::model::{Model, Request, Response};
+=======
+use crate::{client, config};
+use crate::model::Model;
+>>>>>>> fbe8ab1 (<think>)
 
 fn instruction() -> String {
   format!("You are an AI assistant that generates concise and meaningful git commit messages based on provided diffs. Please adhere to the following guidelines:
@@ -27,17 +32,29 @@ pub fn token_used(model: &Model) -> Result<usize> {
   model.count_tokens(&instruction())
 }
 
+<<<<<<< HEAD
 pub async fn generate(diff: String, max_tokens: usize, model: Model) -> Result<Response> {
+=======
+pub async fn generate(diff: String, max_tokens: usize, model: Model) -> Result<client::Response> {
+>>>>>>> fbe8ab1 (<think>)
   if max_tokens == 0 {
     bail!("Max can't be zero (2)")
   }
 
+<<<<<<< HEAD
   let request = Request {
+=======
+  let request = client::Request {
+>>>>>>> fbe8ab1 (<think>)
     system: instruction(),
     prompt: diff,
     max_tokens: max_tokens.try_into().unwrap_or(u16::MAX),
     model
   };
 
+<<<<<<< HEAD
   ollama::call(request).await
+=======
+  client::call(request).await
+>>>>>>> fbe8ab1 (<think>)
 }

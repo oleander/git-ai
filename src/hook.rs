@@ -10,6 +10,7 @@ use thiserror::Error;
 
 use crate::model::Model;
 
+/// Trait for handling file path operations with proper error handling
 pub trait FilePath {
   fn is_empty(&self) -> Result<bool> {
     self.read().map(|s| s.is_empty())
@@ -34,6 +35,7 @@ impl FilePath for PathBuf {
   }
 }
 
+/// Trait for extracting paths from git diff deltas
 trait DiffDeltaPath {
   fn path(&self) -> PathBuf;
 }
@@ -49,6 +51,7 @@ impl DiffDeltaPath for git2::DiffDelta<'_> {
   }
 }
 
+/// Trait for converting byte sequences to UTF-8 strings
 pub trait Utf8String {
   fn to_utf8(&self) -> String;
 }
@@ -65,6 +68,7 @@ impl Utf8String for [u8] {
   }
 }
 
+/// Trait for converting git diffs to patch format with token limits
 pub trait PatchDiff {
   fn to_patch(&self, max_token_count: usize, model: Model) -> Result<String>;
 }
@@ -100,8 +104,12 @@ impl PatchDiff for Diff<'_> {
 
     let mut diffs: Vec<_> = files.values().collect();
 
-    // TODO: No unwrap
-    diffs.sort_by_key(|diff| model.count_tokens(diff).unwrap());
+    diffs.sort_by_key(|diff| {
+      model
+        .count_tokens(diff)
+        .context("Failed to count tokens")
+        .unwrap_or(0)
+    });
 
     diffs
       .iter()
@@ -125,11 +133,11 @@ impl PatchDiff for Diff<'_> {
           let token_limits = [file_token_count, max_tokens_per_file];
           let file_allocated_tokens = token_limits.iter().min().unwrap();
 
-          // We have reached the token limit for the file: truncate
+          // Truncate the diff if it exceeds the token limit
           let truncated_diff = if file_token_count > *file_allocated_tokens {
             model.truncate(diff, *file_allocated_tokens)
           } else {
-            Ok((*diff).clone().to_owned()) // TODO: Better way?
+            Ok(diff.to_string())
           };
 
           log::debug!("file_token_count: {}", file_token_count);
@@ -159,6 +167,8 @@ impl PatchRepository for Repository {
   }
 
   fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>> {
+    log::debug!("Generating diff with tree: {:?}", tree.as_ref().map(|t| t.id()));
+
     let mut opts = DiffOptions::new();
     opts
       .ignore_whitespace_change(true)
@@ -176,9 +186,18 @@ impl PatchRepository for Repository {
       .patience(true)
       .minimal(false);
 
-    self
-      .diff_tree_to_index(tree.as_ref(), None, Some(&mut opts))
-      .context("Failed to get diff")
+    log::debug!("Configured diff options");
+
+    match self.diff_tree_to_index(tree.as_ref(), None, Some(&mut opts)) {
+      Ok(diff) => {
+        log::debug!("Successfully generated diff");
+        Ok(diff)
+      }
+      Err(e) => {
+        log::error!("Failed to generate diff: {}", e);
+        Err(e).context("Failed to get diff")
+      }
+    }
   }
 }
 

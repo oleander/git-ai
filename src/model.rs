@@ -12,6 +12,10 @@ const GPT4O: &str = "gpt-4o";
 const GPT4_TURBO: &str = "gpt-4-turbo-preview";
 const LLAMA3: &str = "llama3";
 const GPT4OMINI: &str = "gpt-4o-mini";
+const LLAMA2: &str = "llama2:latest";
+const CODELLAMA: &str = "codellama:latest";
+const MISTRAL: &str = "mistral:latest";
+const DEEPSEEK_R1_7B: &str = "deepseek-r1:7b";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Response {
@@ -33,22 +37,34 @@ pub enum Model {
   GPT4Turbo,
   Llama3,
   #[default]
-  GPT4oMini
+  GPT4oMini,
+  Llama2,
+  CodeLlama,
+  Mistral,
+  DeepSeekR1_7B
 }
 
 impl Model {
   pub fn count_tokens(&self, text: &str) -> Result<usize> {
-    let max_tokens = get_completion_max_tokens(self.into(), text).unwrap_or(8192);
-
-    Ok(
-      self
-        .context_size()
-        .saturating_sub(max_tokens)
-    )
+    match self {
+      Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B => {
+        // For Ollama models, we'll estimate tokens based on word count
+        // A rough approximation is that each word is about 1.3 tokens
+        let word_count = text.split_whitespace().count();
+        Ok((word_count as f64 * 1.3).ceil() as usize)
+      }
+      _ => {
+        let max_tokens = get_completion_max_tokens(self.into(), text)?;
+        Ok(self.context_size().saturating_sub(max_tokens))
+      }
+    }
   }
 
   pub fn context_size(&self) -> usize {
-    get_context_size(self.into())
+    match self {
+      Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B => 4096_usize,
+      _ => get_context_size(self.into())
+    }
   }
 
   pub(crate) fn truncate(&self, diff: &str, max_tokens: usize) -> Result<String> {
@@ -82,7 +98,11 @@ impl From<&Model> for &str {
       Model::GPT4 => GPT4,
       Model::GPT4Turbo => GPT4_TURBO,
       Model::Llama3 => LLAMA3,
-      Model::GPT4oMini => GPT4OMINI
+      Model::GPT4oMini => GPT4OMINI,
+      Model::Llama2 => LLAMA2,
+      Model::CodeLlama => CODELLAMA,
+      Model::Mistral => MISTRAL,
+      Model::DeepSeekR1_7B => DEEPSEEK_R1_7B
     }
   }
 }
@@ -97,6 +117,10 @@ impl FromStr for Model {
       GPT4_TURBO => Ok(Model::GPT4Turbo),
       LLAMA3 => Ok(Model::Llama3),
       GPT4OMINI => Ok(Model::GPT4oMini),
+      LLAMA2 => Ok(Model::Llama2),
+      CODELLAMA => Ok(Model::CodeLlama),
+      MISTRAL => Ok(Model::Mistral),
+      DEEPSEEK_R1_7B => Ok(Model::DeepSeekR1_7B),
       model => bail!("Invalid model: {}", model)
     }
   }
