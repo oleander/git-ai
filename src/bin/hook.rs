@@ -164,6 +164,16 @@ impl Args {
         pb.set_message("Generating commit message...");
         pb.enable_steady_tick(Duration::from_millis(150));
 
+        // Check if a commit message already exists and is not empty
+        if !std::fs::read_to_string(&self.commit_msg_file)?
+          .trim()
+          .is_empty()
+        {
+          log::debug!("A commit message has already been provided");
+          pb.finish_and_clear();
+          return Ok(());
+        }
+
         let patch = repo
           .to_patch(tree, remaining_tokens, model)
           .context("Failed to get patch")?;
