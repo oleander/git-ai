@@ -1,25 +1,23 @@
 use anyhow::{bail, Result};
-use ai::filesystem::Filesystem;
 use colored::Colorize;
 use console::Emoji;
 
+use crate::filesystem::Filesystem;
+
 const EMOJI: Emoji<'_, '_> = Emoji("🔗", "");
 
-pub fn run() -> Result<()> {
-  let filesystem = Filesystem::new()?;
-
-  if !filesystem.git_hooks_path().exists() {
-    filesystem.git_hooks_path().create_dir_all()?;
-  }
-
-  let hook_file = filesystem.prepare_commit_msg_path()?;
-  let hook_bin = filesystem.git_ai_hook_bin_path()?;
+pub fn install(fs: &Filesystem) -> Result<()> {
+  let hook_bin = fs.hook_bin()?;
+  let hook_file = fs.hook_file()?;
 
   if hook_file.exists() {
-    bail!("Hook already exists at {}, please run 'git ai hook reinstall'", hook_file);
+    bail!(
+      "Hook already exists at {}, please run 'git ai hook reinstall'",
+      hook_file.to_string().italic()
+    );
   }
 
-  hook_file.symlink(hook_bin)?;
+  hook_file.symlink(&hook_bin)?;
 
   println!("{EMOJI} Hook symlinked successfully to {}", hook_file.to_string().italic());
 
