@@ -1,0 +1,292 @@
+#!/usr/bin/env fish
+
+set -x fish_trace 1
+
+# Load environment variables from .env.local if it exists
+if test -f .env.local
+    for line in (cat .env.local)
+        if not string match -q "#*" $line # Skip comments
+            and test -n "$line" # Skip empty lines
+            set -l key (string split -m 1 = $line)[1]
+            set -l value (string split -m 1 = $line)[2]
+            # Remove quotes if they exist
+            set value (string trim -c '"' $value)
+            set value (string trim -c "'" $value)
+            set -gx $key $value
+        end
+    end
+else
+    echo "Warning: .env.local file not found. Make sure you have the required environment variables set."
+end
+
+set -Ux OPENAI_API_KEY $OPENAI_API_KEY
+set -x RUST_LOG debug
+
+if not test -n "$OPENAI_API_KEY"
+    echo "Please set the OPENAI_API_KEY environment variable."
+    exit 1
+end
+
+if not command -v cargo
+    echo "Cargo not found. Please install Rust."
+    exit 1
+end
+
+function on_exit --on-event fish_exit
+    if test -d $TEST_DIR
+        rm -rf $TEST_DIR
+    end
+end
+
+function generate_random_content
+    set size $argv[1]
+    head -c $size /dev/urandom | base64
+end
+
+function last_commit
+    git log -1 --pretty=%B | tr -d '\n'
+end
+
+function fail
+    echo "Test failed: $argv"
+    exit 1
+end
+
+function test_step
+    set description $argv[1]
+    echo "=== Testing: $description ==="
+end
+
+set TEST_DIR /tmp/git-ai-test-(date +%s)
+
+# Install git-ai
+cargo install --force --debug --path . || fail "Cargo installation failed"
+
+# Setup test repository
+rm -rf $TEST_DIR
+mkdir -p $TEST_DIR
+cd $TEST_DIR
+
+git init || fail "Git init failed"
+git config user.name "Test User"
+git config user.email "test@example.com"
+git config --global init.defaultBranch main
+git branch -m main
+
+# Test 1: Hook Installation and Configuration
+test_step "Hook Installation and Configuration"
+
+git-ai hook || echo "As expected"
+git-ai hook install || fail "Hook installation failed"
+git-ai hook uninstall || fail "Hook uninstallation failed"
+git-ai hook install || fail "Hook reinstallation failed"
+git-ai hook reinstall || fail "Hook reinstall failed"
+
+git-ai config reset
+git-ai config || echo "As expected"
+git-ai config set || echo "As expected"
+git-ai config set model gpt-4 || fail "Setting model failed"
+git-ai config set max-tokens 512 || fail "Setting max tokens failed"
+git-ai config set max-commit-length 1024 || fail "Setting max commit length failed"
+git-ai config set openai-api-key "$OPENAI_API_KEY" || fail "Setting OpenAI API key failed"
+
+# Test 2: Basic Git Operations
+test_step "Basic Git Operations"
+
+# 2.1 Initial commit
+echo "Hello World 0" >README.md
+git add README.md
+git status --porcelain || fail "Git status failed before initial commit"
+test -f README.md || fail "README.md was not created"
+git commit -m "Initial commit: Add README.md" || fail "Initial commit failed"
+git status --porcelain || fail "Git status failed after initial commit"
+
+# 2.2 Commit with message
+echo "Hello World" >README.md
+git add README.md
+git commit -m "Initial commit" || fail "Commit with message failed"
+last_commit | grep "Initial commit" || fail "Commit message 'Initial commit' not found"
+
+# 2.3 Commit with --no-edit
+echo "Hello World 2" >README.md
+git add README.md
+git commit --no-edit || fail "Commit --no-edit failed"
+git status --porcelain || fail "Git status failed after commit --no-edit"
+
+# Test 3: File Creation Permutations
+test_step "File Creation Permutations"
+
+# 3.1 Empty file
+touch empty_file.txt
+git add empty_file.txt
+git commit -a --no-edit || fail "Empty file commit failed"
+
+# 3.2 Multiple empty files
+touch empty1.txt empty2.txt empty3.txt
+git add .
+git commit -a --no-edit || fail "Multiple empty files commit failed"
+
+# 3.3 Files with different content types
+echo "Normal text" >normal.txt
+echo -e "Line 1\nLine 2\nLine 3" >multiline.txt
+echo -n "No newline" >no_newline.txt
+echo "Tab	Space Space  End" >whitespace.txt
+git add .
+git commit -a --no-edit || fail "Different content types commit failed"
+
+# Test 4: File Modification Permutations
+test_step "File Modification Permutations"
+
+# 4.1 Modify start of file
+echo "Modified start + Normal text" >normal.txt
+git commit -a --no-edit || fail "Start modification commit failed"
+
+# 4.2 Modify end of file
+echo -e "Line 1\nLine 2\nLine 3\nLine 4" >multiline.txt
+git commit -a --no-edit || fail "End modification commit failed"
+
+# 4.3 Modify middle of file
+echo -e "Line 1\nNew Line\nLine 3\nLine 4" >multiline.txt
+git commit -a --no-edit || fail "Middle modification commit failed"
+
+# Test 5: Advanced Git Operations
+test_step "Advanced Git Operations"
+
+# 5.1 Amend commit
+set prev_commit (last_commit)
+git commit --amend --no-edit || fail "Commit amend --no-edit failed"
+git status --porcelain || fail "Git status failed after amend --no-edit"
+last_commit | grep "$prev_commit" || fail "Amended commit message not found"
+
+# 5.2 Commit with template
+echo "Commit from template" >template.txt
+git add template.txt
+git commit -t template.txt --no-edit || true
+
+# 5.3 Squash commits
+echo "Squash test" >squash.txt
+git add squash.txt
+git commit -m "Pre-squash commit" || fail "Pre-squash commit failed"
+git reset --soft HEAD~1 || fail "Reset failed"
+git commit --squash HEAD~2 -m "Squashed commit" || fail "Squash commit failed"
+last_commit | grep "Squashed commit" || fail "Squash commit message not found"
+
+# Test 6: Branch and Merge Operations
+test_step "Branch and Merge Operations"
+
+# 6.1 Feature branch
+git checkout -b feature-branch || fail "Checkout to feature-branch failed"
+echo "Feature branch change" >feature.txt
+git add feature.txt
+git commit -m "Feature commit" || fail "Feature branch commit failed"
+last_commit | grep "Feature commit" || fail "Feature branch commit message not found"
+
+# 6.2 Merge
+git checkout main || fail "Checkout to main failed"
+git merge --no-edit --no-ff feature-branch || fail "Merge feature-branch failed"
+last_commit | grep "Merge branch 'feature-branch'" || fail "Merge commit message not found"
+
+# Test 7: File Operations
+test_step "File Operations"
+
+# 7.1 File deletions
+rm empty_file.txt
+git add --all
+git commit -a --no-edit || fail "Single deletion commit failed"
+
+rm empty1.txt empty2.txt
+git add --all
+git commit -a --no-edit || fail "Multiple deletions commit failed"
+
+# 7.2 Mixed operations
+touch new_file1.txt
+rm empty3.txt
+echo "Modified again" >normal.txt
+git add --all
+git commit -a --no-edit || fail "Mixed operations commit failed"
+
+# Test 8: Special Content
+test_step "Special Content"
+
+# 8.1 Binary and large files
+generate_random_content 1048576 >large_file.bin
+git add large_file.bin
+git commit -m "Add binary file large_file.bin (1MB)" || fail "Large file commit failed"
+
+# 8.2 Special characters
+echo "Special chars: ¡™£¢∞§¶•ªº" >special_chars.txt
+git add special_chars.txt
+git commit -a --no-edit || fail "Special chars commit failed"
+
+# 8.3 Unicode content
+echo "🚀 Unicode content 你好 привет" >unicode_file.txt
+git add unicode_file.txt
+git commit -a --no-edit || fail "Unicode commit failed"
+
+# Test 9: File System Operations
+test_step "File System Operations"
+
+# 9.1 Directory operations
+mkdir -p src/nested/deep
+echo "Moving file" >src/nested/deep/file.txt
+git add src
+git commit -a --no-edit || fail "Initial directory commit failed"
+git mv src dst
+git commit -a --no-edit || fail "Directory move commit failed"
+
+# 9.2 Symlink operations
+ln -s dst/nested/deep/file.txt symlink.txt
+git add symlink.txt
+git commit -a --no-edit || fail "Symlink creation commit failed"
+
+# 9.3 Permission changes
+chmod +x dst/nested/deep/file.txt
+git add --all
+git commit -a --no-edit || fail "Permission change commit failed"
+
+# Test 10: Edge Cases
+test_step "Edge Cases"
+
+# 10.1 Empty commit (should fail)
+if git commit --allow-empty --no-edit
+    fail "Empty commit should have failed but succeeded"
+end
+echo "Empty commit failed as expected"
+
+# 10.2 Case sensitivity
+echo "Case sensitive" >case.txt
+git add case.txt
+git commit -a --no-edit || fail "Case file commit failed"
+git mv case.txt CASE.txt
+git commit -a --no-edit || fail "Case rename commit failed"
+
+# 10.3 File/directory conversion
+rm dst/nested/deep/file.txt
+mkdir dst/nested/deep/file.txt
+echo "Now a directory" >dst/nested/deep/file.txt/content.txt
+git add --all
+git commit -a --no-edit || fail "File to directory commit failed"
+
+rm -rf dst/nested/deep/file.txt
+echo "Now a file again" >dst/nested/deep/file.txt
+git add --all
+git commit -a --no-edit || fail "Directory to file commit failed"
+
+# Test 11: Bulk Operations
+test_step "Bulk Operations"
+
+# 11.1 Many files
+for i in (seq 1 100)
+    echo "Content $i" >"file$i.txt"
+end
+git add .
+git commit -a --no-edit || fail "Many files commit failed"
+
+# 11.2 Many changes
+for i in (seq 1 1000)
+    echo "Line $i" >>large_changes.txt
+end
+git add large_changes.txt
+git commit -a --no-edit || fail "Many changes commit failed"
+
+echo "All comprehensive tests completed successfully!"

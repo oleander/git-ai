@@ -65,6 +65,7 @@ cargo install --path .
 ### Advanced Configuration
 
 Customize Git AI's behavior with these commands:
+
 - `git-ai config set max-commit-length <length>` (default: 72): Set the maximum length of commit messages.
 - `git-ai config set max-tokens <tokens>` (default: 512): Set the maximum number of tokens for the assistant.
 - `git-ai config set model <model>` (default: "gpt-3.5-turbo"): Set the OpenAI model to use.

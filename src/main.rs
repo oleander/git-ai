@@ -111,7 +111,7 @@ fn run_install() -> Result<()> {
     hook_file.delete()?;
   }
 
-  hook_file.symlink(hook_bin)?;
+  hook_file.symlink(&hook_bin)?;
   println!("🔗 Hook symlinked successfully to \x1B[3m{}\x1B[0m", hook_file);
 
   Ok(())
