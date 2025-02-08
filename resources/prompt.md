@@ -44,72 +44,71 @@ I'll first inspect the contents of the uploaded file to extract three smaller di
 
 Here are three smaller diffs (3-5 lines) formatted as requested:
 
-### EXAMPLE INPUT 1:
+### EXAMPLE INPUT 1
 
-diff --git c/src/hook/mod.rs c/src/hook/mod.rs
-index a0e8ab1..f48f70c 100644
---- c/src/hook/mod.rs
-+++ c/src/hook/mod.rs
-@@ -1,7 +1,5 @@
-// Hook: prepare-commit-msg
+    diff --git c/src/hook/mod.rs c/src/hook/mod.rs
+    index a0e8ab1..f48f70c 100644
+    --- c/src/hook/mod.rs
+    +++ c/src/hook/mod.rs
+    @@ -1,7 +1,5 @@
+    // Hook: prepare-commit-msg
 
-## -#![feature(assert_matches)]
+    -#![feature(assert_matches)]
 
-use std::io::{Read, Write};
-use std::time::Duration;
-use std::path::PathBuf;
+    use std::io::{Read, Write};
+    use std::time::Duration;
+    use std::path::PathBuf;
 
-### EXAMPLE OUTPUT 1:
+### EXAMPLE OUTPUT 1
 
-Remove 'assert_matches' feature flag from hook module
+    Remove 'assert_matches' feature flag from hook module
 
-### EXAMPLE INPUT 2:
+### EXAMPLE INPUT 2
 
-diff --git c/.github/workflows/rust.yml c/.github/workflows/rust.yml
-index e167d7a..2f70ac0 100644
---- c/.github/workflows/rust.yml
-+++ c/.github/workflows/rust.yml
-@@ -52,9 +52,9 @@ jobs:
-uses: actions-rs/cargo@v1
-with:
-command: test
+    diff --git c/.github/workflows/rust.yml c/.github/workflows/rust.yml
+    index e167d7a..2f70ac0 100644
+    --- c/.github/workflows/rust.yml
+    diff --git c/.github/workflows/rust.yml c/.github/workflows/rust.yml
+    index e167d7a..2f70ac0 100644
+    --- c/.github/workflows/rust.yml
+    +++ c/.github/workflows/rust.yml
+    @@ -52,9 +52,9 @@ jobs:
+            uses: actions-rs/cargo@v1
+            with:
+              command: test
+    -      # - name: Test install hook
+    -      #   run: git ai install
+    -      # - name: Run Clippy
+    -      #   uses: actions-rs/clippy-check@v1
+    -      #   with:
+    -      #     token: ${{ secrets.GITHUB_TOKEN }}
+    +      - name: Test install hook
+    +        run: git ai install
+    +      - name: Run Clippy
+    +        uses: actions-rs/clippy-check@v1
+    +        with:
+    +          token: ${{ secrets.GITHUB_TOKEN }}
 
--      # - name: Test install hook
--      #   run: git ai install
--      # - name: Run Clippy
--      #   uses: actions-rs/clippy-check@v1
--      #   with:
--      #     token: ${{ secrets.GITHUB_TOKEN }}
+### EXAMPLE OUTPUT 2
 
-*      - name: Test install hook
-*        run: git ai install
-*      - name: Run Clippy
-*        uses: actions-rs/clippy-check@v1
-*        with:
-*          token: ${{ secrets.GITHUB_TOKEN }}
+    Uncomment install hook and Clippy check in CI workflow
 
-### EXAMPLE OUTPUT 2:
+### EXAMPLE INPUT 3
 
-Uncomment install hook and Clippy check in CI workflow
+    diff --git c/.github/workflows/cd.yml c/.github/workflows/cd.yml
+    index 552fb64..88ebe6c 100644
+    --- c/.github/workflows/cd.yml
+    +++ c/.github/workflows/cd.yml
+    @@ -47,7 +47,7 @@ jobs:
+              components: rust-src,cargo
+              target: ${{ env.TARGET }}
+              override: true
+    -          profile: dev
+    +          profile: minimal
 
-### EXAMPLE INPUT 3:
+          - name: Install cargo-bump
+            run: cargo install cargo-bump
 
-diff --git c/.github/workflows/cd.yml c/.github/workflows/cd.yml
-index 552fb64..88ebe6c 100644
---- c/.github/workflows/cd.yml
-+++ c/.github/workflows/cd.yml
-@@ -47,7 +47,7 @@ jobs:
-components: rust-src,cargo
-target: ${{ env.TARGET }}
-override: true
+### EXAMPLE OUTPUT 3
 
--          profile: dev
-
-*          profile: minimal
-
-       - name: Install cargo-bump
-         run: cargo install cargo-bump
-
-### EXAMPLE OUTPUT 3:
-
-Update CD workflow to use minimal profile
+    Update CD workflow to use minimal profile
