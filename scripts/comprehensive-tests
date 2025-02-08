@@ -1,6 +1,24 @@
 #!/usr/bin/env fish
 
 set -x fish_trace 1
+
+# Load environment variables from .env.local if it exists
+if test -f .env.local
+    for line in (cat .env.local)
+        if not string match -q "#*" $line  # Skip comments
+            and test -n "$line"            # Skip empty lines
+            set -l key (string split -m 1 = $line)[1]
+            set -l value (string split -m 1 = $line)[2]
+            # Remove quotes if they exist
+            set value (string trim -c '"' $value)
+            set value (string trim -c "'" $value)
+            set -gx $key $value
+        end
+    end
+else
+    echo "Warning: .env.local file not found. Make sure you have the required environment variables set."
+end
+
 set -Ux OPENAI_API_KEY $OPENAI_API_KEY
 set -x RUST_LOG debug
 
