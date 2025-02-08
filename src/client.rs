@@ -20,12 +20,12 @@ pub struct Response {
 
 pub async fn call(request: Request) -> Result<Response> {
   match request.model {
-    Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 => {
+    Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 | Model::Tavernari => {
       let client = OllamaClient::new()?;
 
       // For Ollama, we combine system and user prompts with clear roles and request JSON output
       let full_prompt = format!(
-        "### System:\n{}\n\nIMPORTANT: You are a commit message assistant. Your response must be EXACTLY ONE LINE containing ONLY the commit message. No other text, no JSON, no code blocks, no explanation. Just the commit message.\n\nExample good response:\nAdd user authentication feature\n\nExample bad responses:\n1. {{\"commit_message\": \"Add feature\"}}\n2. ```\nAdd feature\n```\n3. Here's the commit message: Add feature\n\nRemember: ONLY the commit message on a single line, nothing else.\n\n### User:\n{}\n\n### Assistant:\n",
+        "### System:\n{}\n\nIMPORTANT: You are a commit message assistant. Your response must be EXACTLY ONE LINE containing ONLY the commit message. No other text, no JSON, no code blocks, no explanation. Just the commit message.\n\nExample good response:\nAdd user authentication feature\n\nExample bad responses:\n1. {{\"commit_message\": \"Add feature\"}}\n2. ```\nAdd feature\n```\n3. Here's the commit message: Add feature\n\nRemember: ONLY the commit message on a single line, nothing else. Keep it concise and clear.\n\n### User:\n{}\n\n### Assistant:\n",
         request.system,
         request.prompt
       );
