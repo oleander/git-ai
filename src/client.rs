@@ -23,8 +23,13 @@ pub async fn call(request: Request) -> Result<Response> {
     Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 | Model::Tavernari => {
       let client = OllamaClient::new()?;
 
-      let prompt = commit::get_instruction_template()?;
-      let response = client.generate(request.model, &prompt).await?;
+      let template = commit::get_instruction_template()?;
+      let full_prompt = format!(
+        "{}\n\nImportant: Respond with ONLY a single line containing the commit message. Do not include any other text, formatting, or explanation.\n\nChanges to review:\n{}",
+        template,
+        request.prompt
+      );
+      let response = client.generate(request.model, &full_prompt).await?;
 
       // Log the raw response for debugging
       log::debug!("Raw Ollama response: {}", response);
