@@ -107,6 +107,7 @@ impl Args {
 
     let response = commit::generate(patch.to_string(), remaining_tokens, model).await?;
     std::fs::write(&self.commit_msg_file, response.response.trim())?;
+
     pb.finish_and_clear();
 
     Ok(())
@@ -122,7 +123,7 @@ impl Args {
         let model = config::APP
           .model
           .clone()
-          .unwrap_or("gpt-4o".to_string())
+          .unwrap_or("gpt-4o-mini".to_string())
           .into();
         let used_tokens = commit::token_used(&model)?;
         let max_tokens = config::APP.max_tokens.unwrap_or(model.context_size());
