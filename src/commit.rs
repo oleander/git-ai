@@ -1,5 +1,6 @@
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use maplit::hashmap;
+use mustache;
 
 use crate::{config, openai, profile};
 use crate::model::Model;
@@ -13,11 +14,11 @@ fn get_instruction_template() -> Result<String> {
   profile!("Generate instruction template");
   let max_length = config::APP.max_commit_length.unwrap_or(72).to_string();
   let template = mustache::compile_str(INSTRUCTION_TEMPLATE)
-    .map_err(|e| anyhow::anyhow!("Template compilation error: {}", e))?
+    .map_err(|e| anyhow!("Template compilation error: {}", e))?
     .render_to_string(&hashmap! {
       "max_length" => max_length
     })
-    .map_err(|e| anyhow::anyhow!("Template rendering error: {}", e))?;
+    .map_err(|e| anyhow!("Template rendering error: {}", e))?;
   Ok(template)
 }
 
@@ -43,18 +44,11 @@ pub fn get_instruction_token_count(model: &Model) -> Result<usize> {
 ///
 /// # Returns
 /// * `Result<openai::Request>` - The prepared request
-pub fn create_commit_request(diff: String, max_tokens: usize, model: Model) -> Result<openai::Request> {
+fn create_commit_request(diff: String, max_tokens: usize, model: Model) -> Result<openai::Request> {
   profile!("Prepare OpenAI request");
-  let max_length = config::APP.max_commit_length.unwrap_or(72).to_string();
-  let instruction_template = mustache::compile_str(INSTRUCTION_TEMPLATE)
-    .map_err(|e| anyhow::anyhow!("Template compilation error: {}", e))?
-    .render_to_string(&hashmap! {
-      "max_length" => max_length
-    })
-    .map_err(|e| anyhow::anyhow!("Template rendering error: {}", e))?;
-
+  let template = get_instruction_template()?;
   Ok(openai::Request {
-    system: instruction_template,
+    system: template,
     prompt: diff,
     max_tokens: max_tokens.try_into().unwrap_or(u16::MAX),
     model
