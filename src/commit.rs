@@ -34,7 +34,7 @@ pub fn get_instruction_token_count(model: &Model) -> Result<usize> {
 ///
 /// # Returns
 /// * `openai::Request` - The prepared request
-fn create_commit_request(diff: String, max_tokens: usize, model: Model) -> openai::Request {
+pub fn create_commit_request(diff: String, max_tokens: usize, model: Model) -> openai::Request {
   profile!("Prepare OpenAI request");
   openai::Request {
     system: get_instruction_template(),

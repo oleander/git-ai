@@ -5,7 +5,7 @@ use async_openai::error::OpenAIError;
 use anyhow::{anyhow, Context, Result};
 use colored::*;
 
-use crate::{config, profile};
+use crate::{commit, config, profile};
 use crate::model::Model;
 
 const MAX_ATTEMPTS: usize = 3;
@@ -24,27 +24,9 @@ pub struct Request {
 }
 
 /// Generates an improved commit message using the provided prompt and diff
-pub async fn generate_commit_message(diff: &str, prompt: &str, file_context: &str, author: &str, date: &str) -> Result<String> {
+pub async fn generate_commit_message(diff: &str) -> Result<String> {
   profile!("Generate commit message");
-  let system_prompt = format!(
-    "You are an expert at writing clear, concise git commit messages. \
-     Your task is to generate a commit message for the following code changes.\n\n\
-     {}\n\n\
-     Consider:\n\
-     - Author: {}\n\
-     - Date: {}\n\
-     - Files changed: {}\n",
-    prompt, author, date, file_context
-  );
-
-  let response = call(Request {
-    system:     system_prompt,
-    prompt:     format!("Generate a commit message for this diff:\n\n{}", diff),
-    max_tokens: 256,
-    model:      Model::GPT4oMini
-  })
-  .await?;
-
+  let response = commit::generate(diff.into(), 256, Model::GPT4oMini).await?;
   Ok(response.response.trim().to_string())
 }
 
