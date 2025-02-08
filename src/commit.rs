@@ -10,7 +10,7 @@ const INSTRUCTION_TEMPLATE: &str = include_str!("../resources/prompt.md");
 
 /// Returns the instruction template for the AI model.
 /// This template guides the model in generating appropriate commit messages.
-fn get_instruction_template() -> Result<String> {
+pub fn get_instruction_template() -> Result<String> {
   profile!("Generate instruction template");
   let max_length = config::APP.max_commit_length.unwrap_or(72).to_string();
   let template = mustache::compile_str(INSTRUCTION_TEMPLATE)

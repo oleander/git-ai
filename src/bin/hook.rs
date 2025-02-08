@@ -96,8 +96,8 @@ pub struct Args {
 
 impl Args {
   pub async fn handle(&self) -> Result<()> {
-    // If source is "message", we should not generate a commit message
-    if self.source.as_deref() == Some("message") {
+    // If source is "message" or "merge", we should not generate a commit message
+    if self.source.as_deref() == Some("message") || self.source.as_deref() == Some("merge") {
       return Ok(());
     }
 
