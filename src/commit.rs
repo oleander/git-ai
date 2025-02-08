@@ -1,5 +1,3 @@
-use std::fs;
-
 use anyhow::{bail, Result};
 
 use crate::{config, openai, profile};
