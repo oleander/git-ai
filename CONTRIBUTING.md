@@ -24,9 +24,7 @@ For each new feature or bug fix, create a new branch based on the `main` branch.
 ```bash
 git checkout -b feature/my-new-feature
 ```
-
 or
-
 ```bash
 git checkout -b fix/my-bug-fix
 ```
@@ -55,15 +53,15 @@ If you're adding a new feature or changing existing functionality, update the RE
 
 1. Push your changes to your fork:
 
-   ```bash
-   git push origin feature/my-new-feature
-   ```
+    ```bash
+    git push origin feature/my-new-feature
+    ```
 
-   or
+    or
 
-   ```bash
-   git push origin fix/my-bug-fix
-   ```
+    ```bash
+    git push origin fix/my-bug-fix
+    ```
 
 2. Go to your fork on GitHub and click the "Pull Request" button to submit your changes.
 
