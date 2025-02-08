@@ -41,8 +41,6 @@ impl OllamaClient {
   }
 
   pub async fn is_available(&self, model: Model) -> bool {
-    // For now, just try to generate a simple test prompt
-    // This is a workaround since the API doesn't have a direct way to check model availability
     let test_prompt = "test";
     self.generate(model, test_prompt).await.is_ok()
   }
