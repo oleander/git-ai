@@ -19,7 +19,7 @@ fn test_file_path_write_and_read() {
   let path = named_file.path().to_path_buf();
   let message = "Hello, world!";
 
-  path.write(message.to_string()).unwrap();
+  path.write(message).unwrap();
 
   let contents = path.read().unwrap();
 
