@@ -23,10 +23,12 @@ end
 set -Ux OPENAI_API_KEY $OPENAI_API_KEY
 set -x RUST_LOG debug
 
-if not test -n "$OPENAI_API_KEY"
-    echo "Please set the OPENAI_API_KEY environment variable."
-    exit 1
-end
+git ai config set model $model || fail "Setting model failed"
+
+# if not test -n "$OPENAI_API_KEY"
+#     echo "Please set the OPENAI_API_KEY environment variable."
+#     exit 1
+# end
 
 if not command -v cargo
     echo "Cargo not found. Please install Rust."
@@ -86,9 +88,9 @@ git-ai hook reinstall || fail "Hook reinstall failed"
 git-ai config reset
 git-ai config || echo "As expected"
 git-ai config set || echo "As expected"
-git-ai config set model gpt-4 || fail "Setting model failed"
-git-ai config set max-tokens 512 || fail "Setting max tokens failed"
-git-ai config set max-commit-length 1024 || fail "Setting max commit length failed"
+git-ai config set model $model || fail "Setting model failed"
+git-ai config set max-tokens 128 || fail "Setting max tokens failed"
+git-ai config set max-commit-length 256 || fail "Setting max commit length failed"
 git-ai config set openai-api-key "$OPENAI_API_KEY" || fail "Setting OpenAI API key failed"
 
 # Test 2: Basic Git Operations
@@ -289,5 +291,50 @@ for i in (seq 1 1000)
 end
 git add large_changes.txt
 git commit -a --no-edit || fail "Many changes commit failed"
+
+# Test 12: Source Type Handling
+test_step "Source Type Handling"
+
+# 12.1 Message source (should not generate)
+echo "Testing message source" >message_source.txt
+git add message_source.txt
+git commit -m "Explicit message" || fail "Message source commit failed"
+last_commit | grep "Explicit message" || fail "Message source was not respected"
+
+# 12.2 Template source (should not generate)
+echo "Template message" >template_msg.txt
+git add template_msg.txt
+git commit -t template.txt --no-edit || true
+last_commit | grep "Commit from template" || fail "Template source was not respected"
+
+# 12.3 Merge source (should not generate)
+git checkout -b test-merge-source || fail "Failed to create merge test branch"
+echo "Merge source test" >merge_source.txt
+git add merge_source.txt
+git commit -m "Merge source test commit" || fail "Merge source test commit failed"
+git checkout main || fail "Failed to checkout main for merge"
+git merge --no-edit test-merge-source || fail "Merge commit failed"
+last_commit | grep "Merge branch 'test-merge-source'" || fail "Merge source was not respected"
+
+# 12.4 Squash source (should not generate)
+git checkout -b test-squash-source || fail "Failed to create squash test branch"
+echo "Squash source test" >squash_source.txt
+git add squash_source.txt
+git commit -m "Pre-squash test commit" || fail "Pre-squash commit failed"
+git checkout main || fail "Failed to checkout main for squash"
+git merge --squash test-squash-source || fail "Squash merge failed"
+git commit -m "Squashed changes" || fail "Squash commit failed"
+last_commit | grep "Squashed changes" || fail "Squash source was not respected"
+
+# 12.5 Normal commit (should generate)
+echo "Normal commit test" >normal_commit.txt
+git add normal_commit.txt
+git commit --no-edit || fail "Normal commit failed"
+last_commit | grep "Initial commit" && fail "Normal commit should have generated a message"
+
+# 12.6 Commit source with amend (should generate)
+echo "Modified normal commit" >>normal_commit.txt
+git add normal_commit.txt
+git commit --amend --no-edit || fail "Amend commit failed"
 
 echo "All comprehensive tests completed successfully!"
