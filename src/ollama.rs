@@ -27,7 +27,7 @@ impl OllamaClient {
   pub async fn call(&self, request: Request) -> Result<Response> {
     let model = request.model.to_string();
     let prompt = format!("{}: {}", request.system, request.prompt);
-    let options = GenerationOptions::default();
+    let options = GenerationOptions::default().tfs_z(0.0);
     let generation_request = GenerationRequest::new(model, prompt).options(options);
     let res = self.client.generate(generation_request).await?;
     Ok(Response { response: res.response })

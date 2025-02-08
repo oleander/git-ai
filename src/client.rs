@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 
 use crate::model::Model;
 use crate::ollama::OllamaClient;
