@@ -84,6 +84,14 @@ jobs:
         if: startsWith(matrix.os, 'macos')
         run: brew install fish
 
+      - name: Install ollama
+        run: curl -fsSL https://ollama.com/install.sh | sh
+
+      - name: Run ollama
+        run: |
+          ollama serve &
+          ollama pull SlyOtis/git-auto-message:latest
+
       - name: Run integration tests
         run: |
           ./scripts/integration-tests
