@@ -270,12 +270,13 @@ fn process_chunk(
     let current_file_num = processed_files.fetch_add(1, Ordering::SeqCst);
     let files_remaining = total_files.saturating_sub(current_file_num);
 
-    if files_remaining == 0 {
-      continue;
-    }
-
+    // Calculate max_tokens_per_file based on actual remaining files
     let total_remaining = remaining_tokens.load(Ordering::SeqCst);
-    let max_tokens_per_file = total_remaining.saturating_div(files_remaining);
+    let max_tokens_per_file = if files_remaining > 0 {
+      total_remaining.saturating_div(files_remaining)
+    } else {
+      total_remaining
+    };
 
     if max_tokens_per_file == 0 {
       continue;
