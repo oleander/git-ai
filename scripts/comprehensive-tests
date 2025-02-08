@@ -323,7 +323,7 @@ echo "Merge source test" >merge_source.txt
 git add merge_source.txt
 git commit -m "Merge source test commit" || fail "Merge source test commit failed"
 git checkout main || fail "Failed to checkout main for merge"
-git merge --no-edit test-merge-source || fail "Merge commit failed"
+git merge --no-ff --no-edit test-merge-source || fail "Merge commit failed"
 last_commit | grep "Merge branch 'test-merge-source'" || fail "Merge source was not respected"
 
 # 12.4 Squash source (should not generate)
