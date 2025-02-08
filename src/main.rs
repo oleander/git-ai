@@ -4,6 +4,7 @@ mod filesystem;
 use structopt::StructOpt;
 use anyhow::Result;
 use dotenv::dotenv;
+use ai::finetune::{self, FinetuneArgs};
 
 use crate::config::App;
 use crate::filesystem::Filesystem;
@@ -14,7 +15,9 @@ enum Cli {
   #[structopt(about = "Installs the git-ai hook")]
   Hook(HookSubcommand),
   #[structopt(about = "Sets or gets configuration values")]
-  Config(ConfigSubcommand)
+  Config(ConfigSubcommand),
+  #[structopt(about = "Exports training data for fine-tuning")]
+  Finetune(FinetuneArgs)
 }
 
 #[derive(StructOpt)]
@@ -222,6 +225,9 @@ async fn main() -> Result<()> {
             }
           },
       },
+    Cli::Finetune(args) => {
+      finetune::run(args).await?;
+    }
   }
 
   Ok(())

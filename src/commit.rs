@@ -31,16 +31,15 @@ fn get_instruction_template() -> Result<String> {
 /// * `Result<usize>` - The number of tokens used or an error
 pub fn get_instruction_token_count(model: &Model) -> Result<usize> {
   profile!("Calculate instruction tokens");
-  let template = get_instruction_template()?;
-  model.count_tokens(&template)
+  model.count_tokens(&get_instruction_template()?)
 }
 
-/// Creates an OpenAI request for commit message generation.
+/// Creates a commit request for the OpenAI API.
 ///
 /// # Arguments
-/// * `diff` - The git diff to generate a commit message for
-/// * `max_tokens` - Maximum number of tokens allowed for the response
-/// * `model` - The AI model to use for generation
+/// * `diff` - The diff to generate a commit message for
+/// * `max_tokens` - The maximum number of tokens to use
+/// * `model` - The model to use for generation
 ///
 /// # Returns
 /// * `Result<openai::Request>` - The prepared request
@@ -55,25 +54,20 @@ fn create_commit_request(diff: String, max_tokens: usize, model: Model) -> Resul
   })
 }
 
-/// Generates a commit message using the AI model.
+/// Generates a commit message for the given patch.
 ///
 /// # Arguments
-/// * `diff` - The git diff to generate a commit message for
-/// * `max_tokens` - Maximum number of tokens allowed for the response
-/// * `model` - The AI model to use for generation
+/// * `patch` - The patch to generate a commit message for
+/// * `remaining_tokens` - The maximum number of tokens to use
+/// * `model` - The model to use for generation
 ///
 /// # Returns
-/// * `Result<openai::Response>` - The generated commit message or an error
-///
-/// # Errors
-/// Returns an error if:
-/// - max_tokens is 0
-/// - OpenAI API call fails
-pub async fn generate(patch: String, remaining_tokens: usize, model: Model) -> Result<openai::Response> {
+/// * `Result<String>` - The generated commit message or an error
+pub async fn generate(patch: String, remaining_tokens: usize, model: Model) -> Result<String> {
   profile!("Generate commit message");
 
-  if remaining_tokens == 0 {
-    bail!("Maximum token count must be greater than zero")
+  if patch.is_empty() {
+    bail!("No changes to commit");
   }
 
   let request = create_commit_request(patch, remaining_tokens, model)?;

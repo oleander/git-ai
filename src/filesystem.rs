@@ -173,14 +173,16 @@ impl Filesystem {
   /// * `Result<Self>` - The initialized filesystem or an error
   pub fn new() -> Result<Self> {
     // Get current directory
-    let current_dir = env::current_dir().context(ERR_CURRENT_DIR)?;
+    let current_dir = { env::current_dir().context(ERR_CURRENT_DIR)? };
 
     // Get executable path
-    let git_ai_bin_path = env::current_exe().context("Failed to get current executable")?;
+    let git_ai_bin_path = { env::current_exe().context("Failed to get current executable")? };
 
     // Open git repository
-    let repo = Repository::open_ext(&current_dir, Flags::empty(), Vec::<&Path>::new())
-      .with_context(|| format!("Failed to open repository at {}", current_dir.display()))?;
+    let repo = {
+      Repository::open_ext(&current_dir, Flags::empty(), Vec::<&Path>::new())
+        .with_context(|| format!("Failed to open repository at {}", current_dir.display()))?
+    };
 
     // Get git path and ensure it's absolute
     let git_path = {

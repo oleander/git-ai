@@ -120,7 +120,7 @@ impl Args {
       .context("Failed to get patch")?;
 
     let response = commit::generate(patch.to_string(), remaining_tokens, model).await?;
-    std::fs::write(&self.commit_msg_file, response.response.trim())?;
+    std::fs::write(&self.commit_msg_file, response.trim())?;
 
     pb.finish_and_clear();
 
@@ -193,7 +193,7 @@ impl Args {
           .context("Failed to get patch")?;
 
         let response = commit::generate(patch.to_string(), remaining_tokens, model).await?;
-        std::fs::write(&self.commit_msg_file, response.response.trim())?;
+        std::fs::write(&self.commit_msg_file, response.trim())?;
 
         pb.finish_and_clear();
 
@@ -205,22 +205,12 @@ impl Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-  if std::env::var("RUST_LOG").is_ok() {
-    env_logger::init();
-  }
+  env_logger::init();
 
-  let time = std::time::Instant::now();
   let args = Args::from_args();
-
-  if log::log_enabled!(log::Level::Debug) {
-    log::debug!("Arguments: {:?}", args);
-  }
-
-  if let Err(err) = args.execute().await {
-    eprintln!("{} ({:?})", err, time.elapsed());
+  if let Err(e) = args.execute().await {
+    eprintln!("Error: {}", e);
     exit(1);
-  } else if log::log_enabled!(log::Level::Debug) {
-    log::debug!("Completed in {:?}", time.elapsed());
   }
 
   Ok(())
