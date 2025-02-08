@@ -20,12 +20,12 @@ pub struct Response {
 
 pub async fn call(request: Request) -> Result<Response> {
   match request.model {
-    Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B => {
+    Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 => {
       let client = OllamaClient::new()?;
 
       // For Ollama, we combine system and user prompts with clear roles and request JSON output
       let full_prompt = format!(
-        "### System:\n{}\n\nIMPORTANT: You are a JSON-only assistant. Your response must be a valid JSON object with exactly one field named 'commit_message'. Example:\n{{\n  \"commit_message\": \"feat: add new feature\"\n}}\n\nRules:\n1. Start your response with '{{'\n2. End your response with '}}'\n3. Include ONLY the JSON object\n4. No other text or explanation\n5. No markdown formatting\n\n### User:\n{}\n\n### Assistant:\n",
+        "### System:\n{}\n\nIMPORTANT: You are a commit message assistant. Your response must be EXACTLY ONE LINE containing ONLY the commit message. No other text, no JSON, no code blocks, no explanation. Just the commit message.\n\nExample good response:\nAdd user authentication feature\n\nExample bad responses:\n1. {{\"commit_message\": \"Add feature\"}}\n2. ```\nAdd feature\n```\n3. Here's the commit message: Add feature\n\nRemember: ONLY the commit message on a single line, nothing else.\n\n### User:\n{}\n\n### Assistant:\n",
         request.system,
         request.prompt
       );
@@ -35,24 +35,14 @@ pub async fn call(request: Request) -> Result<Response> {
       // Log the raw response for debugging
       log::debug!("Raw Ollama response: {}", response);
 
-      // Try to extract JSON from the response by finding the first '{' and last '}'
-      let json_str = response
-        .find('{')
-        .and_then(|start| response.rfind('}').map(|end| &response[start..=end]))
-        .with_context(|| format!("Could not find JSON object in response: {}", response))?;
+      // Take the first non-empty line as the commit message
+      let commit_message = response
+        .lines()
+        .find(|line| !line.trim().is_empty())
+        .map(|line| line.trim().to_string())
+        .with_context(|| format!("Could not find commit message in response: {}", response))?;
 
-      log::debug!("Extracted JSON string: {}", json_str);
-
-      // Parse the JSON response
-      let json_response: serde_json::Value =
-        serde_json::from_str(json_str).with_context(|| format!("Failed to parse JSON response from Ollama: {}", json_str))?;
-
-      // Extract the commit message from the JSON
-      let commit_message = json_response["commit_message"]
-        .as_str()
-        .with_context(|| format!("Failed to extract commit_message from JSON response: {}", json_str))?;
-
-      Ok(Response { response: commit_message.to_string() })
+      Ok(Response { response: commit_message })
     }
     _ => {
       // For OpenAI models, use the existing OpenAI client
@@ -71,7 +61,7 @@ pub async fn call(request: Request) -> Result<Response> {
 
 pub async fn is_model_available(model: Model) -> bool {
   match model {
-    Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B => {
+    Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 => {
       if let Ok(client) = OllamaClient::new() {
         return client.is_available(model).await;
       }

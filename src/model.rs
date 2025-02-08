@@ -18,6 +18,7 @@ const MODEL_LLAMA2: &str = "llama2:latest";
 const MODEL_CODELLAMA: &str = "codellama:latest";
 const MODEL_MISTRAL: &str = "mistral:latest";
 const MODEL_DEEPSEEK: &str = "deepseek-r1:7b";
+const MODEL_SMOLLM2: &str = "smollm2:135m";
 
 /// Represents the available AI models for commit message generation.
 /// Each model has different capabilities and token limits.
@@ -39,7 +40,9 @@ pub enum Model {
   /// Mistral model
   Mistral,
   /// DeepSeek model
-  DeepSeekR1_7B
+  DeepSeekR1_7B,
+  /// Smol LM 2 135M model
+  SmollM2
 }
 
 impl Model {
@@ -54,7 +57,7 @@ impl Model {
   pub fn count_tokens(&self, text: &str) -> Result<usize> {
     profile!("Count tokens");
     match self {
-      Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B => {
+      Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 => {
         // For Ollama models, we'll estimate tokens based on word count
         // A rough approximation is that each word is about 1.3 tokens
         let word_count = text.split_whitespace().count();
@@ -78,7 +81,7 @@ impl Model {
   pub fn context_size(&self) -> usize {
     profile!("Get context size");
     match self {
-      Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B => 4096_usize,
+      Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 => 4096_usize,
       _ => {
         let model_str: &str = self.into();
         get_context_size(model_str)
@@ -144,7 +147,8 @@ impl From<&Model> for &str {
       Model::Llama2 => MODEL_LLAMA2,
       Model::CodeLlama => MODEL_CODELLAMA,
       Model::Mistral => MODEL_MISTRAL,
-      Model::DeepSeekR1_7B => MODEL_DEEPSEEK
+      Model::DeepSeekR1_7B => MODEL_DEEPSEEK,
+      Model::SmollM2 => MODEL_SMOLLM2
     }
   }
 }
@@ -154,14 +158,15 @@ impl FromStr for Model {
 
   fn from_str(s: &str) -> Result<Self> {
     match s.trim().to_lowercase().as_str() {
-      MODEL_GPT4_OPTIMIZED => Ok(Model::GPT4o),
-      MODEL_GPT4 => Ok(Model::GPT4),
-      MODEL_GPT4_TURBO => Ok(Model::GPT4Turbo),
-      MODEL_GPT4_MINI => Ok(Model::GPT4oMini),
-      MODEL_LLAMA2 => Ok(Model::Llama2),
-      MODEL_CODELLAMA => Ok(Model::CodeLlama),
-      MODEL_MISTRAL => Ok(Model::Mistral),
-      MODEL_DEEPSEEK => Ok(Model::DeepSeekR1_7B),
+      s if s.eq_ignore_ascii_case(MODEL_GPT4_OPTIMIZED) => Ok(Model::GPT4o),
+      s if s.eq_ignore_ascii_case(MODEL_GPT4) => Ok(Model::GPT4),
+      s if s.eq_ignore_ascii_case(MODEL_GPT4_TURBO) => Ok(Model::GPT4Turbo),
+      s if s.eq_ignore_ascii_case(MODEL_GPT4_MINI) => Ok(Model::GPT4oMini),
+      s if s.eq_ignore_ascii_case(MODEL_LLAMA2) => Ok(Model::Llama2),
+      s if s.eq_ignore_ascii_case(MODEL_CODELLAMA) => Ok(Model::CodeLlama),
+      s if s.eq_ignore_ascii_case(MODEL_MISTRAL) => Ok(Model::Mistral),
+      s if s.eq_ignore_ascii_case(MODEL_DEEPSEEK) => Ok(Model::DeepSeekR1_7B),
+      s if s.eq_ignore_ascii_case(MODEL_SMOLLM2) => Ok(Model::SmollM2),
       model => bail!("Invalid model name: {}", model)
     }
   }

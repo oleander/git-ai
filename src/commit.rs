@@ -2,7 +2,7 @@ use anyhow::{anyhow, bail, Result};
 use maplit::hashmap;
 use mustache;
 
-use crate::{config, openai, profile};
+use crate::{client, config, profile};
 use crate::model::Model;
 
 /// The instruction template included at compile time
@@ -44,10 +44,10 @@ pub fn get_instruction_token_count(model: &Model) -> Result<usize> {
 ///
 /// # Returns
 /// * `Result<openai::Request>` - The prepared request
-fn create_commit_request(diff: String, max_tokens: usize, model: Model) -> Result<openai::Request> {
-  profile!("Prepare OpenAI request");
+fn create_commit_request(diff: String, max_tokens: usize, model: Model) -> Result<client::Request> {
+  profile!("Prepare request");
   let template = get_instruction_template()?;
-  Ok(openai::Request {
+  Ok(client::Request {
     system: template,
     prompt: diff,
     max_tokens: max_tokens.try_into().unwrap_or(u16::MAX),
@@ -69,7 +69,7 @@ fn create_commit_request(diff: String, max_tokens: usize, model: Model) -> Resul
 /// Returns an error if:
 /// - max_tokens is 0
 /// - OpenAI API call fails
-pub async fn generate(patch: String, remaining_tokens: usize, model: Model) -> Result<openai::Response> {
+pub async fn generate(patch: String, remaining_tokens: usize, model: Model) -> Result<client::Response> {
   profile!("Generate commit message");
 
   if remaining_tokens == 0 {
@@ -77,7 +77,7 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model) -> R
   }
 
   let request = create_commit_request(patch, remaining_tokens, model)?;
-  openai::call(request).await
+  client::call(request).await
 }
 
 pub fn token_used(model: &Model) -> Result<usize> {

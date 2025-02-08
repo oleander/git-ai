@@ -54,6 +54,7 @@ use git2::{Oid, Repository};
 use ai::commit;
 use ai::hook::*;
 use ai::model::Model;
+use ai::config;
 
 #[derive(Debug, PartialEq)]
 enum Source {
@@ -100,7 +101,10 @@ impl Args {
     let pb = ProgressBar::new_spinner();
     pb.enable_steady_tick(Duration::from_millis(100));
 
-    let model = Model::default();
+    let app = config::App::new()?;
+    let model = app.model.as_deref()
+      .map(Model::from)
+      .unwrap_or_default();
     let remaining_tokens = commit::token_used(&model)?;
 
     self
