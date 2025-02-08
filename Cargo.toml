@@ -48,6 +48,9 @@ thiserror = "1.0.61"
 tokio = { version = "1.38.0", features = ["rt-multi-thread"] }
 tiktoken-rs = { version = "0.5.9" }
 openssl-sys = { version = "0.9.102", features = ["vendored"] }
+rayon = "1.8.1"
+parking_lot = "0.12.1"
+num_cpus = "1.16.0"
 
 [dev-dependencies]
 tempfile = "3.10.1"

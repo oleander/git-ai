@@ -3,7 +3,7 @@ mod common;
 use std::path::PathBuf;
 
 use tempfile::NamedTempFile;
-use git2::DiffFormat;
+use git2;
 use anyhow::Result;
 use ai::hook::*;
 use common::*;
@@ -43,18 +43,19 @@ trait TestPatchDiff {
 
 impl TestPatchDiff for git2::Diff<'_> {
   fn is_empty(&self) -> Result<bool> {
-    let mut acc = Vec::new();
-    let mut length = 0;
+    let mut has_changes = false;
 
-    #[rustfmt::skip]
-    self.print(DiffFormat::Patch, |_, _, line| {
-      let content = line.content();
-      acc.extend_from_slice(content);
-      length += content.len();
-      true
-    })?;
+    self.foreach(
+      &mut |_file, _progress| {
+        has_changes = true;
+        true
+      },
+      None,
+      None,
+      None
+    )?;
 
-    Ok(length == 0)
+    Ok(!has_changes)
   }
 
   fn contains(&self, our_file: &GitFile) -> Result<bool> {
@@ -90,35 +91,35 @@ fn test_patch_diff_to_patch() {
   let git_repo = git2::Repository::open(repo_path).unwrap();
   let tree = git_repo.head().unwrap().peel_to_tree().unwrap();
 
-  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
-  assert!(diff.is_empty().unwrap());
+  let diff = git_repo.to_commit_diff(Some(tree.clone())).unwrap();
+  assert!(TestPatchDiff::is_empty(&diff).unwrap());
 
   // Add a new line to the file
   let file = repo.create_file("file", "Hello, world!\n").unwrap();
-  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
-  assert!(diff.is_empty().unwrap());
+  let diff = git_repo.to_commit_diff(Some(tree.clone())).unwrap();
+  assert!(TestPatchDiff::is_empty(&diff).unwrap());
 
   // stage the file
   file.stage().unwrap();
-  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
-  assert!(!diff.is_empty().unwrap());
+  let diff = git_repo.to_commit_diff(Some(tree.clone())).unwrap();
+  assert!(!TestPatchDiff::is_empty(&diff).unwrap());
   assert!(diff.contains(&file).unwrap());
 
   // commit the file
   file.commit().unwrap();
   let tree = git_repo.head().unwrap().peel_to_tree().unwrap();
-  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
-  assert!(diff.is_empty().unwrap());
+  let diff = git_repo.to_commit_diff(Some(tree.clone())).unwrap();
+  assert!(TestPatchDiff::is_empty(&diff).unwrap());
   assert!(!diff.contains(&file).unwrap());
 
   // delete the file
   file.delete().unwrap();
-  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
-  assert!(diff.is_empty().unwrap());
+  let diff = git_repo.to_commit_diff(Some(tree.clone())).unwrap();
+  assert!(TestPatchDiff::is_empty(&diff).unwrap());
 
   // stage the file
   file.stage().unwrap();
-  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
-  assert!(!diff.is_empty().unwrap());
+  let diff = git_repo.to_commit_diff(Some(tree.clone())).unwrap();
+  assert!(!TestPatchDiff::is_empty(&diff).unwrap());
   assert!(diff.contains(&file).unwrap());
 }
