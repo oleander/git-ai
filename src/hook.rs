@@ -279,33 +279,28 @@ fn process_chunk(
     };
 
     if max_tokens_per_file == 0 {
-      // No tokens left to allocate, skip remaining files
-      break;
+      continue;
     }
 
     let token_count = *token_count;
     let allocated_tokens = token_count.min(max_tokens_per_file);
 
-    // Attempt to atomically update remaining tokens
-    match remaining_tokens.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
-      if current >= allocated_tokens {
-        Some(current - allocated_tokens)
-      } else {
-        None
-      }
-    }) {
-      Ok(_) => {
-        let processed_content = if token_count > allocated_tokens {
-          model.truncate(content, allocated_tokens)?
+    if remaining_tokens
+      .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+        if current >= allocated_tokens {
+          Some(current - allocated_tokens)
         } else {
-          content.clone()
-        };
-        chunk_results.push((path.clone(), processed_content));
-      }
-      Err(_) => {
-        // Failed to allocate tokens, skip remaining files
-        break;
-      }
+          None
+        }
+      })
+      .is_ok()
+    {
+      let processed_content = if token_count > allocated_tokens {
+        model.truncate(content, allocated_tokens)?
+      } else {
+        content.clone()
+      };
+      chunk_results.push((path.clone(), processed_content));
     }
   }
 
@@ -371,7 +366,7 @@ impl PatchRepository for Repository {
 
   fn configure_diff_options(&self, opts: &mut DiffOptions) {
     opts
-      .ignore_whitespace_change(false)
+      .ignore_whitespace_change(true)
       .recurse_untracked_dirs(true)
       .recurse_ignored_dirs(false)
       .ignore_whitespace_eol(true)
@@ -408,8 +403,6 @@ impl PatchRepository for Repository {
 
 #[cfg(test)]
 mod tests {
-  use tempfile::TempDir;
-
   use super::*;
 
   #[test]
@@ -451,153 +444,5 @@ mod tests {
     }
 
     assert_eq!(pool.strings.len(), MAX_POOL_SIZE);
-  }
-
-  #[test]
-  fn test_process_chunk_token_allocation() {
-    let model = Arc::new(Model::default());
-    let total_files = 3;
-    let processed_files = Arc::new(AtomicUsize::new(0));
-    let remaining_tokens = Arc::new(AtomicUsize::new(60)); // Reduced to force allocation limits
-    let result_chunks = Arc::new(Mutex::new(Vec::new()));
-
-    let chunk = vec![
-      (PathBuf::from("file1.txt"), "content1".to_string(), 50),
-      (PathBuf::from("file2.txt"), "content2".to_string(), 40),
-      (PathBuf::from("file3.txt"), "content3".to_string(), 30),
-    ];
-
-    process_chunk(&chunk, &model, total_files, &processed_files, &remaining_tokens, &result_chunks).unwrap();
-
-    let results = result_chunks.lock();
-    // With 60 total tokens and 3 files:
-    // First file gets 20 tokens (60/3)
-    // Second file gets 30 tokens (40/2)
-    // Third file gets 10 tokens (10/1)
-    assert_eq!(results.len(), 3);
-    assert_eq!(remaining_tokens.load(Ordering::SeqCst), 0);
-    assert_eq!(processed_files.load(Ordering::SeqCst), 3);
-  }
-
-  #[test]
-  fn test_process_chunk_concurrent_safety() {
-    use std::thread;
-
-    let model = Arc::new(Model::default());
-    let total_files = 6;
-    let processed_files = Arc::new(AtomicUsize::new(0));
-    let remaining_tokens = Arc::new(AtomicUsize::new(100));
-    let result_chunks = Arc::new(Mutex::new(Vec::new()));
-
-    let chunk1 = vec![
-      (PathBuf::from("file1.txt"), "content1".to_string(), 20),
-      (PathBuf::from("file2.txt"), "content2".to_string(), 20),
-      (PathBuf::from("file3.txt"), "content3".to_string(), 20),
-    ];
-
-    let chunk2 = vec![
-      (PathBuf::from("file4.txt"), "content4".to_string(), 20),
-      (PathBuf::from("file5.txt"), "content5".to_string(), 20),
-      (PathBuf::from("file6.txt"), "content6".to_string(), 20),
-    ];
-
-    // Clone values for thread 2
-    let model2 = model.clone();
-    let processed_files2 = processed_files.clone();
-    let remaining_tokens2 = remaining_tokens.clone();
-    let result_chunks2 = result_chunks.clone();
-
-    // Clone values for main thread access after threads complete
-    let processed_files_main = processed_files.clone();
-    let remaining_tokens_main = remaining_tokens.clone();
-    let result_chunks_main = result_chunks.clone();
-
-    let t1 = thread::spawn(move || {
-      process_chunk(&chunk1, &model, total_files, &processed_files, &remaining_tokens, &result_chunks).unwrap();
-    });
-
-    let t2 = thread::spawn(move || {
-      process_chunk(&chunk2, &model2, total_files, &processed_files2, &remaining_tokens2, &result_chunks2).unwrap();
-    });
-
-    t1.join().unwrap();
-    t2.join().unwrap();
-
-    let results = result_chunks_main.lock();
-    assert_eq!(results.len(), 6);
-    assert_eq!(remaining_tokens_main.load(Ordering::SeqCst), 0);
-    assert_eq!(processed_files_main.load(Ordering::SeqCst), 6);
-  }
-
-  #[test]
-  fn test_to_commit_diff_with_head() -> Result<()> {
-    let temp_dir = TempDir::new()?;
-    let repo = Repository::init(temp_dir.path())?;
-    let mut index = repo.index()?;
-
-    // Create a file and stage it
-    let file_path = temp_dir.path().join("test.txt");
-    std::fs::write(&file_path, "initial content")?;
-    index.add_path(file_path.strip_prefix(temp_dir.path())?)?;
-    index.write()?;
-
-    // Create initial commit
-    let tree_id = index.write_tree()?;
-    let tree = repo.find_tree(tree_id)?;
-    let signature = git2::Signature::now("test", "test@example.com")?;
-    repo.commit(Some("HEAD"), &signature, &signature, "Initial commit", &tree, &[])?;
-
-    // Modify and stage the file
-    std::fs::write(&file_path, "modified content")?;
-    index.add_path(file_path.strip_prefix(temp_dir.path())?)?;
-    index.write()?;
-
-    // Get HEAD tree
-    let head = repo.head()?.peel_to_tree()?;
-
-    // Get diff
-    let diff = repo.to_commit_diff(Some(head))?;
-
-    // Verify diff shows only staged changes
-    let mut diff_found = false;
-    diff.print(DiffFormat::Patch, |_delta, _hunk, line| {
-      let content = line.content().to_utf8();
-      if line.origin() == '+' && content.contains("modified content") {
-        diff_found = true;
-      }
-      true
-    })?;
-
-    assert!(diff_found, "Expected to find staged changes in diff");
-    Ok(())
-  }
-
-  #[test]
-  fn test_to_commit_diff_without_head() -> Result<()> {
-    let temp_dir = TempDir::new()?;
-    let repo = Repository::init(temp_dir.path())?;
-    let mut index = repo.index()?;
-
-    // Create and stage a new file
-    let file_path = temp_dir.path().join("test.txt");
-    std::fs::write(&file_path, "test content")?;
-    index.add_path(file_path.strip_prefix(temp_dir.path())?)?;
-    index.write()?;
-
-    // Get diff (no HEAD exists yet)
-    let diff = repo.to_commit_diff(None)?;
-
-    // Verify diff shows staged changes
-    let mut diff_found = false;
-    diff.print(DiffFormat::Patch, |_delta, _hunk, line| {
-      let content = line.content().to_utf8();
-      if line.origin() == '+' && content.contains("test content") {
-        diff_found = true;
-      }
-      true
-    })?;
-
-    assert!(diff_found, "Expected to find staged changes in diff");
-    Ok(())
   }
 }

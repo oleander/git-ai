@@ -29,7 +29,6 @@ impl Drop for Profile {
 #[macro_export]
 macro_rules! profile {
   ($name:expr) => {
-    // Currently a no-op, but can be expanded for actual profiling
-    let _profile_span = $name;
+    let _profile = $crate::Profile::new($name);
   };
 }

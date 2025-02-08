@@ -145,17 +145,18 @@ pub async fn call(request: Request) -> Result<Response> {
               "ERROR:".bold().bright_red(),
               "Network error:".bright_white(),
               e.to_string().dimmed(),
-              "Failed to connect to OpenAI service.".dimmed(),
+              "Failed to connect to OpenAI API.".dimmed(),
               "Check your internet connection".yellow(),
-              "Verify OpenAI service is not experiencing downtime".yellow()
+              "Verify OpenAI service availability".yellow()
             ),
           _ =>
             format!(
-              "{} {}\n    {}\n\nDetails:\n    {}",
+              "{} {}\n    {}\n\nDetails:\n    {}\n\nSuggested Actions:\n    1. {}",
               "ERROR:".bold().bright_red(),
               "Unexpected error:".bright_white(),
               err.to_string().dimmed(),
-              "An unexpected error occurred while communicating with OpenAI.".dimmed()
+              "An unexpected error occurred while calling OpenAI API.".dimmed(),
+              "Please report this issue on GitHub".yellow()
             ),
         };
         return Err(anyhow!(error_msg));
@@ -165,11 +166,11 @@ pub async fn call(request: Request) -> Result<Response> {
     let content = response
       .choices
       .first()
-      .context("No choices returned")?
+      .context("No response choices available")?
       .message
       .content
       .clone()
-      .context("No content returned")?;
+      .context("Response content is empty")?;
 
     Ok(Response { response: content })
   }

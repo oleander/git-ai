@@ -26,7 +26,7 @@ path = "src/bin/hook.rs"
 
 [dependencies]
 # Core functionality
-anyhow = "1.0.95"
+anyhow = { version = "1.0.95", features = ["backtrace"] }
 thiserror = "2.0.11"
 tokio = { version = "1.43", features = ["full"] }
 futures = "0.3"
@@ -52,9 +52,11 @@ serde_derive = "1.0.217"
 serde_ini = "0.2.0"
 serde_json = "1.0"
 
+# OpenAI integration
 async-openai = { version = "0.27.2", default-features = false }
 tiktoken-rs = "0.6.0"
 reqwest = { version = "0.12.12", default-features = true }
+
 # System utilities
 openssl-sys = { version = "0.9.105", features = ["vendored"] }
 rayon = "1.10.0"
@@ -64,6 +66,7 @@ ctrlc = "3.4.5"
 lazy_static = "1.5.0"
 home = "0.5.11"
 dirs = "6.0"
+
 # Syntax highlighting and markdown rendering
 syntect = { version = "5.2", default-features = false, features = [
   "default-fancy",
@@ -74,6 +77,7 @@ textwrap = "0.16"
 structopt = "0.3.26"
 mustache = "0.9.0"
 maplit = "1.0.2"
+
 [dev-dependencies]
 tempfile = "3.16.0"
 
