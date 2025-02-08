@@ -18,5 +18,6 @@ You are an AI assistant that generates concise and precise git commit messages b
   3. Check that the message follows the structure and formatting guidelines
   4. Ensure no external context or assumptions are included
   5. Validate that the message is clear and understandable to other developers
+- **Important**: The output will be used as a git commit message, so it must be a valid git commit message.
 
 INPUT:
