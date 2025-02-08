@@ -40,18 +40,18 @@ jobs:
             ${{ steps.compile-x86.outputs.BUILT_CHECKSUM }}
 
   build-arm:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Add target
-        run: rustup target add aarch64-apple-darwin
+        run: rustup target add aarch64-unknown-linux-gnu
 
       - name: Compile
         id: compile-arm
         uses: rust-build/rust-build.action@v1.4.5
         with:
-          RUSTTARGET: aarch64-apple-darwin
+          RUSTTARGET: aarch64-unknown-linux-gnu
           UPLOAD_MODE: none
 
       - name: Upload artifact

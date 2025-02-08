@@ -42,7 +42,7 @@ thiserror = "1.0.61"
 tokio = { version = "1.38.0", features = ["rt-multi-thread"] }
 tiktoken-rs = { version = "0.5.9" }
 ollama-rs = "0.2.0"
-rust-build = "0.1.0"
+rust-build = { version = "1.4.5" }
 
 [dev-dependencies]
 tempfile = "3.10.1"
@@ -64,6 +64,3 @@ opt-level = 3
 name = "git-ai"
 default-target = "x86_64-unknown-linux-musl"
 targets = ["x86_64-unknown-linux-musl", "aarch64-apple-darwin"]
-
-[dependencies]
-rust-build = { version = "1.4.5" }
