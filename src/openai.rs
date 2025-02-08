@@ -5,20 +5,11 @@ use async_openai::error::OpenAIError;
 use anyhow::{anyhow, Context, Result};
 use colored::*;
 
-<<<<<<< HEAD
-use crate::config;
-use crate::model::Response;
-use crate::model::Request;
-
-<<<<<<< HEAD
-=======
-=======
 use crate::{commit, config, profile};
 use crate::model::Model;
 
 const MAX_ATTEMPTS: usize = 3;
 
->>>>>>> a2a9ad2 (Improve OpenAI Integration (#34))
 #[derive(Debug, Clone, PartialEq)]
 pub struct Response {
   pub response: String
@@ -31,8 +22,6 @@ pub struct Request {
   pub max_tokens: u16,
   pub model:      Model
 }
->>>>>>> 44782ec (Improve AI prompt (#26))
-
 /// Generates an improved commit message using the provided prompt and diff
 pub async fn generate_commit_message(diff: &str) -> Result<String> {
   profile!("Generate commit message");

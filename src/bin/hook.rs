@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 // .git/hooks/prepare-commit-msg
 //
 // git commit --amend --no-edit
@@ -40,16 +42,16 @@
 // Args { commit_msg_file: PathBuf::from(".git/COMMIT_EDITMSG"), source: Some(Source::Commit), sha1: Some("HEAD") }
 // Outcome: Opens the default text editor to allow modification of the most recent commit message. No new commit message is generated automatically; it depends on user input.
 
-use std::process::exit;
 use std::str::FromStr;
 use std::time::Duration;
 use std::path::PathBuf;
+use std::process;
 
 use structopt::StructOpt;
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::ProgressBar;
 use anyhow::{bail, Context, Result};
 use git2::{Oid, Repository};
-use ai::{commit, config};
+use ai::commit;
 use ai::hook::*;
 use ai::model::Model;
 
@@ -78,99 +80,87 @@ impl FromStr for Source {
 }
 
 #[derive(StructOpt, Debug)]
-#[structopt(name = "commit-msg-hook")]
-struct Args {
-  #[structopt(parse(from_os_str))]
-  commit_msg_file: PathBuf,
-  source:          Option<Source>,
-  sha1:            Option<String>
+#[structopt(name = "git-ai-hook")]
+pub struct Args {
+  /// Path to the commit message file
+  pub commit_msg_file: PathBuf,
+
+  /// Type of commit message to generate
+  #[structopt(short = "t", long = "type")]
+  pub commit_type: Option<String>,
+
+  /// SHA1 of the commit to generate message for
+  #[structopt(short = "s", long = "sha1")]
+  pub sha1: Option<String>
 }
 
 impl Args {
+  pub async fn handle(&self) -> Result<()> {
+    let repo = Repository::open_from_env().context("Failed to open repository")?;
+    let pb = ProgressBar::new_spinner();
+    pb.enable_steady_tick(Duration::from_millis(100));
+
+    let model = Model::default();
+    let remaining_tokens = commit::token_used(&model)?;
+
+    self
+      .handle_commit(&repo, &pb, model, remaining_tokens)
+      .await?;
+    pb.finish_and_clear();
+    Ok(())
+  }
+
   async fn handle_commit(&self, repo: &Repository, pb: &ProgressBar, model: Model, remaining_tokens: usize) -> Result<()> {
     let tree = match self.sha1.as_deref() {
       Some("HEAD") | None => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
-      Some(sha1) =>
-        repo
-          .find_object(Oid::from_str(sha1)?, None)
-          .ok()
-          .and_then(|obj| obj.peel_to_tree().ok()),
+      Some(sha1) => {
+        // Try to resolve the reference first
+        if let Ok(obj) = repo.revparse_single(sha1) {
+          obj.peel_to_tree().ok()
+        } else {
+          // If not a reference, try as direct OID
+          repo
+            .find_object(Oid::from_str(sha1)?, None)
+            .ok()
+            .and_then(|obj| obj.peel_to_tree().ok())
+        }
+      }
     };
 
-    log::debug!("Tree: {:?}", tree);
-    log::debug!("Remaining tokens: {}", remaining_tokens);
-    if remaining_tokens == 0 {
-      bail!("Max tokens can't be zero (1)");
+    let diff = repo.to_diff(tree.clone())?;
+    if diff.is_empty()? {
+      if self.sha1.as_deref() == Some("HEAD") {
+        // For amend operations, we want to keep the existing message
+        return Ok(());
+      }
+      bail!("No changes to commit");
     }
 
     let patch = repo
-      .to_patch(tree, remaining_tokens, model)
-      .context("Failed to get patch")?;
+      .to_commit_diff(tree)?
+      .to_patch(remaining_tokens, model)
+      .context("Failed to generate patch")?;
 
     if patch.is_empty() {
       bail!("No changes to commit");
     }
 
-    let response = commit::generate(patch.to_string(), remaining_tokens, model).await?;
-    std::fs::write(&self.commit_msg_file, response.response.trim())?;
-    pb.finish_and_clear();
+    pb.set_message("Generating commit message...");
+    let response = commit::generate(patch, remaining_tokens, model).await?;
+    pb.set_message("Writing commit message...");
 
+    self.commit_msg_file.write(&response.response)?;
     Ok(())
-  }
-
-  async fn execute(&self) -> Result<()> {
-    use Source::*;
-
-    match self.source {
-      Some(Message | Template | Merge | Squash) => Ok(()),
-      Some(Commit) | None => {
-        let repo = Repository::open_from_env().context("Failed to open repository")?;
-        let model = config::APP
-          .model
-          .clone()
-          .unwrap_or("gpt-4o".to_string())
-          .into();
-        let used_tokens = commit::token_used(&model)?;
-        let max_tokens = config::APP.max_tokens.unwrap_or(model.context_size());
-        let remaining_tokens = max_tokens.saturating_sub(used_tokens);
-
-        let pb = ProgressBar::new_spinner();
-        let style = ProgressStyle::default_spinner()
-          .tick_strings(&["-", "\\", "|", "/"])
-          .template("{spinner:.blue} {msg}")
-          .context("Failed to create progress bar style")?;
-
-        pb.set_style(style);
-        pb.set_message("Generating commit message...");
-        pb.enable_steady_tick(Duration::from_millis(150));
-
-        if !self.commit_msg_file.is_empty().unwrap_or_default() {
-          log::debug!("A commit message has already been provided");
-          return Ok(());
-        }
-
-        self
-          .handle_commit(&repo, &pb, model, remaining_tokens)
-          .await
-      }
-    }
   }
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() {
   env_logger::init();
-
-  let time = std::time::Instant::now();
   let args = Args::from_args();
 
-  log::debug!("Arguments: {:?}", args);
-  if let Err(err) = args.execute().await {
-    eprintln!("{} ({:?})", err, time.elapsed());
-    exit(1);
-  } else {
-    log::debug!("Completed in {:?}", time.elapsed());
+  if let Err(e) = args.handle().await {
+    eprintln!("Error: {}", e);
+    process::exit(1);
   }
-
-  Ok(())
 }

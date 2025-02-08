@@ -1,218 +1,29 @@
+#![allow(dead_code)]
 use std::collections::HashMap;
-use std::io::{Read, Write};
 use std::path::PathBuf;
-use std::fs::File;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use structopt::StructOpt;
 use git2::{Diff, DiffFormat, DiffOptions, Repository, Tree};
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use thiserror::Error;
+use rayon::prelude::*;
+use parking_lot::Mutex;
+use num_cpus;
 
 use crate::model::Model;
+use crate::profile;
 
-/// Trait for handling file path operations with proper error handling
-pub trait FilePath {
-  fn is_empty(&self) -> Result<bool> {
-    self.read().map(|s| s.is_empty())
-  }
+// Constants
+const MAX_POOL_SIZE: usize = 100;
+const DEFAULT_STRING_CAPACITY: usize = 4096;
+const PARALLEL_CHUNK_SIZE: usize = 10;
 
-  fn write(&self, msg: String) -> Result<()>;
-  fn read(&self) -> Result<String>;
-}
+// Types
+type DiffData = Vec<(PathBuf, String, usize)>;
 
-impl FilePath for PathBuf {
-  fn write(&self, msg: String) -> Result<()> {
-    let mut file = File::create(self)?;
-    file.write_all(msg.as_bytes())?;
-    Ok(())
-  }
-
-  fn read(&self) -> Result<String> {
-    let mut file = File::open(self)?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
-    Ok(contents)
-  }
-}
-
-/// Trait for extracting paths from git diff deltas
-trait DiffDeltaPath {
-  fn path(&self) -> PathBuf;
-}
-
-impl DiffDeltaPath for git2::DiffDelta<'_> {
-  fn path(&self) -> PathBuf {
-    self
-      .new_file()
-      .path()
-      .or_else(|| self.old_file().path())
-      .map(PathBuf::from)
-      .unwrap_or_default()
-  }
-}
-
-/// Trait for converting byte sequences to UTF-8 strings
-pub trait Utf8String {
-  fn to_utf8(&self) -> String;
-}
-
-impl Utf8String for Vec<u8> {
-  fn to_utf8(&self) -> String {
-    String::from_utf8(self.to_vec()).unwrap_or_default()
-  }
-}
-
-impl Utf8String for [u8] {
-  fn to_utf8(&self) -> String {
-    String::from_utf8(self.to_vec()).unwrap_or_default()
-  }
-}
-
-/// Trait for converting git diffs to patch format with token limits
-pub trait PatchDiff {
-  fn to_patch(&self, max_token_count: usize, model: Model) -> Result<String>;
-}
-
-impl PatchDiff for Diff<'_> {
-  fn to_patch(&self, max_tokens: usize, model: Model) -> Result<String> {
-    let mut files: HashMap<PathBuf, String> = HashMap::new();
-
-    self
-      .print(DiffFormat::Patch, |diff, _hunk, line| {
-        let content = line.content();
-        let string = content.to_utf8();
-
-        // Include both changes and context, but prefix context lines with "context: "
-        // This helps the model understand the context while still identifying actual changes
-        let line_content = match line.origin() {
-          '+' | '-' => string,
-          _ => format!("context: {}", string)
-        };
-
-        match files.get(&diff.path()) {
-          Some(file_acc) => {
-            files.insert(diff.path(), file_acc.to_owned() + &line_content);
-          }
-          None => {
-            files.insert(diff.path(), line_content);
-          }
-        }
-
-        true
-      })
-      .context("Failed to print diff")?;
-
-    let mut diffs: Vec<_> = files.values().collect();
-
-    diffs.sort_by_key(|diff| {
-      model
-        .count_tokens(diff)
-        .context("Failed to count tokens")
-        .unwrap_or(0)
-    });
-
-    diffs
-      .iter()
-      .enumerate()
-      .try_fold(
-        (max_tokens, String::new(), files.len()),
-        |(remaining_tokens, mut final_diff, total_files), (index, diff)| {
-          let files_remaining = total_files.saturating_sub(index);
-          let max_tokens_per_file = remaining_tokens.saturating_div(files_remaining);
-
-          log::debug!("max_tokens_per_file: {}", max_tokens_per_file);
-          log::debug!("remaining_tokens: {}", remaining_tokens);
-          log::debug!("total_files: {}", total_files);
-          log::debug!("index: {}", index);
-
-          if max_tokens_per_file == 0 {
-            bail!("No tokens left to generate commit message. Try increasing the max-tokens configuration option using `git ai config set max-tokens <value>`");
-          }
-
-          let file_token_count = model.count_tokens(diff).context("Failed to count diff tokens")?;
-          let token_limits = [file_token_count, max_tokens_per_file];
-          let file_allocated_tokens = token_limits.iter().min().unwrap();
-
-          // Truncate the diff if it exceeds the token limit
-          let truncated_diff = if file_token_count > *file_allocated_tokens {
-            model.truncate(diff, *file_allocated_tokens)
-          } else {
-            Ok(diff.to_string())
-          };
-
-          log::debug!("file_token_count: {}", file_token_count);
-          log::debug!("file_allocated_tokens: {}", file_allocated_tokens);
-          log::debug!("diff: {}", diff);
-          log::debug!("truncated_diff: {:?}", truncated_diff);
-          log::debug!("remaining_tokens: {}", remaining_tokens);
-          log::debug!("final_diff: {}", final_diff);
-
-          final_diff += &("\n".to_owned() + &truncated_diff.context("Failed to truncate diff")?);
-
-          Ok((remaining_tokens.saturating_sub(*file_allocated_tokens), final_diff, total_files))
-        }
-      )
-      .map(|(_, final_diff, _)| final_diff)
-  }
-}
-
-pub trait PatchRepository {
-  fn to_patch(&self, tree: Option<Tree<'_>>, max_token_count: usize, model: Model) -> Result<String>;
-  fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>>;
-}
-
-impl PatchRepository for Repository {
-  fn to_patch(&self, tree: Option<Tree>, max_token_count: usize, model: Model) -> Result<String> {
-    self.to_diff(tree)?.to_patch(max_token_count, model)
-  }
-
-  fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>> {
-    log::debug!("Generating diff with tree: {:?}", tree.as_ref().map(|t| t.id()));
-
-    let mut opts = DiffOptions::new();
-    opts
-      .ignore_whitespace_change(false)
-      .recurse_untracked_dirs(false)
-      .recurse_ignored_dirs(false)
-      .ignore_whitespace_eol(true)
-      .ignore_blank_lines(true)
-      .include_untracked(false)
-      .ignore_whitespace(true)
-      .indent_heuristic(false)
-      .ignore_submodules(true)
-      .include_ignored(false)
-      .interhunk_lines(0)
-      .context_lines(0)
-      .patience(true)
-      .minimal(false);
-
-    log::debug!("Configured diff options");
-
-    match self.diff_tree_to_index(tree.as_ref(), None, Some(&mut opts)) {
-      Ok(diff) => {
-        log::debug!("Successfully generated diff");
-        Ok(diff)
-      }
-      Err(e) => {
-        log::error!("Failed to generate diff: {}", e);
-        Err(e).context("Failed to get diff")
-      }
-    }
-  }
-}
-
-#[derive(StructOpt, Debug)]
-#[structopt(name = "commit-msg-hook", about = "A tool for generating commit messages.")]
-pub struct Args {
-  pub commit_msg_file: PathBuf,
-
-  #[structopt(short = "t", long = "type")]
-  pub commit_type: Option<String>,
-
-  #[structopt(short = "s", long = "sha1")]
-  pub sha1: Option<String>
-}
-
+// Error definitions
 #[derive(Error, Debug)]
 pub enum HookError {
   #[error("Failed to open repository")]
@@ -227,7 +38,551 @@ pub enum HookError {
   #[error("Failed to write commit message")]
   WriteCommitMessage,
 
-  // anyhow
   #[error(transparent)]
   Anyhow(#[from] anyhow::Error)
+}
+
+// CLI Arguments
+#[derive(StructOpt, Debug)]
+#[structopt(name = "commit-msg-hook", about = "A tool for generating commit messages.")]
+pub struct Args {
+  pub commit_msg_file: PathBuf,
+
+  #[structopt(short = "t", long = "type")]
+  pub commit_type: Option<String>,
+
+  #[structopt(short = "s", long = "sha1")]
+  pub sha1: Option<String>
+}
+
+// Memory management
+#[derive(Debug)]
+struct StringPool {
+  strings:  Vec<String>,
+  capacity: usize
+}
+
+impl StringPool {
+  fn new(capacity: usize) -> Self {
+    Self { strings: Vec::with_capacity(capacity), capacity }
+  }
+
+  fn get(&mut self) -> String {
+    self
+      .strings
+      .pop()
+      .unwrap_or_else(|| String::with_capacity(self.capacity))
+  }
+
+  fn put(&mut self, mut string: String) {
+    string.clear();
+    if self.strings.len() < MAX_POOL_SIZE {
+      self.strings.push(string);
+    }
+  }
+}
+
+// File operations traits
+pub trait FilePath {
+  fn is_empty(&self) -> Result<bool> {
+    self.read().map(|s| s.is_empty())
+  }
+
+  fn read(&self) -> Result<String>;
+  fn write(&self, content: &str) -> Result<()>;
+}
+
+impl FilePath for PathBuf {
+  fn read(&self) -> Result<String> {
+    std::fs::read_to_string(self).context("Failed to read file")
+  }
+
+  fn write(&self, content: &str) -> Result<()> {
+    std::fs::write(self, content).context("Failed to write file")
+  }
+}
+
+// Git operations traits
+trait DiffDeltaPath {
+  fn path(&self) -> PathBuf;
+}
+
+impl DiffDeltaPath for git2::DiffDelta<'_> {
+  fn path(&self) -> PathBuf {
+    self
+      .new_file()
+      .path()
+      .or_else(|| self.old_file().path())
+      .map(|p| p.to_path_buf())
+      .unwrap_or_default()
+  }
+}
+
+// String conversion traits
+pub trait Utf8String {
+  fn to_utf8(&self) -> String;
+}
+
+impl Utf8String for [u8] {
+  fn to_utf8(&self) -> String {
+    String::from_utf8_lossy(self)
+      .chars()
+      .filter(|c| !c.is_control() || *c == '\n' || *c == '\t')
+      .collect()
+  }
+}
+
+// Patch generation traits
+pub trait PatchDiff {
+  fn to_patch(&self, max_token_count: usize, model: Model) -> Result<String>;
+  fn collect_diff_data(&self) -> Result<HashMap<PathBuf, String>>;
+  fn is_empty(&self) -> Result<bool>;
+}
+
+impl PatchDiff for Diff<'_> {
+  fn to_patch(&self, max_tokens: usize, model: Model) -> Result<String> {
+    profile!("Generating patch diff");
+
+    // Step 1: Collect diff data (non-parallel)
+    let files = self.collect_diff_data()?;
+
+    // Step 2: Prepare files for processing
+    let mut files_with_tokens: DiffData = files
+      .into_iter()
+      .map(|(path, content)| {
+        let token_count = model.count_tokens(&content).unwrap_or_default();
+        (path, content, token_count)
+      })
+      .collect();
+
+    files_with_tokens.sort_by_key(|(_, _, count)| *count);
+
+    // Step 3: Process files in parallel
+    let thread_pool = rayon::ThreadPoolBuilder::new()
+      .num_threads(num_cpus::get())
+      .build()
+      .context("Failed to create thread pool")?;
+
+    let total_files = files_with_tokens.len();
+    let remaining_tokens = Arc::new(AtomicUsize::new(max_tokens));
+    let result_chunks = Arc::new(Mutex::new(Vec::with_capacity(total_files)));
+    let processed_files = Arc::new(AtomicUsize::new(0));
+
+    let chunks: Vec<_> = files_with_tokens
+      .chunks(PARALLEL_CHUNK_SIZE)
+      .map(|chunk| chunk.to_vec())
+      .collect();
+
+    let model = Arc::new(model);
+
+    thread_pool.install(|| {
+      chunks
+        .par_iter()
+        .try_for_each(|chunk| process_chunk(chunk, &model, total_files, &processed_files, &remaining_tokens, &result_chunks))
+    })?;
+
+    // Step 4: Combine results
+    let results = result_chunks.lock();
+    let mut final_result = String::with_capacity(
+      results
+        .iter()
+        .map(|(_, content): &(PathBuf, String)| content.len())
+        .sum()
+    );
+
+    for (_, content) in results.iter() {
+      if !final_result.is_empty() {
+        final_result.push('\n');
+      }
+      final_result.push_str(content);
+    }
+
+    Ok(final_result)
+  }
+
+  fn collect_diff_data(&self) -> Result<HashMap<PathBuf, String>> {
+    profile!("Processing diff changes");
+
+    let string_pool = Arc::new(Mutex::new(StringPool::new(DEFAULT_STRING_CAPACITY)));
+    let files = Arc::new(Mutex::new(HashMap::new()));
+
+    self.print(DiffFormat::Patch, |diff, _hunk, line| {
+      let content = line.content().to_utf8();
+      let mut line_content = string_pool.lock().get();
+
+      match line.origin() {
+        '+' | '-' => line_content.push_str(&content),
+        _ => {
+          line_content.push_str("context: ");
+          line_content.push_str(&content);
+        }
+      };
+
+      let mut files = files.lock();
+      let entry = files
+        .entry(diff.path())
+        .or_insert_with(|| String::with_capacity(DEFAULT_STRING_CAPACITY));
+      entry.push_str(&line_content);
+      string_pool.lock().put(line_content);
+      true
+    })?;
+
+    Ok(
+      Arc::try_unwrap(files)
+        .expect("Arc still has multiple owners")
+        .into_inner()
+    )
+  }
+
+  fn is_empty(&self) -> Result<bool> {
+    let mut has_changes = false;
+
+    self.foreach(
+      &mut |_file, _progress| {
+        has_changes = true;
+        true
+      },
+      None,
+      None,
+      None
+    )?;
+
+    Ok(!has_changes)
+  }
+}
+
+fn process_chunk(
+  chunk: &[(PathBuf, String, usize)], model: &Arc<Model>, total_files: usize, processed_files: &AtomicUsize,
+  remaining_tokens: &AtomicUsize, result_chunks: &Arc<Mutex<Vec<(PathBuf, String)>>>
+) -> Result<()> {
+  let mut chunk_results = Vec::with_capacity(chunk.len());
+
+  for (path, content, token_count) in chunk {
+    let current_file_num = processed_files.fetch_add(1, Ordering::SeqCst);
+    let files_remaining = total_files.saturating_sub(current_file_num);
+
+    // Calculate max_tokens_per_file based on actual remaining files
+    let total_remaining = remaining_tokens.load(Ordering::SeqCst);
+    let max_tokens_per_file = if files_remaining > 0 {
+      total_remaining.saturating_div(files_remaining)
+    } else {
+      total_remaining
+    };
+
+    if max_tokens_per_file == 0 {
+      // No tokens left to allocate, skip remaining files
+      break;
+    }
+
+    let token_count = *token_count;
+    let allocated_tokens = token_count.min(max_tokens_per_file);
+
+    // Attempt to atomically update remaining tokens
+    match remaining_tokens.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+      if current >= allocated_tokens {
+        Some(current - allocated_tokens)
+      } else {
+        None
+      }
+    }) {
+      Ok(_) => {
+        let processed_content = if token_count > allocated_tokens {
+          model.truncate(content, allocated_tokens)?
+        } else {
+          content.clone()
+        };
+        chunk_results.push((path.clone(), processed_content));
+      }
+      Err(_) => {
+        // Failed to allocate tokens, skip remaining files
+        break;
+      }
+    }
+  }
+
+  if !chunk_results.is_empty() {
+    result_chunks.lock().extend(chunk_results);
+  }
+  Ok(())
+}
+
+pub trait PatchRepository {
+  fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>>;
+  fn to_commit_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>>;
+  fn configure_diff_options(&self, opts: &mut DiffOptions);
+  fn configure_commit_diff_options(&self, opts: &mut DiffOptions);
+}
+
+impl PatchRepository for Repository {
+  fn to_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>> {
+    profile!("Git diff generation");
+    let mut opts = DiffOptions::new();
+    self.configure_diff_options(&mut opts);
+
+    match tree {
+      Some(tree) => {
+        // Get the diff between tree and working directory, including staged changes
+        self.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))
+      }
+      None => {
+        // If there's no HEAD yet, compare against an empty tree
+        let empty_tree = self.find_tree(self.treebuilder(None)?.write()?)?;
+        // Get the diff between empty tree and working directory, including staged changes
+        self.diff_tree_to_workdir_with_index(Some(&empty_tree), Some(&mut opts))
+      }
+    }
+    .context("Failed to get diff")
+  }
+
+  fn to_commit_diff(&self, tree: Option<Tree<'_>>) -> Result<git2::Diff<'_>> {
+    profile!("Git commit diff generation");
+    let mut opts = DiffOptions::new();
+    self.configure_commit_diff_options(&mut opts);
+
+    match tree {
+      Some(tree) => {
+        // Get the diff between tree and index (staged changes only)
+        self.diff_tree_to_index(Some(&tree), None, Some(&mut opts))
+      }
+      None => {
+        // If there's no HEAD yet, compare against an empty tree
+        let empty_tree = self.find_tree(self.treebuilder(None)?.write()?)?;
+        // Get the diff between empty tree and index (staged changes only)
+        self.diff_tree_to_index(Some(&empty_tree), None, Some(&mut opts))
+      }
+    }
+    .context("Failed to get diff")
+  }
+
+  fn configure_diff_options(&self, opts: &mut DiffOptions) {
+    opts
+      .ignore_whitespace_change(false)
+      .recurse_untracked_dirs(true)
+      .recurse_ignored_dirs(false)
+      .ignore_whitespace_eol(true)
+      .ignore_blank_lines(true)
+      .include_untracked(true)
+      .ignore_whitespace(true)
+      .indent_heuristic(false)
+      .ignore_submodules(true)
+      .include_ignored(false)
+      .interhunk_lines(0)
+      .context_lines(0)
+      .patience(true)
+      .minimal(true);
+  }
+
+  fn configure_commit_diff_options(&self, opts: &mut DiffOptions) {
+    opts
+      .ignore_whitespace_change(false)
+      .recurse_untracked_dirs(false)
+      .recurse_ignored_dirs(false)
+      .ignore_whitespace_eol(true)
+      .ignore_blank_lines(true)
+      .include_untracked(false)
+      .ignore_whitespace(true)
+      .indent_heuristic(false)
+      .ignore_submodules(true)
+      .include_ignored(false)
+      .interhunk_lines(0)
+      .context_lines(0)
+      .patience(true)
+      .minimal(true);
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use tempfile::TempDir;
+
+  use super::*;
+
+  #[test]
+  fn test_string_pool_new() {
+    let pool = StringPool::new(100);
+    assert_eq!(pool.strings.len(), 0);
+    assert_eq!(pool.capacity, 100);
+  }
+
+  #[test]
+  fn test_string_pool_get() {
+    let mut pool = StringPool::new(10);
+    let s1 = pool.get();
+    assert_eq!(s1.capacity(), 10);
+    assert_eq!(s1.len(), 0);
+  }
+
+  #[test]
+  fn test_string_pool_put_and_get() {
+    let mut pool = StringPool::new(10);
+    let mut s1 = String::with_capacity(10);
+    s1.push_str("test");
+    pool.put(s1);
+
+    assert_eq!(pool.strings.len(), 1);
+
+    let s2 = pool.get();
+    assert_eq!(s2.capacity(), 10);
+    assert_eq!(s2.len(), 0);
+    assert_eq!(pool.strings.len(), 0);
+  }
+
+  #[test]
+  fn test_string_pool_limit() {
+    let mut pool = StringPool::new(10);
+
+    for _ in 0..150 {
+      pool.put(String::with_capacity(10));
+    }
+
+    assert_eq!(pool.strings.len(), MAX_POOL_SIZE);
+  }
+
+  #[test]
+  fn test_process_chunk_token_allocation() {
+    let model = Arc::new(Model::default());
+    let total_files = 3;
+    let processed_files = Arc::new(AtomicUsize::new(0));
+    let remaining_tokens = Arc::new(AtomicUsize::new(60)); // Reduced to force allocation limits
+    let result_chunks = Arc::new(Mutex::new(Vec::new()));
+
+    let chunk = vec![
+      (PathBuf::from("file1.txt"), "content1".to_string(), 50),
+      (PathBuf::from("file2.txt"), "content2".to_string(), 40),
+      (PathBuf::from("file3.txt"), "content3".to_string(), 30),
+    ];
+
+    process_chunk(&chunk, &model, total_files, &processed_files, &remaining_tokens, &result_chunks).unwrap();
+
+    let results = result_chunks.lock();
+    // With 60 total tokens and 3 files:
+    // First file gets 20 tokens (60/3)
+    // Second file gets 30 tokens (40/2)
+    // Third file gets 10 tokens (10/1)
+    assert_eq!(results.len(), 3);
+    assert_eq!(remaining_tokens.load(Ordering::SeqCst), 0);
+    assert_eq!(processed_files.load(Ordering::SeqCst), 3);
+  }
+
+  #[test]
+  fn test_process_chunk_concurrent_safety() {
+    use std::thread;
+
+    let model = Arc::new(Model::default());
+    let total_files = 6;
+    let processed_files = Arc::new(AtomicUsize::new(0));
+    let remaining_tokens = Arc::new(AtomicUsize::new(100));
+    let result_chunks = Arc::new(Mutex::new(Vec::new()));
+
+    let chunk1 = vec![
+      (PathBuf::from("file1.txt"), "content1".to_string(), 20),
+      (PathBuf::from("file2.txt"), "content2".to_string(), 20),
+      (PathBuf::from("file3.txt"), "content3".to_string(), 20),
+    ];
+
+    let chunk2 = vec![
+      (PathBuf::from("file4.txt"), "content4".to_string(), 20),
+      (PathBuf::from("file5.txt"), "content5".to_string(), 20),
+      (PathBuf::from("file6.txt"), "content6".to_string(), 20),
+    ];
+
+    // Clone values for thread 2
+    let model2 = model.clone();
+    let processed_files2 = processed_files.clone();
+    let remaining_tokens2 = remaining_tokens.clone();
+    let result_chunks2 = result_chunks.clone();
+
+    // Clone values for main thread access after threads complete
+    let processed_files_main = processed_files.clone();
+    let remaining_tokens_main = remaining_tokens.clone();
+    let result_chunks_main = result_chunks.clone();
+
+    let t1 = thread::spawn(move || {
+      process_chunk(&chunk1, &model, total_files, &processed_files, &remaining_tokens, &result_chunks).unwrap();
+    });
+
+    let t2 = thread::spawn(move || {
+      process_chunk(&chunk2, &model2, total_files, &processed_files2, &remaining_tokens2, &result_chunks2).unwrap();
+    });
+
+    t1.join().unwrap();
+    t2.join().unwrap();
+
+    let results = result_chunks_main.lock();
+    assert_eq!(results.len(), 6);
+    assert_eq!(remaining_tokens_main.load(Ordering::SeqCst), 0);
+    assert_eq!(processed_files_main.load(Ordering::SeqCst), 6);
+  }
+
+  #[test]
+  fn test_to_commit_diff_with_head() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let repo = Repository::init(temp_dir.path())?;
+    let mut index = repo.index()?;
+
+    // Create a file and stage it
+    let file_path = temp_dir.path().join("test.txt");
+    std::fs::write(&file_path, "initial content")?;
+    index.add_path(file_path.strip_prefix(temp_dir.path())?)?;
+    index.write()?;
+
+    // Create initial commit
+    let tree_id = index.write_tree()?;
+    let tree = repo.find_tree(tree_id)?;
+    let signature = git2::Signature::now("test", "test@example.com")?;
+    repo.commit(Some("HEAD"), &signature, &signature, "Initial commit", &tree, &[])?;
+
+    // Modify and stage the file
+    std::fs::write(&file_path, "modified content")?;
+    index.add_path(file_path.strip_prefix(temp_dir.path())?)?;
+    index.write()?;
+
+    // Get HEAD tree
+    let head = repo.head()?.peel_to_tree()?;
+
+    // Get diff
+    let diff = repo.to_commit_diff(Some(head))?;
+
+    // Verify diff shows only staged changes
+    let mut diff_found = false;
+    diff.print(DiffFormat::Patch, |_delta, _hunk, line| {
+      let content = line.content().to_utf8();
+      if line.origin() == '+' && content.contains("modified content") {
+        diff_found = true;
+      }
+      true
+    })?;
+
+    assert!(diff_found, "Expected to find staged changes in diff");
+    Ok(())
+  }
+
+  #[test]
+  fn test_to_commit_diff_without_head() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let repo = Repository::init(temp_dir.path())?;
+    let mut index = repo.index()?;
+
+    // Create and stage a new file
+    let file_path = temp_dir.path().join("test.txt");
+    std::fs::write(&file_path, "test content")?;
+    index.add_path(file_path.strip_prefix(temp_dir.path())?)?;
+    index.write()?;
+
+    // Get diff (no HEAD exists yet)
+    let diff = repo.to_commit_diff(None)?;
+
+    // Verify diff shows staged changes
+    let mut diff_found = false;
+    diff.print(DiffFormat::Patch, |_delta, _hunk, line| {
+      let content = line.content().to_utf8();
+      if line.origin() == '+' && content.contains("test content") {
+        diff_found = true;
+      }
+      true
+    })?;
+
+    assert!(diff_found, "Expected to find staged changes in diff");
+    Ok(())
+  }
 }

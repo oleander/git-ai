@@ -1,12 +1,11 @@
-use std::collections::HashMap;
-
-use anyhow::{bail, Result};
+use anyhow::Result;
 use ollama_rs::generation::completion::request::GenerationRequest;
 use ollama_rs::generation::options::GenerationOptions;
 use ollama_rs::Ollama;
 use async_trait::async_trait;
 
-use crate::model::{Model, Request, Response};
+use crate::model::Model;
+use crate::{Request, Response};
 
 pub struct OllamaClient {
   client: Ollama
