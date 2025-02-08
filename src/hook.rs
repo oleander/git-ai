@@ -279,28 +279,32 @@ fn process_chunk(
     };
 
     if max_tokens_per_file == 0 {
-      continue;
+      // No tokens left to allocate, skip remaining files
+      break;
     }
 
     let token_count = *token_count;
     let allocated_tokens = token_count.min(max_tokens_per_file);
 
-    if remaining_tokens
-      .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
-        if current >= allocated_tokens {
-          Some(current - allocated_tokens)
-        } else {
-          None
-        }
-      })
-      .is_ok()
-    {
-      let processed_content = if token_count > allocated_tokens {
-        model.truncate(content, allocated_tokens)?
+    match remaining_tokens.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+      if current >= allocated_tokens {
+        Some(current - allocated_tokens)
       } else {
-        content.clone()
-      };
-      chunk_results.push((path.clone(), processed_content));
+        None
+      }
+    }) {
+      Ok(_) => {
+        let processed_content = if token_count > allocated_tokens {
+          model.truncate(content, allocated_tokens)?
+        } else {
+          content.clone()
+        };
+        chunk_results.push((path.clone(), processed_content));
+      }
+      Err(_) => {
+        // Failed to allocate tokens, skip remaining files
+        break;
+      }
     }
   }
 
@@ -444,5 +448,31 @@ mod tests {
     }
 
     assert_eq!(pool.strings.len(), MAX_POOL_SIZE);
+  }
+
+  #[test]
+  fn test_process_chunk_token_allocation() {
+    let model = Arc::new(Model::default());
+    let total_files = 3;
+    let processed_files = Arc::new(AtomicUsize::new(0));
+    let remaining_tokens = Arc::new(AtomicUsize::new(60)); // Reduced to force allocation limits
+    let result_chunks = Arc::new(Mutex::new(Vec::new()));
+
+    let chunk = vec![
+      (PathBuf::from("file1.txt"), "content1".to_string(), 50),
+      (PathBuf::from("file2.txt"), "content2".to_string(), 40),
+      (PathBuf::from("file3.txt"), "content3".to_string(), 30),
+    ];
+
+    process_chunk(&chunk, &model, total_files, &processed_files, &remaining_tokens, &result_chunks).unwrap();
+
+    let results = result_chunks.lock();
+    // With 60 total tokens and 3 files:
+    // First file gets 20 tokens (60/3)
+    // Second file gets 30 tokens (40/2)
+    // Third file gets 10 tokens (10/1)
+    assert_eq!(results.len(), 3);
+    assert_eq!(remaining_tokens.load(Ordering::SeqCst), 0);
+    assert_eq!(processed_files.load(Ordering::SeqCst), 3);
   }
 }
