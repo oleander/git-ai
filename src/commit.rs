@@ -5,12 +5,14 @@ use anyhow::{bail, Result};
 use crate::{config, openai, profile};
 use crate::model::Model;
 
+/// The instruction template included at compile time
+const INSTRUCTION_TEMPLATE: &str = include_str!("../resources/prompt.md");
+
 /// Returns the instruction template for the AI model.
 /// This template guides the model in generating appropriate commit messages.
 fn get_instruction_template() -> String {
   profile!("Generate instruction template");
-  let prompt = fs::read_to_string("resources/prompt.md").unwrap_or_else(|_| String::from("Failed to read prompt.md"));
-  prompt.replace("{{max_commit_length}}", &config::APP.max_commit_length.unwrap_or(72).to_string())
+  INSTRUCTION_TEMPLATE.replace("{{max_commit_length}}", &config::APP.max_commit_length.unwrap_or(72).to_string())
 }
 
 /// Calculates the number of tokens used by the instruction template.
