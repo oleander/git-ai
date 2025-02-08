@@ -4,6 +4,12 @@ set -x fish_trace 1
 set -Ux OPENAI_API_KEY $OPENAI_API_KEY
 set -x RUST_LOG debug
 
+if not test -n "$TEST_MODEL"
+    echo "Please set the TEST_MODEL environment variable."
+    exit 1
+end
+set model "$TEST_MODEL"
+
 if not test -n "$OPENAI_API_KEY"
     echo "Please set the OPENAI_API_KEY environment variable."
     exit 1
@@ -52,9 +58,9 @@ git-ai hook reinstall || fail "Hook reinstall failed"
 git-ai config reset
 git-ai config || echo "As expected"
 git-ai config set || echo "As expected"
-git-ai config set model gpt-4 || fail "Setting model failed"
-git-ai config set max-tokens 512 || fail "Setting max tokens failed"
-git-ai config set max-commit-length 1024 || fail "Setting max commit length failed"
+git-ai config set $model || fail "Setting model failed"
+git-ai config set max-tokens 256 || fail "Setting max tokens failed"
+git-ai config set max-commit-length 512 || fail "Setting max commit length failed"
 git-ai config set openai-api-key "$OPENAI_API_KEY" || fail "Setting OpenAI API key failed"
 
 echo "Hello World 0" >README.md

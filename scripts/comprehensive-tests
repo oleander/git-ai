@@ -1,7 +1,12 @@
 #!/usr/bin/env fish
 
 set -x fish_trace 1
-set model "SlyOtis/git-auto-message:latest"
+
+if not test -n "$TEST_MODEL"
+    echo "Please set the TEST_MODEL environment variable."
+    exit 1
+end
+set model "$TEST_MODEL"
 
 # Load environment variables from .env.local if it exists
 if test -f .env.local

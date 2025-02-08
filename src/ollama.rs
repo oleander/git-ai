@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use ollama_rs::generation::completion::request::GenerationRequest;
 use ollama_rs::generation::options::GenerationOptions;
 use ollama_rs::Ollama;
@@ -35,7 +35,11 @@ impl OllamaClient {
   pub async fn generate(&self, model: Model, prompt: &str) -> Result<String> {
     let model_name = <&str>::from(&model);
     let request = GenerationRequest::new(model_name.to_string(), prompt.to_string());
-    let response = self.client.generate(request).await?;
+    let response = self
+      .client
+      .generate(request)
+      .await
+      .context("Failed to connect to Ollama, is it running?")?;
     Ok(response.response)
   }
 
