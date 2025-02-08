@@ -163,14 +163,15 @@ pub async fn call(request: Request) -> Result<Response> {
       }
     };
 
-    Ok(Response {
-      response: response
-        .choices
-        .first()
-        .context("No response choices available")?
-        .message
-        .content
-        .clone()
-    })
+    let content = response
+      .choices
+      .first()
+      .context("No response choices available")?
+      .message
+      .content
+      .clone()
+      .context("Response content is empty")?;
+
+    Ok(Response { response: content })
   }
 }

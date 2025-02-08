@@ -94,7 +94,7 @@ impl TestRepository for Repository {
       Some(tree) => {
         // For staged changes, compare tree to index
         let diff = self.diff_tree_to_index(Some(&tree), None, Some(&mut opts))?;
-        if !diff.is_empty()? {
+        if !TestPatchDiff::is_empty(&diff)? {
           return Ok(diff);
         }
         // If no staged changes, compare tree to workdir
@@ -133,39 +133,39 @@ fn test_patch_diff_to_patch() {
   file.commit().unwrap();
 
   let tree = git_repo.head().unwrap().peel_to_tree().unwrap();
-  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
+  let diff = TestRepository::to_diff(&git_repo, Some(tree.clone())).unwrap();
   assert!(TestPatchDiff::is_empty(&diff).unwrap());
 
   // Add a new line to the file
   let file = repo.create_file("file", "Hello, world!\n").unwrap();
-  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
+  let diff = TestRepository::to_diff(&git_repo, Some(tree.clone())).unwrap();
   assert!(!TestPatchDiff::is_empty(&diff).unwrap());
   assert!(TestPatchDiff::contains(&diff, &file).unwrap());
 
   // stage and commit the file
   file.stage().unwrap();
-  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
+  let diff = TestRepository::to_diff(&git_repo, Some(tree.clone())).unwrap();
   assert!(!TestPatchDiff::is_empty(&diff).unwrap());
   file.commit().unwrap();
   let tree = git_repo.head().unwrap().peel_to_tree().unwrap();
-  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
+  let diff = TestRepository::to_diff(&git_repo, Some(tree.clone())).unwrap();
   assert!(TestPatchDiff::is_empty(&diff).unwrap());
 
   // delete the file
   file.delete().unwrap();
-  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
+  let diff = TestRepository::to_diff(&git_repo, Some(tree.clone())).unwrap();
   assert!(!TestPatchDiff::is_empty(&diff).unwrap());
   assert!(TestPatchDiff::contains(&diff, &file).unwrap());
 
   // stage and commit the deletion
   file.stage().unwrap();
-  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
+  let diff = TestRepository::to_diff(&git_repo, Some(tree.clone())).unwrap();
   assert!(!TestPatchDiff::is_empty(&diff).unwrap());
   assert!(TestPatchDiff::contains(&diff, &file).unwrap());
 
   file.commit().unwrap();
   let tree = git_repo.head().unwrap().peel_to_tree().unwrap();
-  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
+  let diff = TestRepository::to_diff(&git_repo, Some(tree.clone())).unwrap();
   assert!(TestPatchDiff::is_empty(&diff).unwrap());
 
   // test initial commit
@@ -173,18 +173,18 @@ fn test_patch_diff_to_patch() {
   let file = repo.create_file("test.txt", "Hello, world!").unwrap();
   let repo_path = repo.repo_path.path().to_path_buf();
   let git_repo = git2::Repository::open(repo_path).unwrap();
-  let diff = git_repo.to_diff(None).unwrap();
+  let diff = TestRepository::to_diff(&git_repo, None).unwrap();
   assert!(!TestPatchDiff::is_empty(&diff).unwrap());
   assert!(TestPatchDiff::contains(&diff, &file).unwrap());
 
   // stage and commit the file
   file.stage().unwrap();
-  let diff = git_repo.to_diff(None).unwrap();
+  let diff = TestRepository::to_diff(&git_repo, None).unwrap();
   assert!(!TestPatchDiff::is_empty(&diff).unwrap());
   assert!(TestPatchDiff::contains(&diff, &file).unwrap());
 
   file.commit().unwrap();
   let tree = git_repo.head().unwrap().peel_to_tree().unwrap();
-  let diff = git_repo.to_diff(Some(tree.clone())).unwrap();
+  let diff = TestRepository::to_diff(&git_repo, Some(tree.clone())).unwrap();
   assert!(TestPatchDiff::is_empty(&diff).unwrap());
 }
