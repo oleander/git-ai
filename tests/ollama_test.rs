@@ -53,7 +53,6 @@ mod real_client_tests {
   async fn skip_if_no_ollama() {
     if env::var("RUN_OLLAMA_TESTS").is_err() {
       eprintln!("Skipping Ollama integration tests. Set RUN_OLLAMA_TESTS=1 to run them.");
-      return;
     }
   }
 

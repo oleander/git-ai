@@ -254,9 +254,9 @@ impl PatchDiff for Diff<'_> {
     self.foreach(
       &mut |delta, _| {
         let mut files = files.lock();
-        if !files.contains_key(&delta.path()) {
+        if let std::collections::hash_map::Entry::Vacant(e) = files.entry(delta.path()) {
           if delta.status() == git2::Delta::Added {
-            files.insert(delta.path(), String::from("new empty file"));
+            e.insert(String::from("new empty file"));
           }
         }
         true
