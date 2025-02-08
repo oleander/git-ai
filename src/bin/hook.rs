@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 // .git/hooks/prepare-commit-msg
 //
 // git commit --amend --no-edit
