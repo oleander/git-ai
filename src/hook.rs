@@ -360,10 +360,9 @@ impl PatchRepository for Repository {
         self.diff_tree_to_index(Some(&tree), None, Some(&mut opts))
       }
       None => {
-        // If there's no HEAD yet, compare against an empty tree
-        let empty_tree = self.find_tree(self.treebuilder(None)?.write()?)?;
-        // Get the diff between empty tree and index (staged changes only)
-        self.diff_tree_to_index(Some(&empty_tree), None, Some(&mut opts))
+        // If there's no HEAD yet, just get the index diff (staged changes only)
+        let index = self.index()?;
+        self.diff_index_to_index(&index, &index, Some(&mut opts))
       }
     }
     .context("Failed to get diff")
