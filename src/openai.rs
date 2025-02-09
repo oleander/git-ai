@@ -1,9 +1,6 @@
-use async_openai::types::{ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs};
-use async_openai::config::OpenAIConfig;
-use async_openai::Client;
-use async_openai::error::OpenAIError;
-use anyhow::{anyhow, Context, Result};
-use colored::*;
+use anyhow::{anyhow, Result};
+use serde::Serialize;
+use {reqwest, serde_json};
 
 use crate::{commit, config, profile};
 use crate::model::Model;
@@ -15,12 +12,29 @@ pub struct Response {
   pub response: String
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Serialize)]
 pub struct Request {
-  pub prompt:     String,
-  pub system:     String,
-  pub max_tokens: u16,
-  pub model:      Model
+  pub model:       String,
+  pub messages:    Vec<Message>,
+  pub max_tokens:  u16,
+  pub temperature: f32
+}
+
+impl Request {
+  pub fn new(model: Model, system: String, prompt: String, max_tokens: u16) -> Self {
+    Self {
+      model: model.to_string(),
+      messages: vec![Message { role: "system".to_string(), content: system }, Message { role: "user".to_string(), content: prompt }],
+      max_tokens,
+      temperature: 0.7
+    }
+  }
+}
+
+#[derive(Debug, Serialize)]
+pub struct Message {
+  pub role:    String,
+  pub content: String
 }
 
 /// Generates an improved commit message using the provided prompt and diff
@@ -90,89 +104,29 @@ fn truncate_to_fit(text: &str, max_tokens: usize, model: &Model) -> Result<Strin
 
 pub async fn call(request: Request) -> Result<Response> {
   profile!("OpenAI API call");
-  let api_key = config::APP.openai_api_key.clone().context(format!(
-    "{} OpenAI API key not found.\n    Run: {}",
-    "ERROR:".bold().bright_red(),
-    "git-ai config set openai-api-key <your-key>".yellow()
-  ))?;
+  let client = reqwest::Client::new();
+  let openai_key = config::APP
+    .openai
+    .api_key
+    .clone()
+    .ok_or_else(|| anyhow!("OpenAI API key not set"))?;
 
-  let openai_host = config::APP.openai.host.into());
-  let config = OpenAIConfig::new().with_api_key(api_key).with_base_url(openai_host);
-  let client = Client::with_config(config);
+  let openai_host = config::APP.openai.host.clone();
+  let url = format!("{}/chat/completions", openai_host);
 
-  // Calculate available tokens using model's context size
-  let system_tokens = request.model.count_tokens(&request.system)?;
-  let model_context_size = request.model.context_size();
-  let available_tokens = model_context_size.saturating_sub(system_tokens + request.max_tokens as usize);
+  let response = client
+    .post(url)
+    .header("Authorization", format!("Bearer {}", openai_key))
+    .header("Content-Type", "application/json")
+    .json(&request)
+    .send()
+    .await?;
 
-  // Truncate prompt if needed
-  let truncated_prompt = truncate_to_fit(&request.prompt, available_tokens, &request.model)?;
+  let response = response.json::<serde_json::Value>().await?;
+  let content = response["choices"][0]["message"]["content"]
+    .as_str()
+    .ok_or_else(|| anyhow!("Invalid response format"))?
+    .to_string();
 
-  let request = CreateChatCompletionRequestArgs::default()
-    .max_tokens(request.max_tokens)
-    .model(request.model.to_string())
-    .messages([
-      ChatCompletionRequestSystemMessageArgs::default()
-        .content(request.system)
-        .build()?
-        .into(),
-      ChatCompletionRequestUserMessageArgs::default()
-        .content(truncated_prompt)
-        .build()?
-        .into()
-    ])
-    .build()?;
-
-  {
-    profile!("OpenAI request/response");
-    let response = match client.chat().create(request).await {
-      Ok(response) => response,
-      Err(err) => {
-        let error_msg = match err {
-          OpenAIError::ApiError(e) =>
-            format!(
-              "{} {}\n    {}\n\nDetails:\n    {}\n\nSuggested Actions:\n    1. {}\n    2. {}\n    3. {}",
-              "ERROR:".bold().bright_red(),
-              "OpenAI API error:".bright_white(),
-              e.message.dimmed(),
-              "Failed to create chat completion.".dimmed(),
-              "Ensure your OpenAI API key is valid".yellow(),
-              "Check your account credits".yellow(),
-              "Verify OpenAI service availability".yellow()
-            ),
-          OpenAIError::Reqwest(e) =>
-            format!(
-              "{} {}\n    {}\n\nDetails:\n    {}\n\nSuggested Actions:\n    1. {}\n    2. {}",
-              "ERROR:".bold().bright_red(),
-              "Network error:".bright_white(),
-              e.to_string().dimmed(),
-              "Failed to connect to OpenAI API.".dimmed(),
-              "Check your internet connection".yellow(),
-              "Verify OpenAI service availability".yellow()
-            ),
-          _ =>
-            format!(
-              "{} {}\n    {}\n\nDetails:\n    {}\n\nSuggested Actions:\n    1. {}",
-              "ERROR:".bold().bright_red(),
-              "Unexpected error:".bright_white(),
-              err.to_string().dimmed(),
-              "An unexpected error occurred while calling OpenAI API.".dimmed(),
-              "Please report this issue on GitHub".yellow()
-            ),
-        };
-        return Err(anyhow!(error_msg));
-      }
-    };
-
-    let content = response
-      .choices
-      .first()
-      .context("No response choices available")?
-      .message
-      .content
-      .clone()
-      .context("Response content is empty")?;
-
-    Ok(Response { response: content })
-  }
+  Ok(Response { response: content })
 }

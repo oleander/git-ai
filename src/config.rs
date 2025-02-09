@@ -16,14 +16,43 @@ const DEFAULT_MODEL: &str = "gpt-4o-mini";
 const DEFAULT_API_KEY: &str = "<PLACE HOLDER FOR YOUR API KEY>";
 const DEFAULT_OPENAI_HOST: &str = "https://api.openai.com/v1";
 
-#[derive(Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct App {
-  pub openai_api_key:    Option<String>,
   pub model:             Option<String>,
   pub max_tokens:        Option<usize>,
   pub max_commit_length: Option<usize>,
-  pub timeout:           Option<usize>,
-  pub openai_host:       Option<String>
+  pub timeout:           Option<u64>,
+  #[serde(default)]
+  pub openai:            OpenAI
+}
+
+impl Default for App {
+  fn default() -> Self {
+    Self {
+      model:             None,
+      max_tokens:        None,
+      max_commit_length: None,
+      timeout:           None,
+      openai:            OpenAI::default()
+    }
+  }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenAI {
+  #[serde(default = "default_openai_host")]
+  pub host:    String,
+  pub api_key: Option<String>
+}
+
+impl Default for OpenAI {
+  fn default() -> Self {
+    Self { host: default_openai_host(), api_key: None }
+  }
+}
+
+fn default_openai_host() -> String {
+  std::env::var("OPENAI_URL").unwrap_or_else(|_| "https://api.openai.com/v1".to_string())
 }
 
 #[derive(Debug)]
@@ -47,10 +76,10 @@ impl ConfigPaths {
   }
 
   fn ensure_exists(&self) -> Result<()> {
-    if (!self.dir.exists()) {
+    if !self.dir.exists() {
       std::fs::create_dir_all(&self.dir).with_context(|| format!("Failed to create config directory at {:?}", self.dir))?;
     }
-    if (!self.file.exists()) {
+    if !self.file.exists() {
       File::create(&self.file).with_context(|| format!("Failed to create config file at {:?}", self.file))?;
     }
     Ok(())
@@ -103,17 +132,44 @@ impl App {
   }
 
   pub fn update_openai_api_key(&mut self, value: String) -> Result<()> {
-    self.openai_api_key = Some(value);
+    self.openai.api_key = Some(value);
     self.save_with_message("openai-api-key")
   }
 
   pub fn update_openai_host(&mut self, value: String) -> Result<()> {
-    self.openai_host = Some(value);
+    self.openai.host = value;
     self.save_with_message("openai-host")
   }
 
   fn save_with_message(&self, option: &str) -> Result<()> {
     println!("{} Configuration option {} updated!", Emoji("✨", ":-)"), option);
     self.save()
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use std::env;
+
+  use super::*;
+
+  #[test]
+  fn test_openai_url_configuration() {
+    // Test default value
+    let app = App::default();
+    assert_eq!(app.openai.host, "https://api.openai.com/v1");
+
+    // Test environment variable override
+    env::set_var("OPENAI_URL", "https://custom-api.example.com");
+    let app = App::default();
+    assert_eq!(app.openai.host, "https://custom-api.example.com");
+    env::remove_var("OPENAI_URL");
+
+    // Test manual update
+    let mut app = App::default();
+    app
+      .update_openai_host("https://another-api.example.com".to_string())
+      .unwrap();
+    assert_eq!(app.openai.host, "https://another-api.example.com");
   }
 }

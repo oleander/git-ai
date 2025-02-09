@@ -2,8 +2,7 @@ use anyhow::{bail, Result};
 
 use crate::model::Model;
 use crate::ollama::OllamaClient;
-use crate::openai::{self, Request as OpenAIRequest};
-use crate::commit;
+use crate::{commit, openai};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Request {
@@ -20,6 +19,12 @@ pub struct Response {
 
 pub async fn call(request: Request) -> Result<Response> {
   match request.model {
+    Model::GPT4 | Model::GPT4o | Model::GPT4Turbo | Model::GPT4oMini => {
+      let openai_request = openai::Request::new(request.model, request.system, request.prompt, request.max_tokens);
+
+      let response = openai::call(openai_request).await?;
+      Ok(Response { response: response.response })
+    }
     Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 | Model::Tavernari | Model::SlyOtis => {
       let client = OllamaClient::new().await?;
 
@@ -42,19 +47,6 @@ pub async fn call(request: Request) -> Result<Response> {
       }
 
       Ok(Response { response: commit_message })
-    }
-    _ => {
-      // For OpenAI models, use the instruction template as the system prompt
-      let template = commit::get_instruction_template()?;
-      let openai_request = OpenAIRequest {
-        prompt:     request.prompt,
-        system:     template,
-        max_tokens: request.max_tokens,
-        model:      request.model
-      };
-
-      let response = openai::call(openai_request).await?;
-      Ok(Response { response: response.response })
     }
   }
 }

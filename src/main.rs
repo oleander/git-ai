@@ -59,10 +59,16 @@ enum SetSubcommand {
     value: String
   },
 
-  #[structopt(about = "Sets the OpenAI host URL")]
+  #[structopt(about = "OpenAI configuration")]
+  OpenAI(OpenAISubcommand)
+}
+
+#[derive(StructOpt)]
+enum OpenAISubcommand {
+  #[structopt(about = "Sets the OpenAI API URL")]
   Url {
-    #[structopt(default_value = "https://api.openai.com/v1", env = "OPENAI_URL", help = "The OpenAI host URL", name = "VALUE")]
-    value: String
+    #[structopt(env = "OPENAI_URL", default_value = "https://api.openai.com/v1")]
+    url: String
   }
 }
 
@@ -233,9 +239,12 @@ async fn main() -> Result<()> {
             SetSubcommand::OpenaiApiKey { value } => {
               run_config_openai_api_key(value)?;
             }
-            SetSubcommand::Url { value } => {
-              run_config_openai_host(value)?;
-            }
+            SetSubcommand::OpenAI(openai) =>
+              match openai {
+                OpenAISubcommand::Url { url } => {
+                  run_config_openai_host(url)?;
+                }
+              },
           },
       },
   }
