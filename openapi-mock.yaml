@@ -1,0 +1,66 @@
+openapi: 3.0.0
+info:
+  title: OpenAI API Mock
+  version: 1.0.0
+paths:
+  /chat/completions:
+    post:
+      operationId: createChatCompletion
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  object:
+                    type: string
+                  created:
+                    type: integer
+                  model:
+                    type: string
+                  choices:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        index:
+                          type: integer
+                        message:
+                          type: object
+                          properties:
+                            role:
+                              type: string
+                              enum: ["assistant"]
+                            content:
+                              type: string
+                        finish_reason:
+                          type: string
+                          enum: ["stop"]
+                  usage:
+                    type: object
+                    properties:
+                      prompt_tokens:
+                        type: integer
+                      completion_tokens:
+                        type: integer
+                      total_tokens:
+                        type: integer
+              example:
+                id: "chatcmpl-123"
+                object: "chat.completion"
+                created: 1677652288
+                model: "gpt-4"
+                choices:
+                  - index: 0
+                    message:
+                      role: "assistant"
+                      content: "This is a mock response"
+                    finish_reason: "stop"
+                usage:
+                  prompt_tokens: 0
+                  completion_tokens: 0
+                  total_tokens: 0

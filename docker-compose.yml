@@ -1,0 +1,16 @@
+services:
+  prism:
+    image: stoplight/prism:latest
+    platform: linux/amd64
+    command: ["mock", "-h", "0.0.0.0", "/app/openapi-mock.yaml"]
+    ports:
+      - "4010:4010"
+    volumes:
+      - ./openapi-mock.yaml:/app/openapi-mock.yaml
+    restart: unless-stopped
+    stop_grace_period: 1s
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./openapi-mock.yaml
+          target: /app/openapi-mock.yaml
