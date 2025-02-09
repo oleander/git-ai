@@ -215,7 +215,7 @@ impl Model {
       // - Additional weight for code-specific tokens
       6 + (code_lines * 4)
         + text
-          .matches(|c: char| c == '{' || c == '}' || c == '(' || c == ')' || c == ';')
+          .matches(|c: char| ['{', '}', '(', ')', ';'].contains(&c))
           .count()
           * 2
     } else {
@@ -320,34 +320,18 @@ impl Model {
   pub fn truncate(&self, text: &str, max_tokens: usize) -> Result<String> {
     profile!("Truncate text");
 
-    // For small texts or if we're using Ollama, use fast estimation
-    if text.len() < 1000
-      || matches!(
-        self,
-        Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 | Model::Tavernari | Model::SlyOtis
-      )
-    {
-      let estimated_tokens = self.estimate_tokens(text);
-      if estimated_tokens <= max_tokens {
-        return Ok(text.to_string());
-      }
-
-      // Estimate how much text we can keep based on the token ratio
-      let keep_ratio = max_tokens as f64 / estimated_tokens as f64;
-      let keep_bytes = (text.len() as f64 * keep_ratio) as usize;
-
-      // Find the last line break before our estimated cut point
-      let result = text.chars().take(keep_bytes).collect::<String>();
-      return Ok(result);
+    // Check if text already fits within token limit
+    if self.count_tokens(text)? <= max_tokens {
+      return Ok(text.to_string());
     }
 
-    // For other models, use parallel binary search
+    // Use binary search to find the optimal truncation point
     let lines: Vec<_> = text.lines().collect();
     let total_lines = lines.len();
 
     // Use exponential search to find a rough cut point
     let mut size = 1;
-    while size < total_lines && self.estimate_tokens(&lines[..size].join("\n")) <= max_tokens {
+    while size < total_lines && self.count_tokens(&lines[..size].join("\n"))? <= max_tokens {
       size *= 2;
     }
 
@@ -355,9 +339,8 @@ impl Model {
     let mut left = size / 2;
     let mut right = size.min(total_lines);
 
-    // Process multiple points in parallel during binary search
     while left < right {
-      let mid = (left + right + 1) / 2;
+      let mid = (left + right).div_ceil(2);
       let chunk = lines[..mid].join("\n");
 
       if self.count_tokens(&chunk)? <= max_tokens {
