@@ -36,6 +36,7 @@ futures = "0.3"
 parking_lot = "0.12.3"
 async-trait = "0.1"
 tracing = "0.1"
+url = "2.5.0"
 
 # CLI and UI
 

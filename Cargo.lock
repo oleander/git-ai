@@ -988,6 +988,7 @@ dependencies = [
  "tiktoken-rs",
  "tokio",
  "tracing",
+ "url",
 ]
 
 [[package]]

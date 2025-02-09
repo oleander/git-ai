@@ -7,6 +7,8 @@ use config::{Config, FileFormat};
 use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use console::Emoji;
+use thiserror::Error;
+use url::Url;
 
 // Constants
 const DEFAULT_TIMEOUT: i64 = 30;
@@ -42,6 +44,7 @@ impl Default for App {
 pub struct OpenAI {
   #[serde(default = "default_openai_host")]
   pub host:    String,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub api_key: Option<String>
 }
 
@@ -84,6 +87,14 @@ impl ConfigPaths {
     }
     Ok(())
   }
+}
+
+#[derive(Error, Debug)]
+pub enum ConfigError {
+  #[error("Invalid URL format: {0}. The URL should be in the format 'https://api.example.com'")]
+  InvalidUrl(String),
+  #[error("Failed to save configuration: {0}")]
+  SaveError(String)
 }
 
 impl App {
@@ -137,8 +148,13 @@ impl App {
   }
 
   pub fn update_openai_host(&mut self, value: String) -> Result<()> {
+    // Validate URL format
+    Url::parse(&value).map_err(|_| ConfigError::InvalidUrl(value.clone()))?;
+
     self.openai.host = value;
-    self.save_with_message("openai-host")
+    self
+      .save_with_message("openai-host")
+      .map_err(|e| ConfigError::SaveError(e.to_string()).into())
   }
 
   fn save_with_message(&self, option: &str) -> Result<()> {
@@ -165,11 +181,18 @@ mod tests {
     assert_eq!(app.openai.host, "https://custom-api.example.com");
     env::remove_var("OPENAI_URL");
 
-    // Test manual update
+    // Test manual update with valid URL
     let mut app = App::default();
-    app
-      .update_openai_host("https://another-api.example.com".to_string())
-      .unwrap();
-    assert_eq!(app.openai.host, "https://another-api.example.com");
+    let test_url = "https://another-api.example.com";
+    app.openai.host = test_url.to_string();
+    assert_eq!(app.openai.host, test_url);
+
+    // Test URL validation
+    let mut app = App::default();
+    let result = app.update_openai_host("not-a-url".to_string());
+    assert!(result.is_err());
+    if let Err(e) = result {
+      assert!(e.to_string().contains("Invalid URL format"));
+    }
   }
 }
