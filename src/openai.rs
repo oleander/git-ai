@@ -128,7 +128,8 @@ pub async fn call(request: Request) -> Result<Response> {
     .ok_or(OpenAIError::MissingApiKey)?;
 
   let openai_host = config::APP.openai.host.clone();
-  let url = format!("{}/chat/completions", openai_host);
+  let base_url = openai_host.trim_end_matches("/v1").trim_end_matches('/');
+  let url = format!("{}/v1/chat/completions", base_url);
 
   debug!("OpenAI Request URL: {}", url);
   debug!("OpenAI Request Body: {:?}", request);

@@ -16,7 +16,7 @@ const DEFAULT_MAX_COMMIT_LENGTH: i64 = 72;
 const DEFAULT_MAX_TOKENS: i64 = 2024;
 const DEFAULT_MODEL: &str = "gpt-4o-mini";
 const DEFAULT_API_KEY: &str = "<PLACE HOLDER FOR YOUR API KEY>";
-const DEFAULT_OPENAI_HOST: &str = "https://api.openai.com/v1";
+const DEFAULT_OPENAI_HOST: &str = "https://api.openai.com";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct App {
