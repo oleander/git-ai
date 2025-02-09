@@ -2,6 +2,7 @@ use anyhow::Result;
 use serde::Serialize;
 use {reqwest, serde_json};
 use thiserror::Error;
+use log::{debug, error};
 
 use crate::{commit, config, profile};
 use crate::model::Model;
@@ -10,16 +11,16 @@ const MAX_ATTEMPTS: usize = 3;
 
 #[derive(Error, Debug)]
 pub enum OpenAIError {
-    #[error("Failed to connect to OpenAI API at {url}. Please check:\n1. The URL is correct and accessible\n2. Your network connection is working\n3. The API endpoint supports chat completions\n\nError details: {source}")]
-    ConnectionError {
-        url: String,
-        #[source]
-        source: reqwest::Error,
-    },
-    #[error("Invalid response from OpenAI API: {0}")]
-    InvalidResponse(String),
-    #[error("OpenAI API key not set. Please set it using:\ngit ai config set openai-api-key <YOUR_API_KEY>")]
-    MissingApiKey,
+  #[error("Failed to connect to OpenAI API at {url}. Please check:\n1. The URL is correct and accessible\n2. Your network connection is working\n3. The API endpoint supports chat completions\n\nError details: {source}")]
+  ConnectionError {
+    url:    String,
+    #[source]
+    source: reqwest::Error
+  },
+  #[error("Invalid response from OpenAI API: {0}")]
+  InvalidResponse(String),
+  #[error("OpenAI API key not set. Please set it using:\ngit ai config set openai-api-key <YOUR_API_KEY>")]
+  MissingApiKey
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -136,17 +137,33 @@ pub async fn call(request: Request) -> Result<Response> {
     .json(&request)
     .send()
     .await
-    .map_err(|e| OpenAIError::ConnectionError {
-      url: url.clone(),
-      source: e,
-    })?;
+    .map_err(|e| OpenAIError::ConnectionError { url: url.clone(), source: e })?;
 
-  let response = response.json::<serde_json::Value>().await
-    .map_err(|e| OpenAIError::InvalidResponse(e.to_string()))?;
+  // Log response status and headers
+  debug!("OpenAI API Response Status: {}", response.status());
+  debug!("OpenAI API Response Headers: {:?}", response.headers());
 
-  let content = response["choices"][0]["message"]["content"]
+  // Get the raw response text first
+  let response_text = response.text().await.map_err(|e| {
+    error!("Failed to get response text: {}", e);
+    OpenAIError::InvalidResponse(format!("Failed to get response text: {}", e))
+  })?;
+
+  debug!("OpenAI API Raw Response: {}", response_text);
+
+  // Parse the response text
+  let response_json: serde_json::Value = serde_json::from_str(&response_text).map_err(|e| {
+    error!("Failed to parse response JSON: {}", e);
+    OpenAIError::InvalidResponse(format!("Failed to parse response JSON: {}", e))
+  })?;
+
+  let content = response_json["choices"][0]["message"]["content"]
     .as_str()
-    .ok_or_else(|| OpenAIError::InvalidResponse("Response missing expected 'choices[0].message.content' field".to_string()))?
+    .ok_or_else(|| {
+      let err = "Response missing expected 'choices[0].message.content' field";
+      error!("{}", err);
+      OpenAIError::InvalidResponse(err.to_string())
+    })?
     .to_string();
 
   Ok(Response { response: content })
