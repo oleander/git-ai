@@ -154,24 +154,30 @@ impl PatchDiff for Diff<'_> {
 
     // Step 1: Collect diff data (non-parallel)
     let files = self.collect_diff_data()?;
+    let files: Vec<_> = files.into_iter().collect();
 
-    // Step 2: Prepare files for processing
-    let mut files_with_tokens: DiffData = files
-      .into_iter()
-      .map(|(path, content)| {
-        let token_count = model.count_tokens(&content).unwrap_or_default();
-        (path, content, token_count)
-      })
-      .collect();
-
-    files_with_tokens.sort_by_key(|(_, _, count)| *count);
-
-    // Step 3: Process files in parallel
+    // Step 2: Prepare files for processing in parallel
     let thread_pool = rayon::ThreadPoolBuilder::new()
       .num_threads(num_cpus::get())
       .build()
       .context("Failed to create thread pool")?;
 
+    let model = Arc::new(model);
+
+    let files_with_tokens: DiffData = thread_pool.install(|| {
+      files
+        .into_par_iter()
+        .map(|(path, content)| {
+          let token_count = model.count_tokens(&content).unwrap_or_default();
+          (path, content, token_count)
+        })
+        .collect()
+    });
+
+    let mut files_with_tokens = files_with_tokens;
+    files_with_tokens.sort_by_key(|(_, _, count)| *count);
+
+    // Step 3: Process files in parallel (reuse existing thread pool)
     let total_files = files_with_tokens.len();
     let remaining_tokens = Arc::new(AtomicUsize::new(max_tokens));
     let result_chunks = Arc::new(Mutex::new(Vec::with_capacity(total_files)));
@@ -181,8 +187,6 @@ impl PatchDiff for Diff<'_> {
       .chunks(PARALLEL_CHUNK_SIZE)
       .map(|chunk| chunk.to_vec())
       .collect();
-
-    let model = Arc::new(model);
 
     thread_pool.install(|| {
       chunks
