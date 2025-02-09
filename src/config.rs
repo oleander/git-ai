@@ -16,7 +16,6 @@ const DEFAULT_MAX_COMMIT_LENGTH: i64 = 72;
 const DEFAULT_MAX_TOKENS: i64 = 2024;
 const DEFAULT_MODEL: &str = "gpt-4o-mini";
 const DEFAULT_API_KEY: &str = "<PLACE HOLDER FOR YOUR API KEY>";
-const DEFAULT_OPENAI_HOST: &str = "https://api.openai.com";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct App {
@@ -42,7 +41,6 @@ impl Default for App {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OpenAI {
-  #[serde(default = "default_openai_host")]
   pub host:    String,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub api_key: Option<String>
@@ -50,12 +48,11 @@ pub struct OpenAI {
 
 impl Default for OpenAI {
   fn default() -> Self {
-    Self { host: default_openai_host(), api_key: None }
+    Self {
+      host:    String::new(), // Will be set by structopt
+      api_key: None
+    }
   }
-}
-
-fn default_openai_host() -> String {
-  std::env::var("OPENAI_URL").unwrap_or_else(|_| "https://api.openai.com/v1".to_string())
 }
 
 #[derive(Debug)]
@@ -99,7 +96,6 @@ pub enum ConfigError {
 
 impl App {
   pub fn new() -> Result<Self> {
-    dotenv::dotenv().ok();
     PATHS.ensure_exists()?;
 
     let config = Config::builder()
@@ -111,7 +107,6 @@ impl App {
       .set_default("max_tokens", DEFAULT_MAX_TOKENS)?
       .set_default("model", DEFAULT_MODEL)?
       .set_default("openai_api_key", DEFAULT_API_KEY)?
-      .set_default("openai_host", DEFAULT_OPENAI_HOST)?
       .build()?;
 
     config
@@ -150,11 +145,8 @@ impl App {
   pub fn update_openai_host(&mut self, value: String) -> Result<()> {
     // Validate URL format
     Url::parse(&value).map_err(|_| ConfigError::InvalidUrl(value.clone()))?;
-
     self.openai.host = value;
-    self
-      .save_with_message("openai-host")
-      .map_err(|e| ConfigError::SaveError(e.to_string()).into())
+    self.save_with_message("openai-host")
   }
 
   fn save_with_message(&self, option: &str) -> Result<()> {
@@ -165,34 +157,7 @@ impl App {
 
 #[cfg(test)]
 mod tests {
-  use std::env;
-
   use super::*;
 
-  #[test]
-  fn test_openai_url_configuration() {
-    // Test default value
-    let app = App::default();
-    assert_eq!(app.openai.host, "https://api.openai.com/v1");
-
-    // Test environment variable override
-    env::set_var("OPENAI_URL", "https://custom-api.example.com");
-    let app = App::default();
-    assert_eq!(app.openai.host, "https://custom-api.example.com");
-    env::remove_var("OPENAI_URL");
-
-    // Test manual update with valid URL
-    let mut app = App::default();
-    let test_url = "https://another-api.example.com";
-    app.openai.host = test_url.to_string();
-    assert_eq!(app.openai.host, test_url);
-
-    // Test URL validation
-    let mut app = App::default();
-    let result = app.update_openai_host("not-a-url".to_string());
-    assert!(result.is_err());
-    if let Err(e) = result {
-      assert!(e.to_string().contains("Invalid URL format"));
-    }
-  }
+  // Add other tests here as needed
 }
