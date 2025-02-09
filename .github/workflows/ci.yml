@@ -11,6 +11,7 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   TEST_MODEL: SlyOtis/git-auto-message:latest
+  OPENAI_API_URL: http://localhost:4010/v1
 
 jobs:
   lint:

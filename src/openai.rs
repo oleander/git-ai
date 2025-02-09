@@ -7,6 +7,7 @@ use log::{debug, error};
 use crate::{commit, config, profile};
 use crate::model::Model;
 
+#[allow(dead_code)]
 const MAX_ATTEMPTS: usize = 3;
 
 #[derive(Error, Debug)]
@@ -59,65 +60,6 @@ pub async fn generate_commit_message(diff: &str) -> Result<String> {
   let response = commit::generate(diff.into(), 256, Model::GPT4oMini).await?;
   Ok(response.response.trim().to_string())
 }
-
-fn truncate_to_fit(text: &str, max_tokens: usize, model: &Model) -> Result<String> {
-  let token_count = model.count_tokens(text)?;
-  if token_count <= max_tokens {
-    return Ok(text.to_string());
-  }
-
-  let lines: Vec<&str> = text.lines().collect();
-  if lines.is_empty() {
-    return Ok(String::new());
-  }
-
-  // Try increasingly aggressive truncation until we fit
-  for attempt in 0..MAX_ATTEMPTS {
-    let keep_lines = match attempt {
-      0 => lines.len() * 3 / 4, // First try: Keep 75%
-      1 => lines.len() / 2,     // Second try: Keep 50%
-      _ => lines.len() / 4      // Final try: Keep 25%
-    };
-
-    if keep_lines == 0 {
-      break;
-    }
-
-    let mut truncated = Vec::new();
-    truncated.extend(lines.iter().take(keep_lines));
-    truncated.push("... (truncated for length) ...");
-
-    let result = truncated.join("\n");
-    let new_token_count = model.count_tokens(&result)?;
-
-    if new_token_count <= max_tokens {
-      return Ok(result);
-    }
-  }
-
-  // If standard truncation failed, do minimal version with iterative reduction
-  let mut minimal = Vec::new();
-  let mut current_size = lines.len() / 50; // Start with 2% of lines
-
-  while current_size > 0 {
-    minimal.clear();
-    minimal.extend(lines.iter().take(current_size));
-    minimal.push("... (severely truncated for length) ...");
-
-    let result = minimal.join("\n");
-    let new_token_count = model.count_tokens(&result)?;
-
-    if new_token_count <= max_tokens {
-      return Ok(result);
-    }
-
-    current_size /= 2; // Halve the size each time
-  }
-
-  // If everything fails, return just the truncation message
-  Ok("... (content too large, completely truncated) ...".to_string())
-}
-
 pub async fn call(request: Request) -> Result<Response> {
   profile!("OpenAI API call");
   let client = reqwest::Client::new();
