@@ -19,7 +19,7 @@ static TEMPLATE_CACHE: Lazy<Mutex<Option<mustache::Template>>> = Lazy::new(|| Mu
 pub fn get_instruction_template() -> Result<String> {
   profile!("Generate instruction template");
 
-  let max_length = config::APP.max_commit_length.unwrap_or(72).to_string();
+  let max_length = config::APP.app.max_commit_length.unwrap_or(72).to_string();
 
   // Get or compile template
   let template = {

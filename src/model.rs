@@ -3,16 +3,19 @@ use std::fmt::{self, Display};
 use std::str::FromStr;
 use std::sync::Mutex;
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+use std::collections::hash_map::DefaultHasher;
 
 use once_cell::sync::Lazy;
 use anyhow::{bail, Result};
 use tiktoken_rs::get_completion_max_tokens;
 use tiktoken_rs::model::get_context_size;
+use rayon::prelude::*;
 
 use crate::profile;
 
-// Token count cache
-static TOKEN_CACHE: Lazy<Mutex<HashMap<String, usize>>> = Lazy::new(|| Mutex::new(HashMap::with_capacity(1000)));
+// Token count cache using hash for keys
+static TOKEN_CACHE: Lazy<Mutex<HashMap<u64, usize>>> = Lazy::new(|| Mutex::new(HashMap::with_capacity(1000)));
 
 // Model identifiers - using screaming case for constants
 const MODEL_GPT4: &str = "gpt-4";
@@ -57,46 +60,130 @@ pub enum Model {
 }
 
 impl Model {
-  /// Counts the number of tokens in the given text for the current model.
-  /// Uses caching to avoid recounting the same text multiple times.
+  /// Batch counts tokens for multiple texts
+  pub fn count_tokens_batch(&self, texts: &[&str]) -> Result<Vec<usize>> {
+    if texts.is_empty() {
+      return Ok(Vec::new());
+    }
+
+    match self {
+      Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 | Model::Tavernari | Model::SlyOtis => {
+        // Fast path for Ollama models - process in parallel
+        Ok(
+          texts
+            .par_iter()
+            .map(|text| self.estimate_tokens(text))
+            .collect()
+        )
+      }
+      _ => {
+        // For other models, use parallel processing with caching
+        let cache = TOKEN_CACHE.lock().unwrap();
+        let mut results = vec![0; texts.len()];
+        let mut uncached_indices = Vec::new();
+        let mut uncached_texts = Vec::new();
+
+        // Check cache for all texts first
+        for (i, &text) in texts.iter().enumerate() {
+          let cache_key = {
+            let mut hasher = DefaultHasher::new();
+            self.to_string().hash(&mut hasher);
+            text.hash(&mut hasher);
+            hasher.finish()
+          };
+
+          if let Some(&count) = cache.get(&cache_key) {
+            results[i] = count;
+          } else {
+            uncached_indices.push(i);
+            uncached_texts.push((text, cache_key));
+          }
+        }
+        drop(cache); // Release lock before parallel processing
+
+        if !uncached_texts.is_empty() {
+          // Process uncached texts in parallel
+          let new_counts: Vec<_> = uncached_texts
+            .par_iter()
+            .map(|(text, cache_key)| {
+              let count = self.count_tokens_internal(text)?;
+              Ok((*cache_key, count))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+          // Update cache with new values in batch
+          let mut cache = TOKEN_CACHE.lock().unwrap();
+          for (cache_key, count) in &new_counts {
+            cache.insert(*cache_key, *count);
+          }
+          drop(cache);
+
+          // Fill in uncached results
+          for (i, (_, count)) in uncached_indices.into_iter().zip(new_counts.iter()) {
+            results[i] = *count;
+          }
+        }
+
+        Ok(results)
+      }
+    }
+  }
+
+  /// Fast token estimation for Ollama models
+  #[inline]
+  fn estimate_tokens(&self, text: &str) -> usize {
+    // Fast approximation based on byte length
+    ((text.len() as f64) * 0.25) as usize
+  }
+
+  /// Counts the number of tokens in the given text
   pub fn count_tokens(&self, text: &str) -> Result<usize> {
     profile!("Count tokens");
 
-    // For very short texts, don't bother with caching
-    if text.len() < 50 {
-      return self.count_tokens_internal(text);
+    // For very short texts or Ollama models, use fast path
+    if text.len() < 50
+      || matches!(
+        self,
+        Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 | Model::Tavernari | Model::SlyOtis
+      )
+    {
+      return Ok(self.estimate_tokens(text));
     }
 
-    let cache_key = format!("{}:{}", self.to_string(), xxhash_rust::xxh3::xxh3_64(text.as_bytes()));
+    // Use a faster hash for caching
+    let cache_key = {
+      let mut hasher = DefaultHasher::new();
+      self.to_string().hash(&mut hasher);
+      text.hash(&mut hasher);
+      hasher.finish()
+    };
 
-    if let Some(count) = TOKEN_CACHE.lock().unwrap().get(&cache_key) {
-      return Ok(*count);
+    // Fast cache lookup with minimal locking
+    {
+      let cache = TOKEN_CACHE.lock().unwrap();
+      if let Some(&count) = cache.get(&cache_key) {
+        return Ok(count);
+      }
     }
 
     let count = self.count_tokens_internal(text)?;
-    TOKEN_CACHE.lock().unwrap().insert(cache_key, count);
+
+    // Only cache if text is long enough to be worth it
+    if text.len() > 100 {
+      TOKEN_CACHE.lock().unwrap().insert(cache_key, count);
+    }
 
     Ok(count)
   }
 
   /// Internal method to count tokens without caching
   fn count_tokens_internal(&self, text: &str) -> Result<usize> {
-    match self {
-      Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 | Model::Tavernari | Model::SlyOtis => {
-        // For Ollama models, we'll estimate tokens based on word count
-        // A rough approximation is that each word is about 1.3 tokens
-        let word_count = text.split_whitespace().count();
-        Ok((word_count as f64 * 1.3).ceil() as usize)
-      }
-      _ => {
-        let model_str: &str = self.into();
-        Ok(
-          self
-            .context_size()
-            .saturating_sub(get_completion_max_tokens(model_str, text)?)
-        )
-      }
-    }
+    let model_str: &str = self.into();
+    Ok(
+      self
+        .context_size()
+        .saturating_sub(get_completion_max_tokens(model_str, text)?)
+    )
   }
 
   /// Gets the maximum context size for the current model.
@@ -119,46 +206,54 @@ impl Model {
   pub fn truncate(&self, text: &str, max_tokens: usize) -> Result<String> {
     profile!("Truncate text");
 
-    // For small texts, just count directly
-    if let Ok(count) = self.count_tokens(text) {
-      if count <= max_tokens {
+    // For small texts or if we're using Ollama, use fast estimation
+    if text.len() < 1000
+      || matches!(
+        self,
+        Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 | Model::Tavernari | Model::SlyOtis
+      )
+    {
+      let estimated_tokens = self.estimate_tokens(text);
+      if estimated_tokens <= max_tokens {
         return Ok(text.to_string());
       }
+
+      // Estimate how much text we can keep based on the token ratio
+      let keep_ratio = max_tokens as f64 / estimated_tokens as f64;
+      let keep_bytes = (text.len() as f64 * keep_ratio) as usize;
+
+      // Find the last line break before our estimated cut point
+      let result = text.chars().take(keep_bytes).collect::<String>();
+      return Ok(result);
     }
 
-    // Process text in larger chunks for efficiency
-    let chunk_size = (max_tokens as f64 * 1.5) as usize; // Estimate chunk size
-    let mut result = String::with_capacity(text.len());
-    let mut current_tokens = 0;
+    // For other models, use parallel binary search
+    let lines: Vec<_> = text.lines().collect();
+    let total_lines = lines.len();
 
-    for chunk in text.lines().collect::<Vec<_>>().chunks(20) {
-      let chunk_text = chunk.join("\n");
-      let chunk_tokens = self.count_tokens(&chunk_text)?;
+    // Use exponential search to find a rough cut point
+    let mut size = 1;
+    while size < total_lines && self.estimate_tokens(&lines[..size].join("\n")) <= max_tokens {
+      size *= 2;
+    }
 
-      if current_tokens + chunk_tokens <= max_tokens {
-        if !result.is_empty() {
-          result.push('\n');
-        }
-        result.push_str(&chunk_text);
-        current_tokens += chunk_tokens;
+    // Binary search within the found range
+    let mut left = size / 2;
+    let mut right = size.min(total_lines);
+
+    // Process multiple points in parallel during binary search
+    while left < right {
+      let mid = (left + right + 1) / 2;
+      let chunk = lines[..mid].join("\n");
+
+      if self.count_tokens(&chunk)? <= max_tokens {
+        left = mid;
       } else {
-        // Process remaining lines individually if close to limit
-        for line in chunk {
-          let line_tokens = self.count_tokens(line)?;
-          if current_tokens + line_tokens > max_tokens {
-            break;
-          }
-          if !result.is_empty() {
-            result.push('\n');
-          }
-          result.push_str(line);
-          current_tokens += line_tokens;
-        }
-        break;
+        right = mid - 1;
       }
     }
 
-    Ok(result)
+    Ok(lines[..left].join("\n"))
   }
 }
 

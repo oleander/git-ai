@@ -63,11 +63,11 @@ pub async fn generate_commit_message(diff: &str) -> Result<String> {
 pub async fn call(request: Request) -> Result<Response> {
   profile!("OpenAI API call");
   let client = reqwest::Client::new();
-  let openai_key = config::APP
-    .openai
-    .api_key
-    .clone()
-    .ok_or(OpenAIError::MissingApiKey)?;
+  let openai_key = config::APP.openai.key.clone();
+
+  if openai_key.is_empty() {
+    return Err(OpenAIError::MissingApiKey.into());
+  }
 
   let openai_host = config::APP.openai.host.clone();
   let base_url = openai_host.trim_end_matches("/v1").trim_end_matches('/');

@@ -165,28 +165,28 @@ impl PatchDiff for Diff<'_> {
 
     let model = Arc::new(model);
 
-    // Process all files in parallel at once
-    let mut files_with_tokens: Vec<(PathBuf, String, usize)> = thread_pool.install(|| {
-      files
-        .par_iter()
-        .map(|(path, content)| {
-          let token_count = model.count_tokens(content).unwrap_or_default();
-          (path.clone(), content.clone(), token_count)
-        })
-        .collect()
-    });
+    // Batch process all files at once using parallel iterator
+    let contents: Vec<&str> = files.iter().map(|(_, content)| content.as_str()).collect();
+    let token_counts = model.count_tokens_batch(&contents)?;
+
+    // Create files with tokens vector using parallel iterator
+    let mut files_with_tokens: Vec<(PathBuf, String, usize)> = files
+      .into_par_iter() // Use parallel iterator here
+      .zip(token_counts)
+      .map(|((path, content), count)| (path, content, count))
+      .collect();
 
     // Sort by token count for efficient allocation
-    files_with_tokens.sort_by_key(|(_, _, count)| *count);
+    files_with_tokens.par_sort_unstable_by_key(|(_, _, count)| *count);
 
-    // Step 3: Process files with optimized string handling
+    // Step 3: Process files with optimized parallel handling
     let total_files = files_with_tokens.len();
     let remaining_tokens = Arc::new(AtomicUsize::new(max_tokens));
     let result_chunks = Arc::new(Mutex::new(Vec::with_capacity(total_files)));
     let processed_files = Arc::new(AtomicUsize::new(0));
 
-    // Process in parallel with larger chunks for better efficiency
-    let chunk_size = (total_files as f32 / num_cpus::get() as f32).ceil() as usize;
+    // Process in parallel with optimized chunk size
+    let chunk_size = (total_files as f32 / (num_cpus::get() * 2) as f32).ceil() as usize;
     let chunks: Vec<_> = files_with_tokens
       .chunks(chunk_size.max(PARALLEL_CHUNK_SIZE))
       .map(|chunk| chunk.to_vec())
@@ -217,9 +217,9 @@ impl PatchDiff for Diff<'_> {
 
     // Pre-allocate with reasonable capacity
     let files = Arc::new(Mutex::new(HashMap::with_capacity(32)));
-    let string_pool = Arc::new(Mutex::new(StringPool::new(DEFAULT_STRING_CAPACITY)));
+    let _string_pool = Arc::new(Mutex::new(StringPool::new(DEFAULT_STRING_CAPACITY)));
 
-    self.print(DiffFormat::Patch, |delta, hunk, line| {
+    self.print(DiffFormat::Patch, |delta, _hunk, line| {
       let content = line.content().to_utf8();
       let mut files = files.lock();
       let entry = files
@@ -274,49 +274,60 @@ fn process_chunk(
   chunk: &[(PathBuf, String, usize)], model: &Arc<Model>, total_files: usize, processed_files: &AtomicUsize,
   remaining_tokens: &AtomicUsize, result_chunks: &Arc<Mutex<Vec<(PathBuf, String)>>>
 ) -> Result<()> {
-  let mut chunk_results = Vec::with_capacity(chunk.len());
+  // Calculate token allocations for all files in the chunk at once
+  let allocations: Vec<_> = {
+    let mut allocations = Vec::with_capacity(chunk.len());
+    let mut total_allocated = 0;
 
-  for (path, content, token_count) in chunk {
-    let current_file_num = processed_files.fetch_add(1, Ordering::SeqCst);
-    let files_remaining = total_files.saturating_sub(current_file_num);
+    for (path, content, token_count) in chunk {
+      let current_file_num = processed_files.fetch_add(1, Ordering::SeqCst);
+      let files_remaining = total_files.saturating_sub(current_file_num);
 
-    // Calculate max_tokens_per_file based on actual remaining files
-    let total_remaining = remaining_tokens.load(Ordering::SeqCst);
-    let max_tokens_per_file = if files_remaining > 0 {
-      total_remaining.saturating_div(files_remaining)
-    } else {
-      total_remaining
-    };
-
-    if max_tokens_per_file == 0 {
-      continue;
-    }
-
-    let token_count = *token_count;
-    let allocated_tokens = token_count.min(max_tokens_per_file);
-
-    if remaining_tokens
-      .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
-        if current >= allocated_tokens {
-          Some(current - allocated_tokens)
-        } else {
-          None
-        }
-      })
-      .is_ok()
-    {
-      let processed_content = if token_count > allocated_tokens {
-        model.truncate(content, allocated_tokens)?
+      let total_remaining = remaining_tokens.load(Ordering::SeqCst);
+      let max_tokens_per_file = if files_remaining > 0 {
+        total_remaining.saturating_div(files_remaining)
       } else {
-        content.clone()
+        total_remaining
       };
-      chunk_results.push((path.clone(), processed_content));
+
+      if max_tokens_per_file == 0 {
+        continue;
+      }
+
+      let allocated_tokens = *token_count.min(&max_tokens_per_file);
+
+      if total_allocated + allocated_tokens <= total_remaining {
+        allocations.push((path.clone(), content.clone(), allocated_tokens));
+        total_allocated += allocated_tokens;
+      }
     }
+
+    // Update the remaining tokens once for the whole chunk
+    if total_allocated > 0 {
+      remaining_tokens.fetch_sub(total_allocated, Ordering::SeqCst);
+    }
+    allocations
+  };
+
+  // Process all files in parallel using rayon
+  let processed: Vec<_> = allocations
+    .into_par_iter() // Use into_par_iter for better parallelism
+    .map(|(path, content, allocated_tokens)| {
+      let processed_content = if content.len() > 1000 {
+        model.truncate(&content, allocated_tokens).ok()?
+      } else {
+        content
+      };
+      Some((path, processed_content))
+    })
+    .filter_map(|x| x)
+    .collect();
+
+  // Add results all at once
+  if !processed.is_empty() {
+    result_chunks.lock().extend(processed);
   }
 
-  if !chunk_results.is_empty() {
-    result_chunks.lock().extend(chunk_results);
-  }
   Ok(())
 }
 

@@ -55,6 +55,8 @@ use ai::{commit, config};
 use ai::hook::*;
 use ai::model::Model;
 
+const DEFAULT_MODEL: &str = "gpt-4o-mini";
+
 #[derive(Debug, PartialEq)]
 enum Source {
   Message,
@@ -136,13 +138,14 @@ impl Args {
 
     let repo = Repository::open_from_env().context("Failed to open repository")?;
     let model = config::APP
+      .app
       .model
       .clone()
-      .unwrap_or("gpt-4o-mini".to_string())
+      .unwrap_or_else(|| DEFAULT_MODEL.to_string())
       .into();
 
     let used_tokens = commit::token_used(&model)?;
-    let max_tokens = config::APP.max_tokens.unwrap_or(model.context_size());
+    let max_tokens = config::APP.app.max_tokens.unwrap_or(model.context_size());
     let remaining_tokens = max_tokens.saturating_sub(used_tokens).max(512);
 
     let tree = match self.sha1.as_deref() {
