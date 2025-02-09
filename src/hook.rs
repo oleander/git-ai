@@ -152,32 +152,40 @@ impl PatchDiff for Diff<'_> {
   fn to_patch(&self, max_tokens: usize, model: Model) -> Result<String> {
     profile!("Generating patch diff");
 
-    // Step 1: Collect diff data (non-parallel)
+    // Step 1: Collect diff data efficiently with pre-allocated capacity
     let files = self.collect_diff_data()?;
     let files: Vec<_> = files.into_iter().collect();
 
-    // Step 2: Prepare files for processing in parallel
+    // Step 2: Process files in parallel with optimized allocation
     let thread_pool = rayon::ThreadPoolBuilder::new()
       .num_threads(num_cpus::get())
       .build()
       .context("Failed to create thread pool")?;
 
     let model = Arc::new(model);
+    let total_size: usize = files.iter().map(|(_, content)| content.len()).sum();
 
-    let files_with_tokens: DiffData = thread_pool.install(|| {
-      files
-        .into_par_iter()
-        .map(|(path, content)| {
-          let token_count = model.count_tokens(&content).unwrap_or_default();
-          (path, content, token_count)
-        })
-        .collect()
-    });
+    // Pre-allocate with estimated capacity
+    let mut files_with_tokens: Vec<(PathBuf, String, usize)> = Vec::with_capacity(files.len());
 
-    let mut files_with_tokens = files_with_tokens;
+    // Process in larger chunks for better efficiency
+    const CHUNK_SIZE: usize = 10;
+    for chunk in files.chunks(CHUNK_SIZE) {
+      let chunk_results: Vec<_> = thread_pool.install(|| {
+        chunk
+          .par_iter()
+          .map(|(path, content)| {
+            let token_count = model.count_tokens(content).unwrap_or_default();
+            (path.clone(), content.clone(), token_count)
+          })
+          .collect()
+      });
+      files_with_tokens.extend(chunk_results);
+    }
+
     files_with_tokens.sort_by_key(|(_, _, count)| *count);
 
-    // Step 3: Process files in parallel (reuse existing thread pool)
+    // Step 3: Process files with optimized string handling
     let total_files = files_with_tokens.len();
     let remaining_tokens = Arc::new(AtomicUsize::new(max_tokens));
     let result_chunks = Arc::new(Mutex::new(Vec::with_capacity(total_files)));
@@ -194,17 +202,12 @@ impl PatchDiff for Diff<'_> {
         .try_for_each(|chunk| process_chunk(chunk, &model, total_files, &processed_files, &remaining_tokens, &result_chunks))
     })?;
 
-    // Step 4: Combine results
+    // Step 4: Combine results efficiently
     let results = result_chunks.lock();
-    let mut final_result = String::with_capacity(
-      results
-        .iter()
-        .map(|(_, content): &(PathBuf, String)| content.len())
-        .sum()
-    );
+    let mut final_result = String::with_capacity(total_size);
 
-    for (_, content) in results.iter() {
-      if !final_result.is_empty() {
+    for (i, (_, content)) in results.iter().enumerate() {
+      if i > 0 {
         final_result.push('\n');
       }
       final_result.push_str(content);
@@ -216,45 +219,22 @@ impl PatchDiff for Diff<'_> {
   fn collect_diff_data(&self) -> Result<HashMap<PathBuf, String>> {
     profile!("Processing diff changes");
 
+    // Pre-allocate with reasonable capacity
+    let files = Arc::new(Mutex::new(HashMap::with_capacity(32)));
     let string_pool = Arc::new(Mutex::new(StringPool::new(DEFAULT_STRING_CAPACITY)));
-    let files = Arc::new(Mutex::new(HashMap::new()));
 
-    self.print(DiffFormat::Patch, |diff, hunk, line| {
+    self.print(DiffFormat::Patch, |delta, hunk, line| {
       let content = line.content().to_utf8();
-      let mut line_content = string_pool.lock().get();
-
-      // Add file status information
-      if let Some(hunk) = hunk {
-        if hunk.new_lines() > 0 && hunk.old_lines() == 0 {
-          line_content.push_str("new file: ");
-        }
-      }
-
-      match line.origin() {
-        '+' => {
-          line_content.push('+');
-          line_content.push_str(&content);
-        }
-        '-' => {
-          line_content.push('-');
-          line_content.push_str(&content);
-        }
-        _ => {
-          line_content.push_str("context: ");
-          line_content.push_str(&content);
-        }
-      };
-
       let mut files = files.lock();
       let entry = files
-        .entry(diff.path())
-        .or_insert_with(|| String::with_capacity(DEFAULT_STRING_CAPACITY));
-      entry.push_str(&line_content);
-      string_pool.lock().put(line_content);
+        .entry(delta.path())
+        .or_insert_with(|| String::with_capacity(4096));
+
+      entry.push_str(&content);
       true
     })?;
 
-    // Handle empty files or files with no content changes
+    // Handle empty files efficiently
     self.foreach(
       &mut |delta, _| {
         let mut files = files.lock();

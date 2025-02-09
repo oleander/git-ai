@@ -970,6 +970,7 @@ dependencies = [
  "mustache",
  "num_cpus",
  "ollama-rs",
+ "once_cell",
  "openssl-sys",
  "parking_lot",
  "pulldown-cmark",
@@ -989,6 +990,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+ "xxhash-rust",
 ]
 
 [[package]]
@@ -3314,6 +3316,12 @@ name = "xdg"
 version = "2.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "213b7324336b53d2414b2db8537e56544d981803139155afa84f76eeebb7a546"
+
+[[package]]
+name = "xxhash-rust"
+version = "0.8.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fdd20c5420375476fbd4394763288da7eb0cc0b8c11deed431a91562af7335d3"
 
 [[package]]
 name = "yaml-rust"

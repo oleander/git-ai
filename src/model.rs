@@ -1,12 +1,18 @@
 use std::default::Default;
 use std::fmt::{self, Display};
 use std::str::FromStr;
+use std::sync::Mutex;
+use std::collections::HashMap;
 
+use once_cell::sync::Lazy;
 use anyhow::{bail, Result};
 use tiktoken_rs::get_completion_max_tokens;
 use tiktoken_rs::model::get_context_size;
 
 use crate::profile;
+
+// Token count cache
+static TOKEN_CACHE: Lazy<Mutex<HashMap<String, usize>>> = Lazy::new(|| Mutex::new(HashMap::with_capacity(1000)));
 
 // Model identifiers - using screaming case for constants
 const MODEL_GPT4: &str = "gpt-4";
@@ -52,14 +58,29 @@ pub enum Model {
 
 impl Model {
   /// Counts the number of tokens in the given text for the current model.
-  ///
-  /// # Arguments
-  /// * `text` - The text to count tokens for
-  ///
-  /// # Returns
-  /// * `Result<usize>` - The number of tokens or an error
+  /// Uses caching to avoid recounting the same text multiple times.
   pub fn count_tokens(&self, text: &str) -> Result<usize> {
     profile!("Count tokens");
+
+    // For very short texts, don't bother with caching
+    if text.len() < 50 {
+      return self.count_tokens_internal(text);
+    }
+
+    let cache_key = format!("{}:{}", self.to_string(), xxhash_rust::xxh3::xxh3_64(text.as_bytes()));
+
+    if let Some(count) = TOKEN_CACHE.lock().unwrap().get(&cache_key) {
+      return Ok(*count);
+    }
+
+    let count = self.count_tokens_internal(text)?;
+    TOKEN_CACHE.lock().unwrap().insert(cache_key, count);
+
+    Ok(count)
+  }
+
+  /// Internal method to count tokens without caching
+  fn count_tokens_internal(&self, text: &str) -> Result<usize> {
     match self {
       Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 | Model::Tavernari | Model::SlyOtis => {
         // For Ollama models, we'll estimate tokens based on word count
@@ -95,31 +116,49 @@ impl Model {
   }
 
   /// Truncates the given text to fit within the specified token limit.
-  ///
-  /// # Arguments
-  /// * `text` - The text to truncate
-  /// * `max_tokens` - The maximum number of tokens allowed
-  ///
-  /// # Returns
-  /// * `Result<String>` - The truncated text or an error
   pub fn truncate(&self, text: &str, max_tokens: usize) -> Result<String> {
     profile!("Truncate text");
-    let mut truncated = String::new();
-    let mut current_tokens = 0;
 
-    for line in text.lines() {
-      let line_tokens = self.count_tokens(line)?;
-      if current_tokens + line_tokens > max_tokens {
-        break;
+    // For small texts, just count directly
+    if let Ok(count) = self.count_tokens(text) {
+      if count <= max_tokens {
+        return Ok(text.to_string());
       }
-      if !truncated.is_empty() {
-        truncated.push('\n');
-      }
-      truncated.push_str(line);
-      current_tokens += line_tokens;
     }
 
-    Ok(truncated)
+    // Process text in larger chunks for efficiency
+    let chunk_size = (max_tokens as f64 * 1.5) as usize; // Estimate chunk size
+    let mut result = String::with_capacity(text.len());
+    let mut current_tokens = 0;
+
+    for chunk in text.lines().collect::<Vec<_>>().chunks(20) {
+      let chunk_text = chunk.join("\n");
+      let chunk_tokens = self.count_tokens(&chunk_text)?;
+
+      if current_tokens + chunk_tokens <= max_tokens {
+        if !result.is_empty() {
+          result.push('\n');
+        }
+        result.push_str(&chunk_text);
+        current_tokens += chunk_tokens;
+      } else {
+        // Process remaining lines individually if close to limit
+        for line in chunk {
+          let line_tokens = self.count_tokens(line)?;
+          if current_tokens + line_tokens > max_tokens {
+            break;
+          }
+          if !result.is_empty() {
+            result.push('\n');
+          }
+          result.push_str(line);
+          current_tokens += line_tokens;
+        }
+        break;
+      }
+    }
+
+    Ok(result)
   }
 }
 
