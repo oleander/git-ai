@@ -93,6 +93,7 @@ git-ai hook reinstall || fail "Hook reinstall failed"
 git-ai config reset
 git-ai config || echo "As expected"
 git-ai config set || echo "As expected"
+git-ai config set url "http://localhost:4010/v1" || fail "Setting OpenAI URL failed"
 git-ai config set model $model || fail "Setting model failed"
 git-ai config set max-tokens 128 || fail "Setting max tokens failed"
 git-ai config set max-commit-length 256 || fail "Setting max commit length failed"
