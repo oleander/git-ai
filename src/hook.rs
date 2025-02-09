@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 use std::collections::HashMap;
-use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::fs::File;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::io::{Read, Write};
 
 use structopt::StructOpt;
 use git2::{Diff, DiffFormat, DiffOptions, Repository, Tree};
@@ -152,37 +152,45 @@ impl PatchDiff for Diff<'_> {
   fn to_patch(&self, max_tokens: usize, model: Model) -> Result<String> {
     profile!("Generating patch diff");
 
-    // Step 1: Collect diff data (non-parallel)
+    // Step 1: Collect diff data efficiently with pre-allocated capacity
     let files = self.collect_diff_data()?;
+    let files: Vec<_> = files.into_iter().collect();
+    let total_size: usize = files.iter().map(|(_, content)| content.len()).sum();
 
-    // Step 2: Prepare files for processing
-    let mut files_with_tokens: DiffData = files
-      .into_iter()
-      .map(|(path, content)| {
-        let token_count = model.count_tokens(&content).unwrap_or_default();
-        (path, content, token_count)
-      })
-      .collect();
-
-    files_with_tokens.sort_by_key(|(_, _, count)| *count);
-
-    // Step 3: Process files in parallel
+    // Step 2: Process all files in parallel at once
     let thread_pool = rayon::ThreadPoolBuilder::new()
       .num_threads(num_cpus::get())
       .build()
       .context("Failed to create thread pool")?;
 
+    let model = Arc::new(model);
+
+    // Batch process all files at once using parallel iterator
+    let contents: Vec<&str> = files.iter().map(|(_, content)| content.as_str()).collect();
+    let token_counts = model.count_tokens_batch(&contents)?;
+
+    // Create files with tokens vector using parallel iterator
+    let mut files_with_tokens: Vec<(PathBuf, String, usize)> = files
+      .into_par_iter() // Use parallel iterator here
+      .zip(token_counts)
+      .map(|((path, content), count)| (path, content, count))
+      .collect();
+
+    // Sort by token count for efficient allocation
+    files_with_tokens.par_sort_unstable_by_key(|(_, _, count)| *count);
+
+    // Step 3: Process files with optimized parallel handling
     let total_files = files_with_tokens.len();
     let remaining_tokens = Arc::new(AtomicUsize::new(max_tokens));
     let result_chunks = Arc::new(Mutex::new(Vec::with_capacity(total_files)));
     let processed_files = Arc::new(AtomicUsize::new(0));
 
+    // Process in parallel with optimized chunk size
+    let chunk_size = (total_files as f32 / (num_cpus::get() * 2) as f32).ceil() as usize;
     let chunks: Vec<_> = files_with_tokens
-      .chunks(PARALLEL_CHUNK_SIZE)
+      .chunks(chunk_size.max(PARALLEL_CHUNK_SIZE))
       .map(|chunk| chunk.to_vec())
       .collect();
-
-    let model = Arc::new(model);
 
     thread_pool.install(|| {
       chunks
@@ -190,17 +198,12 @@ impl PatchDiff for Diff<'_> {
         .try_for_each(|chunk| process_chunk(chunk, &model, total_files, &processed_files, &remaining_tokens, &result_chunks))
     })?;
 
-    // Step 4: Combine results
+    // Step 4: Combine results efficiently
     let results = result_chunks.lock();
-    let mut final_result = String::with_capacity(
-      results
-        .iter()
-        .map(|(_, content): &(PathBuf, String)| content.len())
-        .sum()
-    );
+    let mut final_result = String::with_capacity(total_size);
 
-    for (_, content) in results.iter() {
-      if !final_result.is_empty() {
+    for (i, (_, content)) in results.iter().enumerate() {
+      if i > 0 {
         final_result.push('\n');
       }
       final_result.push_str(content);
@@ -212,29 +215,36 @@ impl PatchDiff for Diff<'_> {
   fn collect_diff_data(&self) -> Result<HashMap<PathBuf, String>> {
     profile!("Processing diff changes");
 
-    let string_pool = Arc::new(Mutex::new(StringPool::new(DEFAULT_STRING_CAPACITY)));
-    let files = Arc::new(Mutex::new(HashMap::new()));
+    // Pre-allocate with reasonable capacity
+    let files = Arc::new(Mutex::new(HashMap::with_capacity(32)));
+    let _string_pool = Arc::new(Mutex::new(StringPool::new(DEFAULT_STRING_CAPACITY)));
 
-    self.print(DiffFormat::Patch, |diff, _hunk, line| {
+    self.print(DiffFormat::Patch, |delta, _hunk, line| {
       let content = line.content().to_utf8();
-      let mut line_content = string_pool.lock().get();
-
-      match line.origin() {
-        '+' | '-' => line_content.push_str(&content),
-        _ => {
-          line_content.push_str("context: ");
-          line_content.push_str(&content);
-        }
-      };
-
       let mut files = files.lock();
       let entry = files
-        .entry(diff.path())
-        .or_insert_with(|| String::with_capacity(DEFAULT_STRING_CAPACITY));
-      entry.push_str(&line_content);
-      string_pool.lock().put(line_content);
+        .entry(delta.path())
+        .or_insert_with(|| String::with_capacity(4096));
+
+      entry.push_str(&content);
       true
     })?;
+
+    // Handle empty files efficiently
+    self.foreach(
+      &mut |delta, _| {
+        let mut files = files.lock();
+        if let std::collections::hash_map::Entry::Vacant(e) = files.entry(delta.path()) {
+          if delta.status() == git2::Delta::Added {
+            e.insert(String::from("new empty file"));
+          }
+        }
+        true
+      },
+      None,
+      None,
+      None
+    )?;
 
     Ok(
       Arc::try_unwrap(files)
@@ -264,49 +274,60 @@ fn process_chunk(
   chunk: &[(PathBuf, String, usize)], model: &Arc<Model>, total_files: usize, processed_files: &AtomicUsize,
   remaining_tokens: &AtomicUsize, result_chunks: &Arc<Mutex<Vec<(PathBuf, String)>>>
 ) -> Result<()> {
-  let mut chunk_results = Vec::with_capacity(chunk.len());
+  // Calculate token allocations for all files in the chunk at once
+  let allocations: Vec<_> = {
+    let mut allocations = Vec::with_capacity(chunk.len());
+    let mut total_allocated = 0;
 
-  for (path, content, token_count) in chunk {
-    let current_file_num = processed_files.fetch_add(1, Ordering::SeqCst);
-    let files_remaining = total_files.saturating_sub(current_file_num);
+    for (path, content, token_count) in chunk {
+      let current_file_num = processed_files.fetch_add(1, Ordering::SeqCst);
+      let files_remaining = total_files.saturating_sub(current_file_num);
 
-    // Calculate max_tokens_per_file based on actual remaining files
-    let total_remaining = remaining_tokens.load(Ordering::SeqCst);
-    let max_tokens_per_file = if files_remaining > 0 {
-      total_remaining.saturating_div(files_remaining)
-    } else {
-      total_remaining
-    };
-
-    if max_tokens_per_file == 0 {
-      continue;
-    }
-
-    let token_count = *token_count;
-    let allocated_tokens = token_count.min(max_tokens_per_file);
-
-    if remaining_tokens
-      .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
-        if current >= allocated_tokens {
-          Some(current - allocated_tokens)
-        } else {
-          None
-        }
-      })
-      .is_ok()
-    {
-      let processed_content = if token_count > allocated_tokens {
-        model.truncate(content, allocated_tokens)?
+      let total_remaining = remaining_tokens.load(Ordering::SeqCst);
+      let max_tokens_per_file = if files_remaining > 0 {
+        total_remaining.saturating_div(files_remaining)
       } else {
-        content.clone()
+        total_remaining
       };
-      chunk_results.push((path.clone(), processed_content));
+
+      if max_tokens_per_file == 0 {
+        continue;
+      }
+
+      let allocated_tokens = *token_count.min(&max_tokens_per_file);
+
+      if total_allocated + allocated_tokens <= total_remaining {
+        allocations.push((path.clone(), content.clone(), allocated_tokens));
+        total_allocated += allocated_tokens;
+      }
     }
+
+    // Update the remaining tokens once for the whole chunk
+    if total_allocated > 0 {
+      remaining_tokens.fetch_sub(total_allocated, Ordering::SeqCst);
+    }
+    allocations
+  };
+
+  // Process all files in parallel using rayon
+  let processed: Vec<_> = allocations
+    .into_par_iter() // Use into_par_iter for better parallelism
+    .map(|(path, content, allocated_tokens)| {
+      let processed_content = if content.len() > 1000 {
+        model.truncate(&content, allocated_tokens).ok()?
+      } else {
+        content
+      };
+      Some((path, processed_content))
+    })
+    .filter_map(|x| x)
+    .collect();
+
+  // Add results all at once
+  if !processed.is_empty() {
+    result_chunks.lock().extend(processed);
   }
 
-  if !chunk_results.is_empty() {
-    result_chunks.lock().extend(chunk_results);
-  }
   Ok(())
 }
 
@@ -366,7 +387,7 @@ impl PatchRepository for Repository {
 
   fn configure_diff_options(&self, opts: &mut DiffOptions) {
     opts
-      .ignore_whitespace_change(true)
+      .ignore_whitespace_change(false)
       .recurse_untracked_dirs(true)
       .recurse_ignored_dirs(false)
       .ignore_whitespace_eol(true)
@@ -376,28 +397,28 @@ impl PatchRepository for Repository {
       .indent_heuristic(false)
       .ignore_submodules(true)
       .include_ignored(false)
-      .interhunk_lines(0)
-      .context_lines(0)
+      // .interhunk_lines(0)
+      // .context_lines(0)
       .patience(true)
-      .minimal(true);
+      .minimal(false);
   }
 
   fn configure_commit_diff_options(&self, opts: &mut DiffOptions) {
     opts
       .ignore_whitespace_change(false)
-      .recurse_untracked_dirs(false)
+      .recurse_untracked_dirs(true)
       .recurse_ignored_dirs(false)
-      .ignore_whitespace_eol(true)
-      .ignore_blank_lines(true)
+      .ignore_whitespace_eol(false)
+      .ignore_blank_lines(false)
       .include_untracked(false)
-      .ignore_whitespace(true)
-      .indent_heuristic(false)
+      .ignore_whitespace(false)
+      .indent_heuristic(true)
       .ignore_submodules(true)
       .include_ignored(false)
-      .interhunk_lines(0)
-      .context_lines(0)
+      // .interhunk_lines(1)
+      // .context_lines(3)
       .patience(true)
-      .minimal(true);
+      .minimal(false);
   }
 }
 

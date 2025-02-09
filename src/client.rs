@@ -1,8 +1,8 @@
-use anyhow::{Context, Result};
-use serde_json;
+use anyhow::{bail, Result};
 
 use crate::model::Model;
-use crate::openai::{self, Request as OpenAIRequest};
+use crate::ollama::OllamaClient;
+use crate::{commit, openai};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Request {
@@ -18,18 +18,47 @@ pub struct Response {
 }
 
 pub async fn call(request: Request) -> Result<Response> {
-  // Use the OpenAI client for all models
-  let openai_request = OpenAIRequest {
-    prompt:     request.prompt,
-    system:     request.system,
-    max_tokens: request.max_tokens,
-    model:      request.model
-  };
+  match request.model {
+    Model::GPT4 | Model::GPT4o | Model::GPT4Turbo | Model::GPT4oMini => {
+      let openai_request = openai::Request::new(request.model, request.system, request.prompt, request.max_tokens);
 
-  let response = openai::call(openai_request).await?;
-  Ok(Response { response: response.response })
+      let response = openai::call(openai_request).await?;
+      Ok(Response { response: response.response })
+    }
+    Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 | Model::Tavernari | Model::SlyOtis => {
+      let client = OllamaClient::new().await?;
+
+      let template = commit::get_instruction_template()?;
+      let full_prompt = format!(
+        "{}\n\nImportant: Respond with ONLY a single line containing the commit message. Do not include any other text, formatting, or explanation.\n\nChanges to review:\n{}",
+        template,
+        request.prompt
+      );
+      let response = client.generate(request.model, &full_prompt).await?;
+
+      // Log the raw response for debugging
+      log::debug!("Raw Ollama response: {}", response);
+
+      // Take the first non-empty line as the commit message, trimming any whitespace
+      let commit_message = response.trim().to_string();
+
+      if commit_message.is_empty() {
+        bail!("Model returned an empty response");
+      }
+
+      Ok(Response { response: commit_message })
+    }
+  }
 }
 
-pub async fn is_model_available(_model: Model) -> bool {
-  true // OpenAI models are always considered available if API key is set
+pub async fn is_model_available(model: Model) -> bool {
+  match model {
+    Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B | Model::SmollM2 | Model::SlyOtis => {
+      if let Ok(client) = OllamaClient::new().await {
+        return client.is_available(model).await;
+      }
+      false
+    }
+    _ => true // OpenAI models are always considered available if API key is set
+  }
 }
