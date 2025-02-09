@@ -130,6 +130,9 @@ pub async fn call(request: Request) -> Result<Response> {
   let openai_host = config::APP.openai.host.clone();
   let url = format!("{}/chat/completions", openai_host);
 
+  debug!("OpenAI Request URL: {}", url);
+  debug!("OpenAI Request Body: {:?}", request);
+
   let response = client
     .post(&url)
     .header("Authorization", format!("Bearer {}", openai_key))
@@ -140,8 +143,8 @@ pub async fn call(request: Request) -> Result<Response> {
     .map_err(|e| OpenAIError::ConnectionError { url: url.clone(), source: e })?;
 
   // Log response status and headers
-  debug!("OpenAI API Response Status: {}", response.status());
-  debug!("OpenAI API Response Headers: {:?}", response.headers());
+  error!("OpenAI API Response Status: {}", response.status());
+  error!("OpenAI API Response Headers: {:?}", response.headers());
 
   // Get the raw response text first
   let response_text = response.text().await.map_err(|e| {
@@ -149,22 +152,33 @@ pub async fn call(request: Request) -> Result<Response> {
     OpenAIError::InvalidResponse(format!("Failed to get response text: {}", e))
   })?;
 
-  debug!("OpenAI API Raw Response: {}", response_text);
+  error!("OpenAI API Raw Response: {}", response_text);
 
   // Parse the response text
-  let response_json: serde_json::Value = serde_json::from_str(&response_text).map_err(|e| {
-    error!("Failed to parse response JSON: {}", e);
-    OpenAIError::InvalidResponse(format!("Failed to parse response JSON: {}", e))
-  })?;
+  let response_json: serde_json::Value = match serde_json::from_str(&response_text) {
+    Ok(json) => {
+      error!("Parsed JSON Response: {:?}", json);
+      json
+    }
+    Err(e) => {
+      error!("Failed to parse response JSON. Error: {}. Raw text: {}", e, response_text);
+      return Err(OpenAIError::InvalidResponse(format!("Failed to parse response JSON: {}. Raw response: {}", e, response_text)).into());
+    }
+  };
 
-  let content = response_json["choices"][0]["message"]["content"]
-    .as_str()
-    .ok_or_else(|| {
-      let err = "Response missing expected 'choices[0].message.content' field";
-      error!("{}", err);
-      OpenAIError::InvalidResponse(err.to_string())
-    })?
-    .to_string();
+  let content = match response_json
+    .get("choices")
+    .and_then(|choices| choices.get(0))
+    .and_then(|first_choice| first_choice.get("message"))
+    .and_then(|message| message.get("content"))
+    .and_then(|content| content.as_str())
+  {
+    Some(content) => content.to_string(),
+    None => {
+      error!("Invalid response structure. Full JSON: {:?}", response_json);
+      return Err(OpenAIError::InvalidResponse(format!("Invalid response structure. Full response: {}", response_text)).into());
+    }
+  };
 
   Ok(Response { response: content })
 }
