@@ -155,34 +155,28 @@ impl PatchDiff for Diff<'_> {
     // Step 1: Collect diff data efficiently with pre-allocated capacity
     let files = self.collect_diff_data()?;
     let files: Vec<_> = files.into_iter().collect();
+    let total_size: usize = files.iter().map(|(_, content)| content.len()).sum();
 
-    // Step 2: Process files in parallel with optimized allocation
+    // Step 2: Process all files in parallel at once
     let thread_pool = rayon::ThreadPoolBuilder::new()
       .num_threads(num_cpus::get())
       .build()
       .context("Failed to create thread pool")?;
 
     let model = Arc::new(model);
-    let total_size: usize = files.iter().map(|(_, content)| content.len()).sum();
 
-    // Pre-allocate with estimated capacity
-    let mut files_with_tokens: Vec<(PathBuf, String, usize)> = Vec::with_capacity(files.len());
+    // Process all files in parallel at once
+    let mut files_with_tokens: Vec<(PathBuf, String, usize)> = thread_pool.install(|| {
+      files
+        .par_iter()
+        .map(|(path, content)| {
+          let token_count = model.count_tokens(content).unwrap_or_default();
+          (path.clone(), content.clone(), token_count)
+        })
+        .collect()
+    });
 
-    // Process in larger chunks for better efficiency
-    const CHUNK_SIZE: usize = 10;
-    for chunk in files.chunks(CHUNK_SIZE) {
-      let chunk_results: Vec<_> = thread_pool.install(|| {
-        chunk
-          .par_iter()
-          .map(|(path, content)| {
-            let token_count = model.count_tokens(content).unwrap_or_default();
-            (path.clone(), content.clone(), token_count)
-          })
-          .collect()
-      });
-      files_with_tokens.extend(chunk_results);
-    }
-
+    // Sort by token count for efficient allocation
     files_with_tokens.sort_by_key(|(_, _, count)| *count);
 
     // Step 3: Process files with optimized string handling
@@ -191,8 +185,10 @@ impl PatchDiff for Diff<'_> {
     let result_chunks = Arc::new(Mutex::new(Vec::with_capacity(total_files)));
     let processed_files = Arc::new(AtomicUsize::new(0));
 
+    // Process in parallel with larger chunks for better efficiency
+    let chunk_size = (total_files as f32 / num_cpus::get() as f32).ceil() as usize;
     let chunks: Vec<_> = files_with_tokens
-      .chunks(PARALLEL_CHUNK_SIZE)
+      .chunks(chunk_size.max(PARALLEL_CHUNK_SIZE))
       .map(|chunk| chunk.to_vec())
       .collect();
 

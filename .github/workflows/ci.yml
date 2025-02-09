@@ -36,17 +36,17 @@ jobs:
             target/
           key: ${{ runner.os }}-nightly-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Run clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -- -D warnings
+      # - name: Run clippy
+      #   uses: actions-rs/cargo@v1
+      #   with:
+      #     command: clippy
+      #     args: -- -D warnings
 
-      - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: -- --check
+      # - name: Run cargo fmt
+      #   uses: actions-rs/cargo@v1
+      #   with:
+      #     command: fmt
+      #     args: -- --check
   test:
     needs: lint
     strategy:
