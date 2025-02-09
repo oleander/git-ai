@@ -55,14 +55,15 @@ jobs:
         rust: [nightly, stable]
     runs-on: ${{ matrix.os }}
     continue-on-error: false
-    services:
-      fake-openai:
-        image: fake-openai:latest
-        ports:
-          - 8080:8080
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Start test services
+        if: startsWith(matrix.os, 'ubuntu')
+        uses: hoverkraft-tech/compose-action@v2.2.0
+        with:
+          services: prism
 
       - name: Set up Rust
         uses: actions-rs/toolchain@v1

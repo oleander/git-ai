@@ -2,6 +2,8 @@ openapi: 3.1.0
 info:
   title: OpenAI API Mock
   version: 1.0.0
+servers:
+  - url: /
 paths:
   /v1/chat/completions:
     post:

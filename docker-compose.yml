@@ -2,7 +2,7 @@ services:
   prism:
     image: stoplight/prism:latest
     platform: linux/amd64
-    command: ["mock", "-h", "0.0.0.0", "/app/openapi-mock.yaml"]
+    command: ["mock", "-h", "0.0.0.0", "--cors", "/app/openapi-mock.yaml"]
     ports:
       - "4010:4010"
     volumes:
