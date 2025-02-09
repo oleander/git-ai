@@ -86,8 +86,8 @@ pub async fn call(request: Request) -> Result<Response> {
     .map_err(|e| OpenAIError::ConnectionError { url: url.clone(), source: e })?;
 
   // Log response status and headers
-  error!("OpenAI API Response Status: {}", response.status());
-  error!("OpenAI API Response Headers: {:?}", response.headers());
+  debug!("OpenAI API Response Status: {}", response.status());
+  debug!("OpenAI API Response Headers: {:?}", response.headers());
 
   // Get the raw response text first
   let response_text = response.text().await.map_err(|e| {
@@ -95,12 +95,12 @@ pub async fn call(request: Request) -> Result<Response> {
     OpenAIError::InvalidResponse(format!("Failed to get response text: {}", e))
   })?;
 
-  error!("OpenAI API Raw Response: {}", response_text);
+  debug!("OpenAI API Raw Response: {}", response_text);
 
   // Parse the response text
   let response_json: serde_json::Value = match serde_json::from_str(&response_text) {
     Ok(json) => {
-      error!("Parsed JSON Response: {:?}", json);
+      debug!("Parsed JSON Response: {:?}", json);
       json
     }
     Err(e) => {

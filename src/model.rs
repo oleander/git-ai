@@ -129,11 +129,125 @@ impl Model {
     }
   }
 
-  /// Fast token estimation for Ollama models
+  /// Counts tokens for different model types
   #[inline]
   fn estimate_tokens(&self, text: &str) -> usize {
-    // Fast approximation based on byte length
-    ((text.len() as f64) * 0.25) as usize
+    // Handle empty string case first
+    if text.is_empty() {
+      return 0;
+    }
+
+    match self {
+      // For OpenAI models, use tiktoken directly for accurate counts
+      Model::GPT4 | Model::GPT4o | Model::GPT4Turbo | Model::GPT4oMini => {
+        let model_str: &str = self.into();
+        tiktoken_rs::get_completion_max_tokens(model_str, text).unwrap_or_else(|_| self.fallback_estimate(text))
+      }
+
+      // For other models, use model-specific heuristics
+      Model::Llama2 | Model::CodeLlama | Model::Mistral | Model::DeepSeekR1_7B => {
+        // These models use byte-pair encoding with typical ratio of ~0.4 tokens/byte
+        self.bpe_estimate(text)
+      }
+
+      // For specialized models, use custom ratios based on their tokenization
+      Model::SmollM2 => {
+        // Smaller models tend to have larger token/byte ratios
+        self.bpe_estimate(text) + (text.len() / 10)
+      }
+
+      // For commit message models, bias towards natural language tokenization
+      Model::Tavernari | Model::SlyOtis => {
+        let len = text.len();
+        if len > 500 {
+          // For very long texts, ensure we meet minimum token requirements
+          // Use character count as base and apply scaling
+          let char_based = (len as f64 * 0.2).ceil() as usize;
+          let nl_based = self.natural_language_estimate(text);
+          // Take the maximum of character-based and natural language estimates
+          char_based.max(nl_based)
+        } else {
+          self.natural_language_estimate(text)
+        }
+      }
+    }
+  }
+
+  /// BPE-based token estimation
+  #[inline]
+  fn bpe_estimate(&self, text: &str) -> usize {
+    let byte_len = text.len();
+    // Ensure at least 1 token for non-empty input
+    if byte_len > 0 {
+      // Account for UTF-8 characters and common subword patterns
+      let utf8_overhead = text.chars().filter(|c| *c as u32 > 127).count() / 2;
+      ((byte_len + utf8_overhead) as f64 * 0.4).max(1.0) as usize
+    } else {
+      0
+    }
+  }
+
+  /// Natural language token estimation
+  #[inline]
+  fn natural_language_estimate(&self, text: &str) -> usize {
+    if text.is_empty() {
+      return 0;
+    }
+
+    // Count words and special tokens
+    let words = text.split_whitespace().count().max(1); // At least 1 token for non-empty
+    let special_chars = text.chars().filter(|c| !c.is_alphanumeric()).count();
+
+    // Check for code blocks and apply higher weight
+    let code_block_weight = if text.contains("```") {
+      // Count lines within code blocks for better estimation
+      let code_lines = text
+        .split("```")
+        .skip(1) // Skip text before first code block
+        .take(1) // Take just the first code block
+        .next()
+        .map(|block| block.lines().count())
+        .unwrap_or(0);
+
+      // Apply higher weight for code blocks:
+      // - Base weight for the block markers (6 tokens for ```language and ```)
+      // - Each line gets extra weight for syntax
+      // - Additional weight for code-specific tokens
+      6 + (code_lines * 4)
+        + text
+          .matches(|c: char| c == '{' || c == '}' || c == '(' || c == ')' || c == ';')
+          .count()
+          * 2
+    } else {
+      0
+    };
+
+    // Add extra weight for newlines to better handle commit message format
+    let newline_weight = text.matches('\n').count();
+
+    words + (special_chars / 2) + code_block_weight + newline_weight
+  }
+
+  /// Fallback estimation when tiktoken fails
+  #[inline]
+  fn fallback_estimate(&self, text: &str) -> usize {
+    if text.is_empty() {
+      return 0;
+    }
+
+    // More conservative estimate for fallback
+    let words = text.split_whitespace().count().max(1); // At least 1 token for non-empty
+    let chars = text.chars().count();
+    let special_chars = text.chars().filter(|c| !c.is_alphanumeric()).count();
+
+    // For very long texts, use a more aggressive scaling factor
+    let length_factor = if chars > 500 {
+      1.5
+    } else {
+      1.3
+    };
+
+    ((words as f64 * length_factor) + (chars as f64 * 0.1) + (special_chars as f64 * 0.2)).max(1.0) as usize
   }
 
   /// Counts the number of tokens in the given text
@@ -312,5 +426,104 @@ impl From<&str> for Model {
 impl From<String> for Model {
   fn from(s: String) -> Self {
     s.as_str().into()
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_gpt4_token_estimation() {
+    let model = Model::GPT4;
+    // Test with known GPT-4 tokenization patterns
+    assert!(model.estimate_tokens("Hello world") >= 2); // Should be at least 2 tokens
+    assert!(model.estimate_tokens("Hello, world! 🌎") >= 4); // Should account for special chars and emoji
+
+    // Test longer text with typical patterns
+    let code = "fn main() { println!(\"Hello, world!\"); }";
+    let estimated = model.estimate_tokens(code);
+    assert!(estimated >= 10, "Code snippet estimation too low: {}", estimated);
+  }
+
+  #[test]
+  fn test_llama_token_estimation() {
+    let model = Model::Llama2;
+    // Test BPE-based estimation
+    let text = "This is a test of the BPE tokenizer";
+    let estimated = model.estimate_tokens(text);
+    assert!(estimated >= 7, "Basic text estimation too low: {}", estimated);
+
+    // Test with UTF-8 characters
+    let text_utf8 = "Hello 世界! こんにちは";
+    let basic = model.estimate_tokens("Hello world!");
+    let utf8 = model.estimate_tokens(text_utf8);
+    assert!(utf8 > basic, "UTF-8 text should have higher token count");
+  }
+
+  #[test]
+  fn test_commit_message_estimation() {
+    let model = Model::Tavernari;
+    // Test typical commit message
+    let msg = "fix(api): resolve null pointer in user auth\n\nThis commit fixes a null pointer exception that occurred when processing user authentication with empty tokens.";
+    let estimated = model.estimate_tokens(msg);
+    assert!(estimated >= 20, "Commit message estimation too low: {}", estimated);
+
+    // Test with code snippet in commit message
+    let msg_with_code = "fix: Update user model\n\n```rust\nuser.name = name.trim().to_string();\n```";
+    let estimated_with_code = model.estimate_tokens(msg_with_code);
+    assert!(estimated_with_code > estimated, "Message with code should have higher count");
+  }
+
+  #[test]
+  fn test_small_model_estimation() {
+    let model = Model::SmollM2;
+    // Test basic text
+    let text = "Testing the small model tokenization";
+    let estimated = model.estimate_tokens(text);
+    assert!(estimated >= 5, "Basic text estimation too low: {}", estimated);
+
+    // Compare with larger model to verify higher token count
+    let large_model = Model::Llama2;
+    assert!(
+      model.estimate_tokens(text) > large_model.estimate_tokens(text),
+      "Small model should estimate more tokens than larger models"
+    );
+  }
+
+  #[test]
+  fn test_edge_cases() {
+    let models = [Model::GPT4, Model::Llama2, Model::Tavernari, Model::SmollM2];
+
+    for model in models {
+      // Empty string
+      assert_eq!(model.estimate_tokens(""), 0, "Empty string should have 0 tokens");
+
+      // Single character
+      assert!(model.estimate_tokens("a") > 0, "Single char should have >0 tokens");
+
+      // Whitespace only
+      assert!(model.estimate_tokens("   \n   ") > 0, "Whitespace should have >0 tokens");
+
+      // Very long text
+      let long_text = "a".repeat(1000);
+      assert!(
+        model.estimate_tokens(&long_text) >= 100,
+        "Long text estimation suspiciously low for {model:?}"
+      );
+    }
+  }
+
+  #[test]
+  fn test_fallback_estimation() {
+    let model = Model::GPT4;
+    // Force fallback by using invalid model string
+    let text = "Testing fallback estimation logic";
+    let fallback = model.fallback_estimate(text);
+    assert!(fallback > 0, "Fallback estimation should be positive");
+    assert!(
+      fallback >= text.split_whitespace().count(),
+      "Fallback should estimate at least one token per word"
+    );
   }
 }

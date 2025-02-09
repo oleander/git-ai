@@ -189,10 +189,3 @@ mod bool_as_string {
     }
   }
 }
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  // Add other tests here as needed
-}
