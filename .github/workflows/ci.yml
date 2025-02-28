@@ -62,7 +62,8 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
-          default: true
+          override: true
+          components: rustfmt, clippy
 
       - uses: actions/cache@v4
         with:
