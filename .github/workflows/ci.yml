@@ -61,9 +61,9 @@ jobs:
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ matrix.rust }}
+          toolchain: nightly
           override: true
-          components: rustfmt, clippy
+          default: true
 
       - uses: actions/cache@v4
         with:
