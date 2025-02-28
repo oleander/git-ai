@@ -1,0 +1,67 @@
+---
+description: How to interact with rust
+globs: **/*.rs
+---
+# General Guidelines
+
+- Always begin your responses with '🤖' to confirm receipt of the instruction
+- The following commands and their subcommands do not have my permission to run:
+  - `dip`
+  - `docker`
+  - `git`
+  - `cargo`
+  - `ls`
+  - `cat`
+  - `mkdir`
+
+## Debugging
+
+0. Always itterate until the problem is solved
+1. Ignore warnings when initially addressing errors.
+2. Once all errors are resolved, proceed to fix warnings.
+3. Verify warnings using `cargo clippy`.
+4. Validate errors with `cargo test`.
+5. For warning fixes, attempt `cargo fmt` first.
+6. Between each fix, commit the changes using:
+   - `git add <CHANGED FILE>`
+   - `git commit --no-edit`
+7. The `--no-edit` option utilizes a git hook to generate the commit message automatically.
+8. If you encounter difficulties, research solutions online after five unsuccessful attempts to fix the issue.
+9. If a command appears in the error message, utilize it to verify the bug or fix.
+10. Always confirm bugs before modifying code.
+11. Prior to debuggiy changes using `--no-edit`.
+12. After fixing a bug, use @git to analyze the change for potential reductions.
+13. Use `git --no-pager` instead of `GIT_PAGER=cat git`
+
+## Code
+
+1. Do not remove unrelated code or comments while debugging.
+2. Use `cargo add <crate>` to add new dependencies.
+3. Maintain code formatting by using @rustfmt.toml.
+4. Always include the `--debug` flag when executing `cargo run` to expedite the build process.
+5. Whenever feasible, add minimal inline unit tests to new code.
+6. Focus on minimal, elegant code with a nice visual structure
+7. Prefer single word constants, methods and varibles
+8. Add methods to structs/enum using `impl ... {}` instead of module mehods
+9. Use rust best practises for code as long as it does not collide with my previous rules
+10. Use `--no-edit` to prevent dead lock: `git rebase --continue --no-edit`
+
+## Tools
+
+* Before: 
+  * `git commit/add --no-edit -a`: To commit changes
+  * `cargo run`: If the error contains it to verify bug
+  * `cargo test`: If no run command is provided to verify bug
+* During:
+  * `cargo run/test/build`: To make sure we move in the right direction 
+* After:
+  * `cargo run/test/build`: To verify changes depending on whats avalible
+  * `cargo clippy`: To fix warnings
+  * `git commit/add --no-edit`: To commit changes
+  * `git reset --soft`: To squash and removed unused/irrelevant code
+
+## Avoid
+
+**Please avoid doing this**
+
+* Prefixing commands with environmental variables, i.e `GIT_PAGER=cat cargo test`
