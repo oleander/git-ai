@@ -63,6 +63,7 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
           override: true
+          default: true
           profile: minimal
 
       - uses: actions/cache@v4
