@@ -50,7 +50,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        os: [self-hosted, macos-latest, ubuntu-latest]
         rust: [nightly, stable]
     runs-on: ${{ matrix.os }}
     continue-on-error: false
