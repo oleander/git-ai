@@ -55,6 +55,8 @@ use ai::{commit, config};
 use ai::hook::*;
 use ai::model::Model;
 
+const DEFAULT_MODEL: &str = "gpt-4o-mini";
+
 #[derive(Debug, PartialEq)]
 enum Source {
   Message,
@@ -130,76 +132,76 @@ impl Args {
   async fn execute(&self) -> Result<()> {
     use Source::*;
 
-    match self.source {
-      Some(Message | Template | Merge | Squash) => Ok(()),
-      Some(Commit) | None => {
-        let repo = Repository::open_from_env().context("Failed to open repository")?;
-        let model = config::APP
-          .model
-          .clone()
-          .unwrap_or("gpt-4o-mini".to_string())
-          .into();
-        let used_tokens = commit::token_used(&model)?;
-        let max_tokens = config::APP.max_tokens.unwrap_or(model.context_size());
-        let remaining_tokens = max_tokens.saturating_sub(used_tokens).max(512); // Ensure minimum 512 tokens
-
-        let tree = match self.sha1.as_deref() {
-          Some("HEAD") | None => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
-          Some(sha1) => {
-            // Try to resolve the reference first
-            if let Ok(obj) = repo.revparse_single(sha1) {
-              obj.peel_to_tree().ok()
-            } else {
-              // If not a reference, try as direct OID
-              repo
-                .find_object(Oid::from_str(sha1)?, None)
-                .ok()
-                .and_then(|obj| obj.peel_to_tree().ok())
-            }
-          }
-        };
-
-        let diff = repo.to_diff(tree.clone())?;
-        if diff.is_empty()? {
-          if self.source == Some(Commit) {
-            // For amend operations, we want to keep the existing message
-            return Ok(());
-          }
-          bail!("No changes to commit");
-        }
-
-        let pb = ProgressBar::new_spinner();
-        let style = ProgressStyle::default_spinner()
-          .tick_strings(&["-", "\\", "|", "/"])
-          .template("{spinner:.blue} {msg}")
-          .context("Failed to create progress bar style")?;
-
-        pb.set_style(style);
-        pb.set_message("Generating commit message...");
-        pb.enable_steady_tick(Duration::from_millis(150));
-
-        // Check if a commit message already exists and is not empty
-        if !std::fs::read_to_string(&self.commit_msg_file)?
-          .trim()
-          .is_empty()
-        {
-          log::debug!("A commit message has already been provided");
-          pb.finish_and_clear();
-          return Ok(());
-        }
-
-        let patch = repo
-          .to_patch(tree, remaining_tokens, model)
-          .context("Failed to get patch")?;
-
-        let response = commit::generate(patch.to_string(), remaining_tokens, model).await?;
-        std::fs::write(&self.commit_msg_file, response.response.trim())?;
-
-        pb.finish_and_clear();
-
-        Ok(())
-      }
+    if matches!(self.source, Some(Message) | Some(Template) | Some(Merge) | Some(Squash)) {
+      return Ok(());
     }
+
+    let repo = Repository::open_from_env().context("Failed to open repository")?;
+    let model = config::APP
+      .app
+      .model
+      .clone()
+      .unwrap_or_else(|| DEFAULT_MODEL.to_string())
+      .into();
+
+    let used_tokens = commit::token_used(&model)?;
+    let max_tokens = config::APP.app.max_tokens.unwrap_or(model.context_size());
+    let remaining_tokens = max_tokens.saturating_sub(used_tokens).max(512);
+
+    let tree = match self.sha1.as_deref() {
+      Some("HEAD") | None => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
+      Some(sha1) => {
+        // Try to resolve the reference first
+        if let Ok(obj) = repo.revparse_single(sha1) {
+          obj.peel_to_tree().ok()
+        } else {
+          // If not a reference, try as direct OID
+          repo
+            .find_object(Oid::from_str(sha1)?, None)
+            .ok()
+            .and_then(|obj| obj.peel_to_tree().ok())
+        }
+      }
+    };
+
+    let diff = repo.to_diff(tree.clone())?;
+    if diff.is_empty()? {
+      if self.source == Some(Commit) {
+        // For amend operations, we want to keep the existing message
+        return Ok(());
+      }
+      bail!("No changes to commit");
+    }
+
+    let pb = ProgressBar::new_spinner();
+    let style = ProgressStyle::default_spinner()
+      .tick_strings(&["-", "\\", "|", "/"])
+      .template("{spinner:.blue} {msg}")
+      .context("Failed to create progress bar style")?;
+
+    pb.set_style(style);
+    pb.set_message("Generating commit message...");
+    pb.enable_steady_tick(Duration::from_millis(150));
+
+    if !std::fs::read_to_string(&self.commit_msg_file)?
+      .trim()
+      .is_empty()
+    {
+      log::debug!("A commit message has already been provided");
+      pb.finish_and_clear();
+      return Ok(());
+    }
+
+    let patch = repo
+      .to_patch(tree, remaining_tokens, model)
+      .context("Failed to get patch")?;
+
+    let response = commit::generate(patch.to_string(), remaining_tokens, model).await?;
+    std::fs::write(&self.commit_msg_file, response.response.trim())?;
+
+    pb.finish_and_clear();
+
+    Ok(())
   }
 }
 

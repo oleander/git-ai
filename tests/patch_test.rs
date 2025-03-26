@@ -88,7 +88,7 @@ impl TestRepository for Repository {
     opts
       .include_untracked(true)
       .recurse_untracked_dirs(true)
-      .show_untracked_content(true);
+      .show_untracked_content(false);
 
     match tree {
       Some(tree) => {

@@ -10,6 +10,8 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  TEST_MODEL: SlyOtis/git-auto-message:latest
+  OPENAI_API_URL: http://localhost:4010/v1
 
 jobs:
   lint:
@@ -58,6 +60,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Start test services
+        if: startsWith(matrix.os, 'ubuntu')
+        uses: hoverkraft-tech/compose-action@v2.2.0
+        with:
+          services: prism
+
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -84,10 +92,25 @@ jobs:
         if: startsWith(matrix.os, 'macos')
         run: brew install fish
 
-      - name: Run integration tests
+      - name: Install ollama
+        if: startsWith(matrix.os, 'ubuntu')
+        run: curl -fsSL https://ollama.com/install.sh | sh
+
+      - name: Run ollama
+        if: startsWith(matrix.os, 'ubuntu')
         run: |
-          ./scripts/integration-tests
+          ollama serve &
+          ollama pull SlyOtis/git-auto-message:latest
+
+      - name: Run comprehensive tests
+        run: |
           cargo build --release
           cargo test --release
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Run integration tests (ubuntu)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: ./scripts/integration-tests
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
