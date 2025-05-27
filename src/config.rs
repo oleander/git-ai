@@ -8,13 +8,22 @@ use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use console::Emoji;
 
+// Constants
+const DEFAULT_TIMEOUT: i64 = 30;
+const DEFAULT_MAX_COMMIT_LENGTH: i64 = 72;
+const DEFAULT_MAX_TOKENS: i64 = 2024;
+const DEFAULT_MODEL: &str = "gpt-4o";
+const DEFAULT_API_KEY: &str = "<PLACE HOLDER FOR YOUR API KEY>";
+
 #[derive(Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct App {
-  pub openai_api_key:    Option<String>,
-  pub model:             Option<String>,
-  pub max_tokens:        Option<usize>,
-  pub max_commit_length: Option<usize>,
-  pub timeout:           Option<usize>
+  pub openai_api_key:     Option<String>,
+  pub model:              Option<String>,
+  pub max_tokens:         Option<usize>,
+  pub max_commit_length:  Option<usize>,
+  pub timeout:            Option<usize>,
+  pub enable_multi_step:  Option<bool>,
+  pub parallel_api_calls: Option<bool>
 }
 
 impl App {
@@ -46,11 +55,13 @@ impl App {
       .add_source(config::Environment::with_prefix("APP").try_parsing(true))
       .add_source(config::File::new(CONFIG_PATH.to_str().unwrap(), FileFormat::Ini))
       .set_default("language", "en")?
-      .set_default("timeout", 30)?
-      .set_default("max_commit_length", 72)?
-      .set_default("max_tokens", 2024)?
-      .set_default("model", "gpt-4o")?
-      .set_default("openai_api_key", "<PLACE HOLDER FOR YOUR API KEY>")?
+      .set_default("timeout", DEFAULT_TIMEOUT)?
+      .set_default("max_commit_length", DEFAULT_MAX_COMMIT_LENGTH)?
+      .set_default("max_tokens", DEFAULT_MAX_TOKENS)?
+      .set_default("model", DEFAULT_MODEL)?
+      .set_default("openai_api_key", DEFAULT_API_KEY)?
+      .set_default("enable_multi_step", true)?
+      .set_default("parallel_api_calls", true)?
       .build()?;
 
     config
@@ -65,34 +76,62 @@ impl App {
       .write_all(contents.as_bytes())
       .context("Failed to write config file")
   }
+
+  pub fn update_model(&mut self, value: String) -> Result<()> {
+    self.model = Some(value);
+    self.save_with_message("model")
+  }
+
+  pub fn update_max_tokens(&mut self, value: usize) -> Result<()> {
+    self.max_tokens = Some(value);
+    self.save_with_message("max-tokens")
+  }
+
+  pub fn update_max_commit_length(&mut self, value: usize) -> Result<()> {
+    self.max_commit_length = Some(value);
+    self.save_with_message("max-commit-length")
+  }
+
+  pub fn update_openai_api_key(&mut self, value: String) -> Result<()> {
+    self.openai_api_key = Some(value);
+    self.save_with_message("openai-api-key")
+  }
+
+  pub fn update_enable_multi_step(&mut self, value: bool) -> Result<()> {
+    self.enable_multi_step = Some(value);
+    self.save_with_message("enable-multi-step")
+  }
+
+  pub fn update_parallel_api_calls(&mut self, value: bool) -> Result<()> {
+    self.parallel_api_calls = Some(value);
+    self.save_with_message("parallel-api-calls")
+  }
+
+  fn save_with_message(&self, option: &str) -> Result<()> {
+    println!("{} Configuration option {} updated!", Emoji("✨", ":-)"), option);
+    self.save()
+  }
 }
 
+// Standalone functions for backward compatibility
 pub fn run_model(value: String) -> Result<()> {
   let mut app = App::new()?;
-  app.model = value.into();
-  println!("{} Configuration option model updated!", Emoji("✨", ":-)"));
-  app.save()
+  app.update_model(value)
 }
 
 pub fn run_max_tokens(max_tokens: usize) -> Result<()> {
   let mut app = App::new()?;
-  app.max_tokens = max_tokens.into();
-  println!("{} Configuration option max-tokens updated!", Emoji("✨", ":-)"));
-  app.save()
+  app.update_max_tokens(max_tokens)
 }
 
 pub fn run_max_commit_length(max_commit_length: usize) -> Result<()> {
   let mut app = App::new()?;
-  app.max_commit_length = max_commit_length.into();
-  println!("{} Configuration option max-commit-length updated!", Emoji("✨", ":-)"));
-  app.save()
+  app.update_max_commit_length(max_commit_length)
 }
 
 pub fn run_openai_api_key(value: String) -> Result<()> {
   let mut app = App::new()?;
-  app.openai_api_key = Some(value);
-  println!("{} Configuration option openai-api-key updated!", Emoji("✨", ":-)"));
-  app.save()
+  app.update_openai_api_key(value)
 }
 
 pub fn run_reset() -> Result<()> {
