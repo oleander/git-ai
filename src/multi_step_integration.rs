@@ -4,6 +4,7 @@ use async_openai::types::{ChatCompletionRequestSystemMessageArgs, ChatCompletion
 use async_openai::Client;
 use serde_json::Value;
 use futures::future::join_all;
+use tokio;
 
 use crate::multi_step_analysis::{
   create_analyze_function_tool, create_generate_function_tool, create_score_function_tool, FileDataForScoring, FileWithScore
@@ -42,26 +43,39 @@ pub async fn generate_commit_message_multi_step(
   // Step 1: Analyze each file individually in parallel
   log::debug!("Analyzing {} files in parallel", parsed_files.len());
 
-  // Create futures for all file analyses
-  let analysis_futures: Vec<_> = parsed_files
-    .iter()
+  // Create futures for all file analyses using tokio::spawn for true parallelism
+  let analysis_handles: Vec<tokio::task::JoinHandle<_>> = parsed_files
+    .into_iter()
     .map(|file| {
+      let client = client.clone();
+      let model = model.to_string();
       let file_path = file.path.clone();
       let operation = file.operation.clone();
-      async move {
+
+      // Spawn each analysis as a separate tokio task
+      tokio::spawn(async move {
         log::debug!("Analyzing file: {file_path}");
         let start_time = std::time::Instant::now();
         let payload = format!("{{\"file_path\": \"{file_path}\", \"operation_type\": \"{operation}\", \"diff_content\": \"...\"}}");
 
-        let result = call_analyze_function(client, model, file).await;
+        let result = call_analyze_function(&client, &model, &file).await;
         let duration = start_time.elapsed();
         (file, result, duration, payload)
-      }
+      })
     })
     .collect();
 
-  // Execute all analyses in parallel
-  let analysis_results = join_all(analysis_futures).await;
+  // Execute all analyses in parallel and wait for completion
+  let mut analysis_results = Vec::new();
+  for handle in analysis_handles {
+    match handle.await {
+      Ok(result) => analysis_results.push(result),
+      Err(e) => {
+        log::error!("Task panicked during file analysis: {}", e);
+        // Continue with other files even if one task panics
+      }
+    }
+  }
 
   // Process results and handle errors
   let mut file_analyses = Vec::new();
