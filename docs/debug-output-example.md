@@ -77,34 +77,45 @@ This document shows an example of the comprehensive debug output generated when 
 ## Debug Output Sections Explained
 
 ### 1. Initialization
+
 Shows the git hook arguments and build configuration.
 
 ### 2. Setup & Preparation
+
 Tracks timing for:
+
 - Template generation
 - Token counting
 - Context size calculation
 
 ### 3. Git Diff Processing
+
 Shows:
+
 - Diff generation timing
 - File parsing results
 - Number of files detected
 
 ### 4. AI Processing
+
 Details the multi-step attempt and fallback:
+
 - Multi-step errors (if any)
 - Single-step fallback success
 - API call duration
 
 ### 5. Analysis Results
+
 Displays:
+
 - Generated commit message
 - Message length validation
 - AI reasoning for the message
 
 ### 6. File Analysis
+
 For each file:
+
 - Path and operation type
 - Summary of changes
 - Impact score
@@ -112,20 +123,26 @@ For each file:
 - File category
 
 ### 7. Statistics Summary
+
 Aggregated data:
+
 - Total lines changed
 - Average impact score
 - Files grouped by category
 - Files grouped by change type
 
 ### 8. Performance Summary
+
 Overall timing:
+
 - API request/response time
 - Total execution time
 - Success status
 
 ### 9. Final Result
+
 Shows the actual git commit result:
+
 - Branch name
 - Commit hash (short)
 - Commit message
@@ -149,6 +166,7 @@ git commit
 ## Implementation Notes
 
 The debug output is only shown when:
+
 1. `RUST_LOG=debug` is set
 2. The build is a debug build (or release with debug logging)
 3. The git hook successfully processes the commit

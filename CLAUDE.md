@@ -78,6 +78,7 @@ The project is structured into several core components:
 3. **Diff Processing** (`src/hook.rs`): Handles parsing and processing Git diffs, with performance optimizations for handling large diffs through parallel processing and token management.
 
 4. **API Integration**:
+
    - **OpenAI** (`src/openai.rs`): Manages communication with the OpenAI API, handling request creation, error handling, and response parsing.
    - **Ollama** (`src/ollama.rs`): Provides integration with local Ollama models as an alternative to OpenAI.
 
@@ -96,6 +97,7 @@ The project is structured into several core components:
 1. **Hook Installation**: When `git-ai hook install` is run, the tool symlinks its executable to the repository's `.git/hooks/prepare-commit-msg` hook.
 
 2. **Commit Message Generation**:
+
    - When a user runs `git commit` without specifying a message
    - The hook intercepts the commit process
    - Retrieves the staged changes (diff)

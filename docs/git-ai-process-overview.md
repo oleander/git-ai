@@ -1,6 +1,7 @@
 # Git AI Hook Commit Message Generation Process - Detailed Overview
 
 ## Table of Contents
+
 1. [Introduction](#introduction)
 2. [Architecture Overview](#architecture-overview)
 3. [Process Flow](#process-flow)
@@ -35,18 +36,22 @@ The system consists of several key components:
 ### Core Components
 
 1. **CLI Interface** (`src/main.rs`)
+
    - Command-line interface for configuration and hook management
    - Handles installation, uninstallation, and configuration commands
 
 2. **Git Hook Binary** (`src/bin/hook.rs`)
+
    - Actual git hook executable invoked during commit process
    - Manages the prepare-commit-msg hook lifecycle
 
 3. **Multi-Step Integration** (`src/multi_step_integration.rs`)
+
    - Orchestrates the multi-phase commit message generation
    - Coordinates between different analysis steps
 
 4. **Multi-Step Analysis** (`src/multi_step_analysis.rs`)
+
    - Implements file categorization and impact scoring
    - Generates commit message candidates
 
@@ -94,6 +99,7 @@ graph TD
 When `git commit` is executed without a message:
 
 1. **Hook Invocation**
+
    ```rust
    // src/bin/hook.rs
    struct Args {
@@ -104,6 +110,7 @@ When `git commit` is executed without a message:
    ```
 
 2. **Environment Setup**
+
    - Parse command-line arguments
    - Initialize logging and profiling
    - Load configuration from `~/.config/git-ai/config.toml`
@@ -136,6 +143,7 @@ impl PatchRepository for Repository {
 ```
 
 **Diff Processing Features:**
+
 - Parallel processing for large diffs
 - Token counting and management
 - Memory pooling for efficiency
@@ -183,11 +191,13 @@ If multi-step fails, the system falls back to a simpler approach using function 
 The generation process follows these principles:
 
 1. **Analyze Functional Significance**
+
    - Identify primary changes
    - Determine change impact
    - Group related modifications
 
 2. **Generate Reasoning**
+
    - Explain why changes were made
    - Justify message selection
    - Document decision process
@@ -232,6 +242,7 @@ pub fn analyze_file(file_path: &str, diff_content: &str, operation_type: &str) -
 ```
 
 **File Categories:**
+
 - `source`: Core application code (weight: 1.0)
 - `test`: Test files (weight: 0.6)
 - `config`: Configuration files (weight: 0.8)
@@ -291,6 +302,7 @@ macro_rules! profile {
 ```
 
 **Tracked Metrics:**
+
 - Total execution time
 - API request/response duration
 - Diff parsing time
@@ -313,6 +325,7 @@ The multi-step system provides several advantages:
 ### 1. Divide and Conquer Strategy
 
 Instead of processing the entire diff at once, the system:
+
 - Parses individual files
 - Analyzes each independently
 - Aggregates results intelligently
@@ -353,11 +366,13 @@ Multi-Step OpenAI → Local Multi-Step → Single-Step OpenAI → Error
 ### Fallback Triggers
 
 1. **API Failures**
+
    - Network timeouts
    - Rate limiting
    - Invalid responses
 
 2. **Token Limits**
+
    - Diff too large
    - Context overflow
    - Model constraints
@@ -439,19 +454,23 @@ git-ai config reset
 ## Key Features Summary
 
 1. **Intelligent Fallback System**
+
    - Multi-step → Local → Single-step
    - Ensures commits always succeed
 
 2. **Impact-Based Prioritization**
+
    - Focuses on functionally significant changes
    - Weights files by category and size
 
 3. **Comprehensive Logging**
+
    - Debug output with timing
    - Structured information display
    - Performance metrics
 
 4. **Token Management**
+
    - Careful limit handling
    - Intelligent truncation
    - Model-aware processing

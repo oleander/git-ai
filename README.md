@@ -10,6 +10,54 @@
 - **Local Optimization**: Hosts an exclusive assistant instance on your machine, learning from all your projects to elevate the quality of commit messages throughout your development environment.
 - **Intelligent Fallbacks**: Automatically falls back to local analysis when API is unavailable, ensuring you always get meaningful commit messages.
 
+## How It Works
+
+Git AI uses a sophisticated multi-step analysis process to generate meaningful commit messages:
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│ Git Commit  │────▶│ Parse Diff  │────▶│   Analyze   │────▶│  Generate   │
+│  (no msg)   │     │   Files     │     │   Files     │     │  Message    │
+└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
+                           │                    │                    │
+                           ▼                    ▼                    ▼
+                    ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+                    │ auth.rs     │     │ Score: 0.95 │     │ Best Match: │
+                    │ test.rs     │     │ Score: 0.65 │     │ "Add JWT    │
+                    │ main.rs     │     │ Score: 0.62 │     │  auth"      │
+                    └─────────────┘     └─────────────┘     └─────────────┘
+```
+
+### Multi-Step Process
+
+1. **Parse**: Splits the git diff into individual files
+2. **Analyze**: Examines each file for:
+   - Lines added/removed
+   - File type (source, test, config, docs)
+   - Change significance
+3. **Score**: Calculates impact scores based on:
+   - Operation type (add: 0.3, modify: 0.2, delete: 0.25)
+   - File category (source: 1.0, test: 0.6, config: 0.8)
+   - Lines changed (normalized)
+4. **Generate**: Creates multiple commit message candidates
+5. **Select**: Chooses the best message based on highest impact
+
+### Intelligent Fallback Strategy
+
+```
+┌──────────────────┐
+│ Multi-Step + API │ ──── Fail ───┐
+└────────┬─────────┘              │
+         │ Success                ▼
+         ▼                 ┌──────────────────┐
+   ┌───────────┐           │ Local Multi-Step │ ──── Fail ───┐
+   │  Message  │           └────────┬─────────┘              │
+   │ Generated │ ◀──────────────────┘ Success                ▼
+   └───────────┘                                   ┌──────────────────┐
+         ▲                                         │ Single-Step API  │
+         └─────────────────────────────────────────┴──────────────────┘
+```
+
 ## Quick Start
 
 ```bash
