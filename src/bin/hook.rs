@@ -41,17 +41,17 @@
 // git commit --amend
 // Args { commit_msg_file: PathBuf::from(".git/COMMIT_EDITMSG"), source: Some(Source::Commit), sha1: Some("HEAD") }
 // Outcome: Opens the default text editor to allow modification of the most recent commit message. No new commit message is generated automatically; it depends on user input.
-
 use std::process::exit;
 use std::str::FromStr;
 use std::time::Duration;
 use std::path::PathBuf;
 
+use colored::Colorize;
 use structopt::StructOpt;
 use indicatif::{ProgressBar, ProgressStyle};
 use anyhow::{bail, Context, Result};
 use git2::{Oid, Repository};
-use ai::{commit, config};
+use ai::{commit, config, debug_output};
 use ai::hook::*;
 use ai::model::Model;
 
@@ -119,7 +119,7 @@ impl Args {
       .to_patch(tree, remaining_tokens, model)
       .context("Failed to get patch")?;
 
-    let response = commit::generate(patch.to_string(), remaining_tokens, model).await?;
+    let response = commit::generate(patch.to_string(), remaining_tokens, model, None).await?;
     std::fs::write(&self.commit_msg_file, response.response.trim())?;
 
     pb.finish_and_clear();
@@ -192,7 +192,7 @@ impl Args {
           .to_patch(tree, remaining_tokens, model)
           .context("Failed to get patch")?;
 
-        let response = commit::generate(patch.to_string(), remaining_tokens, model).await?;
+        let response = commit::generate(patch.to_string(), remaining_tokens, model, None).await?;
         std::fs::write(&self.commit_msg_file, response.response.trim())?;
 
         pb.finish_and_clear();
@@ -205,6 +205,17 @@ impl Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+  // Always enable debug logging in debug builds
+  #[cfg(debug_assertions)]
+  {
+    if std::env::var("RUST_LOG").is_err() {
+      std::env::set_var("RUST_LOG", "debug");
+    }
+    env_logger::init();
+  }
+
+  // In release builds, only initialize logging if RUST_LOG is set
+  #[cfg(not(debug_assertions))]
   if std::env::var("RUST_LOG").is_ok() {
     env_logger::init();
   }
@@ -212,15 +223,40 @@ async fn main() -> Result<()> {
   let time = std::time::Instant::now();
   let args = Args::from_args();
 
+  // Initialize debug session if in debug mode
   if log::log_enabled!(log::Level::Debug) {
-    log::debug!("Arguments: {:?}", args);
+    let args_str = format!(
+      "commit_msg_file='{}', source={:?}, sha1={:?}",
+      args.commit_msg_file.display(),
+      args.source,
+      args.sha1
+    );
+    debug_output::init_debug_session(&args_str);
   }
 
-  if let Err(err) = args.execute().await {
-    eprintln!("{} ({:?})", err, time.elapsed());
+  let result = args.execute().await;
+  let total_time = time.elapsed();
+
+  if let Err(err) = result {
+    eprintln!("{} ({:?})", err, total_time);
     exit(1);
-  } else if log::log_enabled!(log::Level::Debug) {
-    log::debug!("Completed in {:?}", time.elapsed());
+  } else {
+    // In debug builds, show comprehensive timing report
+    #[cfg(debug_assertions)]
+    {
+      if log::log_enabled!(log::Level::Debug) {
+        debug_output::print_final_output();
+      } else {
+        eprintln!("\n{}", "Performance Summary:".blue().bold());
+        eprintln!("├─ Total execution time: {:?}", total_time);
+        eprintln!("└─ See detailed section timings above");
+      }
+    }
+    // In release builds with debug logging enabled
+    #[cfg(not(debug_assertions))]
+    if log::log_enabled!(log::Level::Debug) {
+      debug_output::print_final_output();
+    }
   }
 
   Ok(())

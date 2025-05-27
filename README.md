@@ -4,9 +4,11 @@
 
 ### Key Features
 
+- **Multi-Step Analysis** (Default): Uses a sophisticated divide-and-conquer approach that analyzes each file individually, calculates impact scores, and generates multiple commit message candidates before selecting the best one.
 - **Smart Integration**: Leverages OpenAI's powerful Assistant API, expertly tailored to transform git diffs into insightful commit messages.
 - **Contextual Learning**: This feature maintains a dedicated thread for each project, allowing the assistant to build context over time and thereby improving performance and message relevance with every commit.
 - **Local Optimization**: Hosts an exclusive assistant instance on your machine, learning from all your projects to elevate the quality of commit messages throughout your development environment.
+- **Intelligent Fallbacks**: Automatically falls back to local analysis when API is unavailable, ensuring you always get meaningful commit messages.
 
 ## Quick Start
 

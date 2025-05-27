@@ -183,7 +183,18 @@ fn run_config_openai_api_key(value: String) -> Result<()> {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
+  // Load environment variables from .env file if present
   dotenv().ok();
+
+  // Initialize logging with debug level in debug builds
+  #[cfg(debug_assertions)]
+  {
+    if std::env::var("RUST_LOG").is_err() {
+      std::env::set_var("RUST_LOG", "debug");
+    }
+    env_logger::init();
+    println!("Debug build: Performance profiling enabled");
+  }
 
   let args = Cli::from_args();
 
