@@ -121,7 +121,7 @@ impl Model {
 
     // Perform binary search to find optimal word count
     while left < right {
-      let mid = (left + right + 1) / 2;
+      let mid = (left + right).div_ceil(2);
       let candidate = words[..mid].join(" ");
       let tokens = self.count_tokens(&candidate)?;
 
