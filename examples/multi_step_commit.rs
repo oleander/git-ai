@@ -215,10 +215,10 @@ Binary files a/logo.png and b/logo.png differ
 
     match generate_commit_message_multi_step(&client, model, example_diff, Some(72)).await {
       Ok(message) => {
-        println!("Generated commit message: {}\n", message);
+        println!("Generated commit message: {message}\n");
       }
       Err(e) => {
-        eprintln!("Error generating commit message: {}", e);
+        eprintln!("Error generating commit message: {e}");
       }
     }
   } else {
@@ -226,10 +226,10 @@ Binary files a/logo.png and b/logo.png differ
 
     match generate_commit_message_local(example_diff, Some(72)) {
       Ok(message) => {
-        println!("Generated commit message: {}\n", message);
+        println!("Generated commit message: {message}\n");
       }
       Err(e) => {
-        eprintln!("Error generating commit message: {}", e);
+        eprintln!("Error generating commit message: {e}");
       }
     }
   }

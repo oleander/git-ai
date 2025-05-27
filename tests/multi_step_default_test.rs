@@ -25,7 +25,7 @@ index 1234567..abcdefg 100644
   assert!(message.len() <= 72);
 
   // The message should be something meaningful about updating main.rs
-  println!("Generated message: {}", message);
+  println!("Generated message: {message}");
 }
 
 #[tokio::test]
@@ -59,5 +59,5 @@ index 0000000..1234567
   let message = result.unwrap();
   assert!(!message.is_empty());
 
-  println!("Generated message via default flow: {}", message);
+  println!("Generated message via default flow: {message}");
 }

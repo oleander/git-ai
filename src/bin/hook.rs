@@ -238,7 +238,7 @@ async fn main() -> Result<()> {
   let total_time = time.elapsed();
 
   if let Err(err) = result {
-    eprintln!("{} ({:?})", err, total_time);
+    eprintln!("{err} ({total_time:?})");
     exit(1);
   } else {
     // In debug builds, show comprehensive timing report
@@ -248,7 +248,7 @@ async fn main() -> Result<()> {
         debug_output::print_final_output();
       } else {
         eprintln!("\n{}", "Performance Summary:".blue().bold());
-        eprintln!("├─ Total execution time: {:?}", total_time);
+        eprintln!("├─ Total execution time: {total_time:?}");
         eprintln!("└─ See detailed section timings above");
       }
     }

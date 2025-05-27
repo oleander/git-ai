@@ -210,7 +210,7 @@ impl DebugSession {
         .green()
         .to_string()
     };
-    eprintln!("  └ Files parsed from diff           {}", files_status);
+    eprintln!("  └ Files parsed from diff           {files_status}");
 
     // Discovered Files
     if self.total_files_parsed > 0 {
@@ -370,7 +370,7 @@ impl DebugSession {
           }
 
           if let Some(ref reasoning) = multi_step.reasoning {
-            eprintln!("    │ Reasoning: {}", reasoning);
+            eprintln!("    │ Reasoning: {reasoning}");
           }
         }
       }
@@ -383,7 +383,7 @@ impl DebugSession {
       } else {
         "SUCCESS".green().to_string()
       };
-      eprintln!("  Multi-Step Attempt:                           {}", multi_step_status);
+      eprintln!("  Multi-Step Attempt:                           {multi_step_status}");
 
       if let Some(ref error) = self.multi_step_error {
         eprintln!("    │ Creating score function tool              ✓");
@@ -423,7 +423,7 @@ impl DebugSession {
         let mut line = String::new();
         for word in words {
           if line.len() + word.len() + 1 > 70 {
-            eprintln!("    {}", line);
+            eprintln!("    {line}");
             line = word.to_string();
           } else {
             if !line.is_empty() {
@@ -433,7 +433,7 @@ impl DebugSession {
           }
         }
         if !line.is_empty() {
-          eprintln!("    {}", line);
+          eprintln!("    {line}");
         }
       }
     }
@@ -504,7 +504,7 @@ impl DebugSession {
           "Not reflected in commit message"
         };
 
-        eprintln!("    └ Weight:       {}", weight_str);
+        eprintln!("    └ Weight:       {weight_str}");
       }
     }
 
@@ -519,8 +519,8 @@ impl DebugSession {
         files.files.values().map(|f| f.impact_score).sum::<f32>() / files.files.len() as f32
       };
 
-      eprintln!("  │ Total Lines Changed:     {}", total_lines);
-      eprintln!("  │ Average Impact Score:    {:.2}", avg_impact);
+      eprintln!("  │ Total Lines Changed:     {total_lines}");
+      eprintln!("  │ Average Impact Score:    {avg_impact:.2}");
       eprintln!("  │");
 
       // Count by category
@@ -531,7 +531,7 @@ impl DebugSession {
 
       eprintln!("  │ By Category:");
       for (category, count) in category_counts {
-        eprintln!("  │   └ {}: {}", category, count);
+        eprintln!("  │   └ {category}: {count}");
       }
 
       eprintln!("  │");
@@ -544,7 +544,7 @@ impl DebugSession {
 
       eprintln!("  │ By Change Type:");
       for (change_type, count) in type_counts {
-        eprintln!("  │   └ {}: {}", change_type, count);
+        eprintln!("  │   └ {change_type}: {count}");
       }
     }
 
@@ -639,7 +639,7 @@ impl DebugSession {
 
     if let Some(duration) = self.timings.get(key) {
       let duration_str = format_duration(*duration);
-      eprintln!("  {} {:<35} {:<10} ✓", prefix, label, duration_str);
+      eprintln!("  {prefix} {label:<35} {duration_str:<10} ✓");
     } else {
       eprintln!("  {} {:<35} {:<10} ✓", prefix, label, "0.00ms");
     }
@@ -649,7 +649,7 @@ impl DebugSession {
 fn format_duration(duration: Duration) -> String {
   let micros = duration.as_micros();
   if micros < 1000 {
-    format!("{:.0}µs", micros)
+    format!("{micros:.0}µs")
   } else if micros < 1_000_000 {
     format!("{:.2}ms", duration.as_secs_f32() * 1000.0)
   } else {

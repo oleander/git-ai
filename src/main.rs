@@ -112,7 +112,7 @@ fn run_install() -> Result<()> {
   }
 
   hook_file.symlink(&hook_bin)?;
-  println!("🔗 Hook symlinked successfully to \x1B[3m{}\x1B[0m", hook_file);
+  println!("🔗 Hook symlinked successfully to \x1B[3m{hook_file}\x1B[0m");
 
   Ok(())
 }
@@ -123,9 +123,9 @@ fn run_uninstall() -> Result<()> {
 
   if hook_file.exists() {
     hook_file.delete()?;
-    println!("🗑️  Hook uninstalled successfully from \x1B[3m{}\x1B[0m", hook_file);
+    println!("🗑️  Hook uninstalled successfully from \x1B[3m{hook_file}\x1B[0m");
   } else {
-    println!("⚠️  No hook found at \x1B[3m{}\x1B[0m", hook_file);
+    println!("⚠️  No hook found at \x1B[3m{hook_file}\x1B[0m");
   }
 
   Ok(())
@@ -156,21 +156,21 @@ fn run_config_reset() -> Result<()> {
 fn run_config_model(value: String) -> Result<()> {
   let mut app = App::new()?;
   app.update_model(value.clone())?;
-  println!("✅ Model set to: {}", value);
+  println!("✅ Model set to: {value}");
   Ok(())
 }
 
 fn run_config_max_tokens(max_tokens: usize) -> Result<()> {
   let mut app = App::new()?;
   app.update_max_tokens(max_tokens)?;
-  println!("✅ Max tokens set to: {}", max_tokens);
+  println!("✅ Max tokens set to: {max_tokens}");
   Ok(())
 }
 
 fn run_config_max_commit_length(max_commit_length: usize) -> Result<()> {
   let mut app = App::new()?;
   app.update_max_commit_length(max_commit_length)?;
-  println!("✅ Max commit length set to: {}", max_commit_length);
+  println!("✅ Max commit length set to: {max_commit_length}");
   Ok(())
 }
 

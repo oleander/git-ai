@@ -40,7 +40,7 @@ pub async fn generate_commit_message(diff: &str) -> Result<String> {
       match commit::generate(diff.to_string(), 256, Model::GPT4oMini, None).await {
         Ok(response) => return Ok(response.response.trim().to_string()),
         Err(e) => {
-          log::warn!("Direct generation failed, falling back to local: {}", e);
+          log::warn!("Direct generation failed, falling back to local: {e}");
         }
       }
     }
@@ -94,9 +94,9 @@ pub async fn generate_commit_message(diff: &str) -> Result<String> {
           file
         )
       } else if lines_removed > 0 && lines_added == 0 {
-        format!("Remove content from {}", file)
+        format!("Remove content from {file}")
       } else {
-        format!("Update {}", file)
+        format!("Update {file}")
       }
     }
     std::cmp::Ordering::Greater => format!("Update {} files", files_mentioned.len()),
@@ -180,7 +180,7 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
   match generate_commit_message_multi_step(&client, &model, &request.prompt, config::APP.max_commit_length).await {
     Ok(message) => return Ok(Response { response: message }),
     Err(e) => {
-      log::warn!("Multi-step approach failed, falling back to single-step: {}", e);
+      log::warn!("Multi-step approach failed, falling back to single-step: {e}");
     }
   }
 
@@ -226,7 +226,7 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
   let mut last_error = None;
 
   for attempt in 1..=MAX_ATTEMPTS {
-    log::debug!("OpenAI API attempt {} of {}", attempt, MAX_ATTEMPTS);
+    log::debug!("OpenAI API attempt {attempt} of {MAX_ATTEMPTS}");
 
     // Track API call duration
     let api_start = Instant::now();
@@ -240,7 +240,7 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
           session.set_api_duration(api_duration);
         }
 
-        log::debug!("OpenAI API call successful on attempt {}", attempt);
+        log::debug!("OpenAI API call successful on attempt {attempt}");
 
         // Extract the response
         let choice = response
@@ -277,7 +277,7 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
                 commit_messages.push(commit_args.message);
               }
               Err(e) => {
-                log::warn!("Failed to parse tool call {}: {}", i, e);
+                log::warn!("Failed to parse tool call {i}: {e}");
               }
             }
           }
@@ -302,11 +302,11 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
       }
       Err(e) => {
         last_error = Some(e);
-        log::warn!("OpenAI API attempt {} failed", attempt);
+        log::warn!("OpenAI API attempt {attempt} failed");
 
         if attempt < MAX_ATTEMPTS {
           let delay = Duration::from_millis(500 * attempt as u64);
-          log::debug!("Retrying after {:?}", delay);
+          log::debug!("Retrying after {delay:?}");
           tokio::time::sleep(delay).await;
         }
       }
@@ -322,11 +322,11 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
         api_err.r#type.as_deref().unwrap_or("unknown"),
         api_err.code.as_deref().unwrap_or("unknown")
       );
-      log::error!("{}", error_msg);
+      log::error!("{error_msg}");
       Err(anyhow!(error_msg))
     }
     Some(e) => {
-      log::error!("OpenAI request failed: {}", e);
+      log::error!("OpenAI request failed: {e}");
       Err(anyhow!("OpenAI request failed: {}", e))
     }
     None => Err(anyhow!("OpenAI request failed after {} attempts", MAX_ATTEMPTS))

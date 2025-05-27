@@ -30,7 +30,7 @@ pub async fn generate_commit_message_simple(
     .into();
 
   let user_message = ChatCompletionRequestUserMessageArgs::default()
-    .content(format!("Generate a commit message for the following git diff:\n\n{}", diff_content))
+    .content(format!("Generate a commit message for the following git diff:\n\n{diff_content}"))
     .build()?
     .into();
 
@@ -106,9 +106,9 @@ pub fn generate_commit_message_simple_local(diff_content: &str, max_length: Opti
           file
         )
       } else if lines_removed > 0 && lines_added == 0 {
-        format!("Remove content from {}", file)
+        format!("Remove content from {file}")
       } else {
-        format!("Update {}", file)
+        format!("Update {file}")
       }
     }
     std::cmp::Ordering::Greater => format!("Update {} files", files_mentioned.len()),

@@ -193,7 +193,7 @@ pub fn create_generate_function_tool() -> Result<ChatCompletionTool> {
 
 /// Analyzes a single file's changes
 pub fn analyze_file(file_path: &str, diff_content: &str, operation_type: &str) -> FileAnalysisResult {
-  log::debug!("Analyzing file: {} ({})", file_path, operation_type);
+  log::debug!("Analyzing file: {file_path} ({operation_type})");
 
   // Count lines added and removed
   let mut lines_added = 0u32;
@@ -213,12 +213,7 @@ pub fn analyze_file(file_path: &str, diff_content: &str, operation_type: &str) -
   // Generate summary based on diff content
   let summary = generate_file_summary(file_path, diff_content, operation_type);
 
-  log::debug!(
-    "File analysis complete: +{} -{} lines, category: {}",
-    lines_added,
-    lines_removed,
-    file_category
-  );
+  log::debug!("File analysis complete: +{lines_added} -{lines_removed} lines, category: {file_category}");
 
   FileAnalysisResult { lines_added, lines_removed, file_category, summary }
 }
@@ -251,7 +246,7 @@ pub fn calculate_impact_scores(files_data: Vec<FileDataForScoring>) -> ScoreResu
 
 /// Generates commit message candidates
 pub fn generate_commit_messages(files_with_scores: Vec<FileWithScore>, max_length: usize) -> GenerateResult {
-  log::debug!("Generating commit messages (max length: {})", max_length);
+  log::debug!("Generating commit messages (max length: {max_length})");
 
   // Find the highest impact changes
   let primary_change = files_with_scores.first();
@@ -378,7 +373,7 @@ fn generate_action_message(primary: &FileWithScore, _all_files: &[FileWithScore]
   };
 
   let component = extract_component_name(&primary.file_path);
-  let message = format!("{} {}", base, component);
+  let message = format!("{base} {component}");
 
   if message.len() > max_length {
     message.chars().take(max_length).collect()
@@ -396,7 +391,7 @@ fn generate_component_message(primary: &FileWithScore, _all_files: &[FileWithSco
     _ => "changes"
   };
 
-  let message = format!("{}: {}", component, action);
+  let message = format!("{component}: {action}");
 
   if message.len() > max_length {
     message.chars().take(max_length).collect()

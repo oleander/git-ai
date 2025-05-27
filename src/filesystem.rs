@@ -47,8 +47,8 @@ impl File {
   /// # Returns
   /// * `Result<()>` - Success or an error if deletion fails
   pub fn delete(&self) -> Result<()> {
-    log::debug!("Removing file at {}", self);
-    fs::remove_file(&self.path).with_context(|| format!("Failed to remove file at {}", self))
+    log::debug!("Removing file at {self}");
+    fs::remove_file(&self.path).with_context(|| format!("Failed to remove file at {self}"))
   }
 
   /// Creates a symbolic link to the target file.
@@ -59,8 +59,8 @@ impl File {
   /// # Returns
   /// * `Result<()>` - Success or an error if link creation fails
   pub fn symlink(&self, target: &File) -> Result<()> {
-    log::debug!("Symlinking {} to {}", target, self);
-    symlink_unix(&target.path, &self.path).with_context(|| format!("Failed to symlink {} to {}", target, self))
+    log::debug!("Symlinking {target} to {self}");
+    symlink_unix(&target.path, &self.path).with_context(|| format!("Failed to symlink {target} to {self}"))
   }
 
   /// Gets the relative path from the current directory.
@@ -134,8 +134,8 @@ impl Dir {
   /// # Returns
   /// * `Result<()>` - Success or an error if creation fails
   pub fn create_dir_all(&self) -> Result<()> {
-    log::debug!("Creating directory at {}", self);
-    fs::create_dir_all(&self.path).with_context(|| format!("Failed to create directory at {}", self))
+    log::debug!("Creating directory at {self}");
+    fs::create_dir_all(&self.path).with_context(|| format!("Failed to create directory at {self}"))
   }
 
   /// Gets the relative path from the current directory.

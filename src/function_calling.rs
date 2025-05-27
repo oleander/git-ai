@@ -41,7 +41,7 @@ pub struct CommitFunctionCall {
 pub fn create_commit_function_tool(max_length: Option<usize>) -> Result<ChatCompletionTool> {
   let max_length = max_length.unwrap_or(72);
 
-  log::debug!("Creating commit function tool with max_length: {}", max_length);
+  log::debug!("Creating commit function tool with max_length: {max_length}");
 
   let function = FunctionObjectArgs::default()
         .name("commit")
@@ -200,7 +200,7 @@ pub fn create_commit_function_tool(max_length: Option<usize>) -> Result<ChatComp
         .build()?;
 
   log::debug!("Successfully created commit function tool");
-  log::trace!("Function definition: {:?}", function);
+  log::trace!("Function definition: {function:?}");
 
   Ok(ChatCompletionTool { r#type: ChatCompletionToolType::Function, function })
 }
@@ -208,7 +208,7 @@ pub fn create_commit_function_tool(max_length: Option<usize>) -> Result<ChatComp
 /// Parses the function call response to extract the commit message
 pub fn parse_commit_function_response(arguments: &str) -> Result<CommitFunctionArgs> {
   log::debug!("Parsing commit function response");
-  log::trace!("Raw arguments: {}", arguments);
+  log::trace!("Raw arguments: {arguments}");
 
   let args: CommitFunctionArgs = serde_json::from_str(arguments)?;
 
@@ -240,8 +240,8 @@ pub fn parse_commit_function_response(arguments: &str) -> Result<CommitFunctionA
   let avg_impact: f32 = args.files.values().map(|f| f.impact_score).sum::<f32>() / args.files.len() as f32;
 
   log::debug!("Summary statistics:");
-  log::debug!("  Total lines changed: {}", total_lines);
-  log::debug!("  Average impact score: {:.2}", avg_impact);
+  log::debug!("  Total lines changed: {total_lines}");
+  log::debug!("  Average impact score: {avg_impact:.2}");
 
   // Count by file category
   let mut category_counts = std::collections::HashMap::new();
@@ -253,7 +253,7 @@ pub fn parse_commit_function_response(arguments: &str) -> Result<CommitFunctionA
 
   log::debug!("  Files by category:");
   for (category, count) in category_counts {
-    log::debug!("    {}: {}", category, count);
+    log::debug!("    {category}: {count}");
   }
 
   // Count by change type
@@ -264,7 +264,7 @@ pub fn parse_commit_function_response(arguments: &str) -> Result<CommitFunctionA
 
   log::debug!("  Files by change type:");
   for (change_type, count) in type_counts {
-    log::debug!("    {}: {}", change_type, count);
+    log::debug!("    {change_type}: {count}");
   }
 
   Ok(args)

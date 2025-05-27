@@ -119,7 +119,7 @@ impl Model {
   /// * `Result<String>` - The truncated text or an error
   pub(crate) fn walk_truncate(&self, text: &str, max_tokens: usize, within: usize) -> Result<String> {
     profile!("Walk truncate iteration");
-    log::debug!("max_tokens: {}, within: {}", max_tokens, within);
+    log::debug!("max_tokens: {max_tokens}, within: {within}");
 
     // Ultra-fast path: if text is small or max_tokens is large, just return the text
     if text.len() < 1000 || max_tokens > 1000 {

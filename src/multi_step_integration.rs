@@ -49,12 +49,9 @@ pub async fn generate_commit_message_multi_step(
       let file_path = file.path.clone();
       let operation = file.operation.clone();
       async move {
-        log::debug!("Analyzing file: {}", file_path);
+        log::debug!("Analyzing file: {file_path}");
         let start_time = std::time::Instant::now();
-        let payload = format!(
-          "{{\"file_path\": \"{}\", \"operation_type\": \"{}\", \"diff_content\": \"...\"}}",
-          file_path, operation
-        );
+        let payload = format!("{{\"file_path\": \"{file_path}\", \"operation_type\": \"{operation}\", \"diff_content\": \"...\"}}");
 
         let result = call_analyze_function(client, model, file).await;
         let duration = start_time.elapsed();
@@ -189,7 +186,7 @@ pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
     } else {
       diff_content.to_string()
     };
-    log::debug!("Diff content preview: \n{}", preview);
+    log::debug!("Diff content preview: \n{preview}");
   }
 
   // Handle different diff formats
@@ -234,7 +231,7 @@ pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
         } else {
           a_path
         };
-        log::debug!("Found new file in diff: {}", path);
+        log::debug!("Found new file in diff: {path}");
         current_file = Some(ParsedFile {
           path:         path.to_string(),
           operation:    "modified".to_string(), // Default, will be updated
@@ -301,7 +298,7 @@ pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
     if !sections.is_empty() {
       for (i, section) in sections.iter().enumerate() {
         // Add the "diff --git" prefix back
-        let full_section = format!("diff --git{}", section);
+        let full_section = format!("diff --git{section}");
 
         // Extract file path from the section more carefully
         let mut path = "unknown";
@@ -320,7 +317,7 @@ pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
         }
 
         if found_path {
-          log::debug!("Found file in section {}: {}", i, path);
+          log::debug!("Found file in section {i}: {path}");
           files.push(ParsedFile {
             path:         path.to_string(),
             operation:    "modified".to_string(), // Default

@@ -84,7 +84,7 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
         match generate_commit_message_multi_step(&client, &model_str, &patch, max_length).await {
           Ok(message) => return Ok(openai::Response { response: message }),
           Err(e) => {
-            log::warn!("Multi-step generation with custom settings failed: {}", e);
+            log::warn!("Multi-step generation with custom settings failed: {e}");
             if let Some(session) = debug_output::debug_session() {
               session.set_multi_step_error(e.to_string());
             }
@@ -102,7 +102,7 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
         match generate_commit_message_multi_step(&client, &model_str, &patch, max_length).await {
           Ok(message) => return Ok(openai::Response { response: message }),
           Err(e) => {
-            log::warn!("Multi-step generation failed: {}", e);
+            log::warn!("Multi-step generation failed: {e}");
             if let Some(session) = debug_output::debug_session() {
               session.set_multi_step_error(e.to_string());
             }
@@ -116,7 +116,7 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
   match generate_commit_message_local(&patch, max_length) {
     Ok(message) => return Ok(openai::Response { response: message }),
     Err(e) => {
-      log::warn!("Local multi-step generation failed: {}", e);
+      log::warn!("Local multi-step generation failed: {e}");
     }
   }
 

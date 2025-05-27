@@ -7,7 +7,7 @@ fn main() -> Result<()> {
 
   // Print the tool definition
   println!("Commit Function Tool Definition:");
-  println!("{:#?}", tool);
+  println!("{tool:#?}");
 
   // Example of parsing a function response
   let example_response = r#"{
