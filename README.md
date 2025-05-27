@@ -234,7 +234,7 @@ just local-install
 + }
 ```
 
-**Generated commit:** `feat: add JWT token validation with comprehensive error handling`
+**Generated commit:** `Add JWT token validation with comprehensive error handling`
 
 ### Bug Fix Analysis
 
@@ -244,7 +244,7 @@ just local-install
 + if user.age >= 18 {
 ```
 
-**Generated commit:** `fix: correct age validation to include 18-year-olds in config`
+**Generated commit:** `Correct age validation to include 18-year-olds in config`
 
 ## ⚙️ Configuration Reference
 
