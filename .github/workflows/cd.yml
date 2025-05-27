@@ -126,6 +126,10 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: git push origin HEAD --tags
 
+      - name: Test push to origin (dry run)
+        if: github.ref != 'refs/heads/main'
+        run: git push origin HEAD --tags --dry-run
+
       - name: Download all artifacts
         if: github.ref == 'refs/heads/main'
         run: gh run download ${{ github.run_id }}
