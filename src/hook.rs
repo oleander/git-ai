@@ -171,7 +171,10 @@ impl PatchDiff for Diff<'_> {
     // Fast path for small diffs - skip tokenization entirely
     if files.len() == 1 {
       profile!("Single file fast path");
-      let (_, content) = files.into_iter().next().unwrap();
+      let (_, content) = files
+        .into_iter()
+        .next()
+        .ok_or_else(|| HookError::EmptyDiffOutput)?;
 
       // If content is small enough to fit, just return it directly
       if content.len() < max_tokens * 4 {

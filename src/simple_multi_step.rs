@@ -94,7 +94,10 @@ pub fn generate_commit_message_simple_local(diff_content: &str, max_length: Opti
   // Generate a simple commit message based on the diff
   let message = match files_mentioned.len().cmp(&1) {
     std::cmp::Ordering::Equal => {
-      let file = files_mentioned.iter().next().unwrap();
+      let file = files_mentioned
+        .iter()
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("No files mentioned in commit message"))?;
       if lines_added > 0 && lines_removed == 0 {
         format!(
           "Add {} to {}",
