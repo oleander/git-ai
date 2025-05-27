@@ -1,0 +1,80 @@
+---
+description:
+globs: **/*.rs,*.rs
+alwaysApply: false
+---
+
+# Formatting
+
+- Enforce `rustfmt.toml` with `edition = "2021"` and `max_width = 100`
+  unless a project-local file overrides. Never push unformatted code.
+- Keep imports grouped: std ▸ external ▸ internal, then alphabetised.
+
+# Naming
+
+- snake_case for items and functions; SCREAMING_SNAKE_CASE for consts;
+  PascalCase for types and traits; crate names are kebab-case on crates.io.
+- Prefer expressive verbs for functions and nouns for types.
+
+# Module & file organisation
+
+- One public type per file where practical; sibling modules live in a
+  directory with `mod.rs` or the newer `mod foo;` inline split file
+  form. Avoid deep trees (>3 levels). Public re-exports go in
+  `lib.rs` so the crate has a clean surface.
+
+# Error handling
+
+- Bubble typed errors with `thiserror`; erase at API boundaries with
+  `anyhow::Result<T>` for binaries.
+- Use `?` eagerly; avoid `unwrap` and `expect` in library code.
+
+# Linting
+
+- Clippy runs in CI with at least:
+  deny = [clippy::correctness, clippy::needless_bool,
+  clippy::unwrap_used, clippy::expect_used]
+- Allow unused code only behind `#[cfg(test)]`.
+
+# Concurrency
+
+- Favour message-passing (`tokio::sync::mpsc`) over shared mutability.
+- Keep `unsafe` blocks tiny; wrap them in safe abstractions with
+  doc-comment `// SAFETY:` explanations.
+
+# Generics & traits
+
+- Keep public generics bounded (`T: Read + Send + 'static`), avoid
+  unconstrained `impl Trait` in return positions for libraries.
+- Implement `From<T>`/`Into<T>` rather than ad-hoc converters.
+
+# Testing
+
+- Each module gets `#[cfg(test)] mod tests { use super::*; … }`.
+- Integration tests live in `tests/` and use only the public API.
+
+# Performance & build
+
+- Use `cargo check` in on-save hooks; enable `-Zthreads=N` on nightly
+  for large crates to shorten feedback loops.
+- Gate expensive features behind `cfg(feature = "heavy")`.
+
+# Documentation
+
+- Every public item has a triple-slash summary line, followed by
+  examples guarded by `rust`, `no_run` or `compile_fail`.
+- Rendered docs must pass `cargo doc --warnings`.
+
+# Workspaces & dependency hygiene
+
+- Use a root-level Cargo workspace to share one lockfile; commit it for
+  apps, decide per RFC c-lock for libs.
+- Keep third-party deps in the fewest indirect copies; audit with
+  `cargo deny`.
+
+# Unsafe code boundaries
+
+- Mark every `unsafe fn` with `#[forbid(unsafe_op_in_unsafe_fn)]`.
+- Document invariants and require proof obligations in comments.
+
+# EOF

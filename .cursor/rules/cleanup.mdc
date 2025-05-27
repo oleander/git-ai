@@ -1,0 +1,90 @@
+---
+description: Full repository cleanup for Rust projects. Recursively remove dead code, unused dependencies, outdated docs, and other cruft from a Cargo application safely, with minimal impact on public APIs. Uses automated tools and best practices to produce a single clean-up commit.
+globs:
+alwaysApply: false
+---
+
+# Rust Full Cleanup
+
+This rule performs a thorough **cleanup of a Rust Cargo repository**. It traverses the entire codebase (not just recent diffs) to detect and remove any unnecessary code, dependencies, or documentation. The goal is to eliminate dead weight and outdated content, making the project leaner and more maintainable without altering the public-facing API or breaking functionality. Specifically, it targets:
+
+- **Dead or unused code** – functions, structs, modules, or symbols that are never called.
+- **Unused dependencies** – crates listed in **Cargo.toml** that are not actually referenced in code.
+- **Outdated documentation** – content in `README.md`, `docs/` files, module comments, or rustdoc that no longer reflects the code.
+- **Obsolete tests or examples** – test cases or example code referring to removed or non-existent functionality.
+- **Legacy files or placeholders** – stray configuration files, stubs, or artifacts that no longer serve a purpose.
+- **General clutter** – anything that adds complexity without contributing to core functionality.
+
+## Tools and Approach
+
+To achieve this cleanup safely and effectively, the rule leverages several Rust tools and checks:
+
+- **cargo-udeps** – Use `cargo udeps` (cargo unused dependencies) to scan for dependencies that can be dropped. This will highlight any libraries in Cargo.toml that the project doesn’t actually use, so they can be removed.
+- **cargo clippy** – Run `cargo clippy` to catch common mistakes and lint issues. We use **Clippy** to detect dead code (with `#[warn(dead_code)]`) and other potential issues. Clippy’s lints will help identify unused functions or imports and improve overall code quality.
+- **cargo fix** – Apply `cargo fix` after reviewing warnings. **Cargo fix** will automatically remove unused imports and apply straightforward fixes for warnings. This helps eliminate trivial dead code (like unused variables or imports) in bulk.
+- **cargo deadlinks** – After building documentation (`cargo doc`), run `cargo deadlinks` to find broken links in docs. This flags references in documentation that point to removed code or missing pages, so we can update or remove them.
+- **cargo fmt** – Finally, run `cargo fmt` (Rustfmt) to format the code according to Rust’s style guide. This ensures the codebase remains well-formatted after the removals.
+- **Tests & Build** – Throughout the process, frequently run `cargo build` and `cargo test` to ensure that removals do not break anything. This double-checks that the code still compiles and all tests pass after cleaning up.
+
+Using these tools in combination provides a safety net: we detect unused items, remove them, clean up documentation, and verify everything still works. The process is iterative and careful, focusing on one category at a time.
+
+## Cleanup Procedure
+
+Following is the step-by-step procedure the rule will execute to perform the full cleanup:
+
+1. **Identify Unused Dependencies:** Start by finding unused dependencies in the project. Run `cargo +nightly udeps --all-targets` to get a report of dependencies not used in production or dev builds. For each dependency flagged as unused, remove it from **Cargo.toml** (and Cargo.lock). Double-check that it’s truly unused (consider conditional features or platform-specific usage). This will slim down the dependency list, reducing build bloat.
+
+2. **Remove Dead Code:** Next, locate dead code within the repository:
+
+   - Enable warnings for unused or dead code (ensure no `#![allow(dead_code)]` or similar is masking them).
+   - Run `cargo clippy` and `cargo check` to gather warnings about unused functions, methods, or modules. The Rust compiler itself will warn about unused private items by default (`dead_code` warnings).
+   - For each warning, verify that the item is not used anywhere in the repo (use an IDE “find references” or `grep` through the code to confirm). If confirmed unused, **delete the code** (functions, structs, impl blocks, etc.).
+   - Pay special attention to public (`pub`) items. **Do not remove public exports or public API** items unless you are certain they are truly unused by any consumer. (In a library crate, something can be “dead” internally but still part of the public API. _As a rule of thumb: you can't remove part of the public API except during major version bumps._)
+   - Remove any feature-flagged code that is tied to now-removed functionality or dependencies. For example, if an unused dependency was only used in a certain optional feature, consider removing that feature flag and related code if it’s now obsolete.
+   - Use `cargo fix` to automatically remove trivial unused items. For instance, **cargo fix will remove unused import statements** and other machine-fixable dead code for you. Run `cargo fix --allow-staged` or on a clean working tree to apply these fixes en masse, then review the changes.
+   - After removals, run `cargo build` to ensure nothing broken. Run `cargo clippy` again to see if more issues surface after the first round of deletions.
+
+3. **Update Documentation:** Once code and dependencies are cleaned up, address the documentation:
+
+   - Open **README.md** and any markdown files under `docs/`. Remove or update sections that describe features or modules that were removed. Outdated instructions or references to now-nonexistent code should be excised to prevent confusion.
+   - Search for API names in docs that might have been deleted. If examples in the README or docs refer to a function that no longer exists, remove those examples or replace them with relevant ones.
+   - Scan Rustdoc comments in the source (public item docstrings). If they mention behaviors or modules that have been eliminated, update those comments for accuracy.
+   - Run `cargo doc` to generate the documentation and then `cargo deadlinks` on the `target/doc` output. **Cargo-deadlinks will flag broken intra-doc links** (e.g. link to a struct or module that was removed). For each broken link, either update it to a valid reference or remove it if the item no longer exists. This ensures the documentation doesn’t contain dangling references.
+   - Also remove any inline documentation examples or tests (often in doc comments as `/// ```rust` blocks) that pertain to removed code.
+
+4. **Eliminate Obsolete Tests and Examples:** Now check the tests and examples directories:
+
+   - Remove or update **unit tests or integration tests** that were targeting code you deleted. If a test file entirely tests a now-removed module or feature, delete that test file. If parts of tests reference removed functions, those tests should be removed or refactored accordingly.
+   - Similarly, if the project has an `examples/` directory or example code in docs, eliminate any example code that no longer runs because the underlying functionality was removed.
+   - Run `cargo test` after this to confirm that all remaining tests pass and no tests are failing due to missing code.
+
+5. **Delete Legacy Files:** Look for any miscellaneous files that are no longer needed:
+
+   - Old migration or config files that are not used, placeholder files (e.g. empty module files, old feature flag toggles, deprecated scripts) – remove them to avoid confusion.
+   - If the repository has directories or modules that have been completely deprecated (e.g. an old `v1/` API that’s replaced by `v2/` but still lingering), consider removing those entirely, after confirming they are truly unsued.
+   - Check for files of other types (JSON, YAML, etc.) that might have been related to removed features (for instance, an unused CI config or a data file not referenced anymore) and remove them.
+
+6. **Final Polish (Format & Review):** After all removals:
+
+   - Run **cargo fmt** to format the codebase. This will tidy up any indentation or spacing affected by code removals, ensuring the project adheres to standard Rust style (rustfmt formats code according to the Rust style guide).
+   - Run **cargo clippy** one more time to catch any new lint issues introduced (for example, if removing code made a `use` statement unused, etc., though `cargo fmt`/`fix` likely handled those).
+   - Perform a full **build and test** run (`cargo build && cargo test`) to ensure the project is in a consistent, working state with all tests passing and no warnings.
+   - Double-check that no public-facing APIs or interfaces have been unintentionally changed. At this stage, only internal implementation details should have been removed. The external behavior and documented APIs should remain the same (unless the cleanup intentionally deprecated something with proper communication).
+
+7. **Single Commit Summary:** Finally, bundle all these changes into **one commit** (or a single cohesive patch). Compose a clear commit message that summarizes the cleanup actions and rationale. For example:
+
+   ```
+   chore: remove unused code, deps, and outdated docs
+
+   - Removed unused functions `foo_bar` and `unused_helper` (dead code not referenced anywhere in the project).
+   - Dropped unused dependency "xyz" from Cargo.toml (no references in code) to slim down build.
+   - Cleaned up README and docs: removed sections referring to the old ABC module that was deleted.
+   - Deleted obsolete test `old_feature_test.rs` and example `legacy_demo.rs` which targeted removed code.
+   - Removed legacy config files `old_config.yml` and placeholder module `unused_mod.rs`.
+
+   All changes are internal and do not affect the public API. Project builds and tests pass.
+   ```
+
+   Use an **imperative tone** in the commit subject (e.g. “Remove unused X…”). Be specific about what was removed and why (e.g. “dead code”, “unused dependency”). This commit acts as a record for future developers, explaining the cleanup. Ensure all modifications from the above steps are included before committing.
+
+By following this rule, Cursor will systematically clean the Rust project of clutter. The repository’s maintainability improves as we delete dead code (improving readability and reducing confusion), remove unused crates (reducing compile times and potential attack surface), and keep documentation in sync with reality. The cleanup is done **safely**: no public interfaces are touched without deliberate decision, and tests/compilation guard against accidental breakage. The end result is a single comprehensive commit that makes the codebase leaner and easier to work with, without altering its external behavior or API. All changes are confined to removing unneeded elements, thereby simplifying the project in a responsible way.
