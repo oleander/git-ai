@@ -118,6 +118,10 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: cargo publish --allow-dirty
 
+      - name: Test publish to crates.io (dry run)
+        if: github.ref != 'refs/heads/main'
+        run: cargo publish --dry-run --allow-dirty
+
       - name: Push to origin
         if: github.ref == 'refs/heads/main'
         run: git push origin HEAD --tags
