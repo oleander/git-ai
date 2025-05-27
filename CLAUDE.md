@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Git AI is a Rust-based CLI tool that seamlessly integrates with git hooks to automate commit message generation based on staged changes. It leverages OpenAI's API to analyze git diffs and create contextually relevant commit messages.
+Git AI is a Rust-based CLI tool that seamlessly integrates with git hooks to automate commit message generation based on staged changes. It leverages OpenAI's API to analyze git diffs and create contextually relevant commit messages. The tool uses a sophisticated multi-step analysis process to generate meaningful commit messages by analyzing individual files, calculating impact scores, and selecting the best message from multiple candidates.
 
 ## Development Commands
 
@@ -22,6 +22,9 @@ cargo install --path .
 
 # Install the git hook in the current repository
 git-ai hook install
+
+# Quick local installation for development with hook setup
+just local-install
 ```
 
 ### Configuration
@@ -67,6 +70,24 @@ cargo install cargo-binstall
 cargo binstall git-ai
 ```
 
+### Using the Justfile
+
+The project includes a Justfile with useful commands:
+
+```bash
+# Install locally with debug symbols and setup hooks
+just local-install
+
+# Run integration tests in Docker
+just integration-test
+
+# Build Docker image
+just docker-build
+
+# Run GitHub Actions locally
+just local-github-actions
+```
+
 ## Architecture
 
 The project is structured into several core components:
@@ -90,7 +111,9 @@ The project is structured into several core components:
 
 8. **Function Calling** (`src/function_calling.rs`): Implements OpenAI function calling for structured commit message generation with reasoning and file change summaries.
 
-9. **Profiling** (`src/profiling.rs`): Performance profiling utilities to measure execution time of various operations.
+9. **Multi-Step Analysis** (`src/multi_step_analysis.rs` and `src/multi_step_integration.rs`): Implements the sophisticated divide-and-conquer approach that analyzes files individually, calculates impact scores, and generates multiple commit message candidates.
+
+10. **Profiling** (`src/profiling.rs`): Performance profiling utilities to measure execution time of various operations.
 
 ## Key Workflows
 
@@ -105,12 +128,26 @@ The project is structured into several core components:
    - Sends the processed diff to OpenAI
    - Uses the AI response as the commit message
 
-3. **Performance Optimization**:
+3. **Multi-Step Analysis Process**:
+
+   - **Parse**: Splits the git diff into individual files
+   - **Analyze**: Examines each file for lines added/removed, file type, and change significance
+   - **Score**: Calculates impact scores based on operation type, file category, and lines changed
+   - **Generate**: Creates multiple commit message candidates
+   - **Select**: Chooses the best message based on highest impact
+
+4. **Performance Optimization**:
+
    - Parallel processing for large diffs
    - Token management to ensure API limits aren't exceeded
    - String pooling to reduce memory allocations
    - Smart truncation to prioritize more relevant parts of large diffs
    - Tiered token counting approaches based on text length for better performance
+
+5. **Intelligent Fallback Strategy**:
+   - First attempts multi-step analysis with API
+   - Falls back to local multi-step if API fails
+   - Falls back to single-step API as a last resort
 
 ## Testing
 
@@ -134,3 +171,18 @@ cargo test test_empty_diff
 ```
 
 Test files are located in the `tests/` directory and include utilities for creating test repositories and verifying diff operations.
+
+## Example Usage
+
+After installation and configuration:
+
+```bash
+# Make changes to your code
+# Stage changes
+git add .
+
+# Commit without a message - Git AI will generate one
+git commit --all --no-edit
+```
+
+The commit message will be automatically generated based on the staged changes.
