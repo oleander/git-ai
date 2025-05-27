@@ -116,21 +116,26 @@ jobs:
         run: git tag v${{ steps.app.outputs.version }}
 
       - name: Publish to crates.io
+        if: github.ref == 'refs/heads/main'
         run: cargo publish --allow-dirty
 
       - name: Push to origin
+        if: github.ref == 'refs/heads/main'
         run: git push origin HEAD --tags
 
       - name: Download all artifacts
+        if: github.ref == 'refs/heads/main'
         run: gh run download ${{ github.run_id }}
 
       - name: Zip each downloaded directory
+        if: github.ref == 'refs/heads/main'
         run: |
           for dir in $(ls -d git-ai-*); do
             tar -czf ${dir}.tar.gz ${dir}
           done
 
       - name: Uploads compressed artifacts
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.app.outputs.version }}
