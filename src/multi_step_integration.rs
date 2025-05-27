@@ -183,12 +183,13 @@ pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
   if log::log_enabled!(log::Level::Debug) && !diff_content.is_empty() {
     // Make sure we truncate at a valid UTF-8 character boundary
     let preview = if diff_content.len() > 500 {
-      let truncated_index = diff_content.char_indices()
+      let truncated_index = diff_content
+        .char_indices()
         .take_while(|(i, _)| *i < 500)
         .last()
         .map(|(i, c)| i + c.len_utf8())
         .unwrap_or(0);
-      
+
       format!("{}... (truncated)", &diff_content[..truncated_index])
     } else {
       diff_content.to_string()
@@ -352,12 +353,14 @@ pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
     for (i, file) in files.iter().enumerate() {
       let content_preview = if file.diff_content.len() > 200 {
         // Make sure we truncate at a valid UTF-8 character boundary
-        let truncated_index = file.diff_content.char_indices()
+        let truncated_index = file
+          .diff_content
+          .char_indices()
           .take_while(|(i, _)| *i < 200)
           .last()
           .map(|(i, c)| i + c.len_utf8())
           .unwrap_or(0);
-        
+
         format!("{}... (truncated)", &file.diff_content[..truncated_index])
       } else {
         file.diff_content.clone()
