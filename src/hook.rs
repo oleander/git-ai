@@ -16,7 +16,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use structopt::StructOpt;
 use git2::{Diff, DiffFormat, DiffOptions, Repository, Tree};
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use thiserror::Error;
 use rayon::prelude::*;
 use num_cpus;
