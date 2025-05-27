@@ -42,12 +42,11 @@
 // Args { commit_msg_file: PathBuf::from(".git/COMMIT_EDITMSG"), source: Some(Source::Commit), sha1: Some("HEAD") }
 // Outcome: Opens the default text editor to allow modification of the most recent commit message. No new commit message is generated automatically; it depends on user input.
 use std::process::exit;
-use std::str::FromStr;
 use std::time::Duration;
 use std::path::PathBuf;
 
 use colored::Colorize;
-use structopt::StructOpt;
+use clap::{Parser, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 use anyhow::{bail, Context, Result};
 use git2::{Oid, Repository};
@@ -55,7 +54,7 @@ use ai::{commit, config, debug_output};
 use ai::hook::*;
 use ai::model::Model;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, ValueEnum)]
 enum Source {
   Message,
   Template,
@@ -64,28 +63,17 @@ enum Source {
   Commit
 }
 
-impl FromStr for Source {
-  type Err = anyhow::Error;
-
-  fn from_str(s: &str) -> Result<Self> {
-    match s {
-      "message" => Ok(Source::Message),
-      "template" => Ok(Source::Template),
-      "merge" => Ok(Source::Merge),
-      "squash" => Ok(Source::Squash),
-      "commit" => Ok(Source::Commit),
-      other => bail!("{:?} is not a valid source", other)
-    }
-  }
-}
-
-#[derive(StructOpt, Debug)]
-#[structopt(name = "commit-msg-hook")]
+#[derive(Parser, Debug)]
+#[command(name = "commit-msg-hook", about = "A tool for generating commit messages.")]
 struct Args {
-  #[structopt(parse(from_os_str))]
+  #[arg(value_name = "COMMIT_MSG_FILE")]
   commit_msg_file: PathBuf,
-  source:          Option<Source>,
-  sha1:            Option<String>
+
+  #[arg(short = 't', long = "type", value_name = "SOURCE")]
+  source: Option<Source>,
+
+  #[arg(short = 's', long = "sha1", value_name = "SHA1")]
+  sha1: Option<String>
 }
 
 impl Args {
@@ -221,7 +209,7 @@ async fn main() -> Result<()> {
   }
 
   let time = std::time::Instant::now();
-  let args = Args::from_args();
+  let args = Args::parse();
 
   // Initialize debug session if in debug mode
   if log::log_enabled!(log::Level::Debug) {

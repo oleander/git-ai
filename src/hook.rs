@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use rayon::prelude::*;
-use structopt::StructOpt;
+use clap::Parser;
 use git2::{Diff, DiffFormat, DiffOptions, Repository, Tree};
 use anyhow::{Context, Result};
 use thiserror::Error;
@@ -45,15 +45,16 @@ pub enum HookError {
 }
 
 // CLI Arguments
-#[derive(StructOpt, Debug)]
-#[structopt(name = "commit-msg-hook", about = "A tool for generating commit messages.")]
+#[derive(Parser, Debug)]
+#[command(name = "commit-msg-hook", about = "A tool for generating commit messages.")]
 pub struct Args {
+  #[arg(value_name = "COMMIT_MSG_FILE")]
   pub commit_msg_file: PathBuf,
 
-  #[structopt(short = "t", long = "type")]
+  #[arg(short = 't', long = "type", value_name = "TYPE")]
   pub commit_type: Option<String>,
 
-  #[structopt(short = "s", long = "sha1")]
+  #[arg(short = 's', long = "sha1", value_name = "SHA1")]
   pub sha1: Option<String>
 }
 
