@@ -57,10 +57,29 @@ jobs:
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev
+          sudo apt-get install -y pkg-config libssl-dev musl-dev
+          # Install musl-compatible OpenSSL
+          wget https://github.com/openssl/openssl/releases/download/openssl-3.3.2/openssl-3.3.2.tar.gz
+          tar -xzf openssl-3.3.2.tar.gz
+          cd openssl-3.3.2
+          CC=musl-gcc ./Configure no-shared no-async --prefix=/usr/local/musl --openssldir=/usr/local/musl/ssl linux-x86_64
+          make -j$(nproc)
+          sudo make install
+          cd ..
+          rm -rf openssl-3.3.2*
 
       - name: Build for target
         run: |
+          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-musl" ]; then
+            export OPENSSL_STATIC=1
+            export OPENSSL_DIR=/usr/local/musl
+            export OPENSSL_INCLUDE_DIR=/usr/local/musl/include
+            export OPENSSL_LIB_DIR=/usr/local/musl/lib
+            export PKG_CONFIG_ALLOW_CROSS=1
+            export PKG_CONFIG_ALL_STATIC=1
+            export CC_x86_64_unknown_linux_musl=musl-gcc
+            export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc
+          fi
           cargo build \
             -Z unstable-options \
             --profile dev \
