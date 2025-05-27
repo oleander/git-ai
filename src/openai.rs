@@ -139,25 +139,50 @@ fn truncate_to_fit(text: &str, max_tokens: usize, model: &Model) -> Result<Strin
     return Ok(text.to_string());
   }
 
+  // Collect character indices to ensure we slice at valid UTF-8 boundaries
+  let char_indices: Vec<(usize, char)> = text.char_indices().collect();
+  if char_indices.is_empty() {
+    return Ok(String::new());
+  }
+
   // Binary search for the right truncation point
   let mut low = 0;
-  let mut high = text.len();
+  let mut high = char_indices.len();
   let mut best_fit = String::new();
 
   while low < high {
     let mid = (low + high) / 2;
-    let truncated = &text[..mid];
+
+    // Get the byte index for this character position
+    let byte_index = if mid < char_indices.len() {
+      char_indices[mid].0
+    } else {
+      text.len()
+    };
+
+    let truncated = &text[..byte_index];
 
     // Find the last complete line
-    if let Some(last_newline) = truncated.rfind('\n') {
-      let candidate = &text[..last_newline];
+    if let Some(last_newline_pos) = truncated.rfind('\n') {
+      // Ensure we're at a valid UTF-8 boundary for the newline position
+      let candidate = &text[..last_newline_pos];
       let candidate_tokens = model.count_tokens(candidate)?;
 
       if candidate_tokens <= max_tokens {
         best_fit = candidate.to_string();
-        low = last_newline + 1;
+        // Find the character index after the newline
+        let next_char_idx = char_indices
+          .iter()
+          .position(|(idx, _)| *idx > last_newline_pos)
+          .unwrap_or(char_indices.len());
+        low = next_char_idx;
       } else {
-        high = last_newline;
+        // Find the character index of the newline
+        let newline_char_idx = char_indices
+          .iter()
+          .rposition(|(idx, _)| *idx <= last_newline_pos)
+          .unwrap_or(0);
+        high = newline_char_idx;
       }
     } else {
       high = mid;
