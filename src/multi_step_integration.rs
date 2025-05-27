@@ -89,6 +89,11 @@ pub async fn generate_commit_message_multi_step(
         file_analyses.push((file, analysis));
       }
       Err(e) => {
+        // Check if it's an API key error - if so, propagate it immediately
+        let error_str = e.to_string();
+        if error_str.contains("invalid_api_key") || error_str.contains("Incorrect API key") || error_str.contains("Invalid API key") {
+          return Err(e);
+        }
         log::warn!("Failed to analyze file {}: {}", file.path, e);
         // Continue with other files even if one fails
       }
