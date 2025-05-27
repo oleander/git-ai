@@ -44,32 +44,60 @@ git commit --all --no-edit
 Git AI uses a sophisticated multi-step analysis process:
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│ Git Commit  │────▶│ Parse Diff  │────▶│   Analyze   │────▶│  Generate   │
-│  (no msg)   │     │   Files     │     │   Files     │     │  Message    │
-└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
-                           │                    │                    │
-                           ▼                    ▼                    ▼
-                    ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-                    │ auth.rs     │     │ Score: 0.95 │     │ Best Match: │
-                    │ test.rs     │     │ Score: 0.65 │     │ "Add JWT    │
-                    │ main.rs     │     │ Score: 0.62 │     │  auth"      │
-                    └─────────────┘     └─────────────┘     └─────────────┘
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│ Git Commit  │────▶│ Parse Diff  │────▶│  Analyze    │────▶│   Score     │────▶│  Generate   │
+│  (no msg)   │     │   Files     │     │   Files     │     │   Files     │     │  Messages   │
+└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
+                           │                    │                    │                    │
+                           ▼                    ▼                    ▼                    ▼
+                    ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+                    │ auth.rs     │     │ Lines: +50  │     │ Score: 0.95 │     │ Candidates: │
+                    │ test.rs     │     │ Lines: -10  │     │ Score: 0.65 │     │ 1. "Add JWT"│
+                    │ main.rs     │     │ Category:   │     │ Score: 0.62 │     │ 2. "auth:   │
+                    └─────────────┘     │   source    │     └─────────────┘     │    impl"    │
+                                       └─────────────┘                           └─────────────┘
+                                                                                         │
+                                                                                         ▼
+                                                                                 ┌─────────────┐
+                                                                                 │   Select    │
+                                                                                 │    Best     │
+                                                                                 │  Message    │
+                                                                                 └─────────────┘
 ```
 
 ### Multi-Step Process
 
 1. **Parse** - Splits the git diff into individual files
-2. **Analyze** - Examines each file for:
-   - Lines added/removed
-   - File type (source, test, config, docs)
-   - Change significance
+
+   - Handles different diff formats (standard, commit with hash, raw output)
+   - Extracts file paths, operation types, and diff content
+   - Supports added, modified, deleted, renamed, and binary files
+
+2. **Analyze** - Examines each file in parallel for:
+
+   - Lines added/removed (counts actual +/- lines)
+   - File type categorization (source, test, config, docs, binary, build)
+   - Change significance and summary generation
+   - Uses OpenAI function calling for structured analysis
+
 3. **Score** - Calculates impact scores based on:
-   - Operation type (add: 0.3, modify: 0.2, delete: 0.25)
-   - File category (source: 1.0, test: 0.6, config: 0.8)
-   - Lines changed (normalized)
+
+   - Operation type weights (add: 0.3, modify: 0.2, delete: 0.25, rename: 0.1, binary: 0.05)
+   - File category weights (source: 0.4, test: 0.2, config: 0.25, build: 0.3, docs: 0.1, binary: 0.05)
+   - Lines changed (normalized up to 0.3)
+   - Total score capped at 1.0
+
 4. **Generate** - Creates multiple commit message candidates
-5. **Select** - Chooses the best message based on highest impact
+
+   - Action-focused style (e.g., "Add authentication")
+   - Component-focused style (e.g., "auth: implementation")
+   - Impact-focused style (e.g., "New feature for authentication")
+   - Respects max length constraints
+
+5. **Select** - Chooses the best message based on:
+   - Highest impact files
+   - Overall change context
+   - Conventional commit format when appropriate
 
 ### Intelligent Fallback Strategy
 
@@ -87,7 +115,13 @@ Git AI uses a sophisticated multi-step analysis process:
          └─────────────────────────────────────────┴──────────────────┘
 ```
 
-Git AI automatically falls back to local analysis when the API is unavailable, ensuring you always get meaningful commit messages.
+Git AI automatically falls back through multiple strategies:
+
+1. **Multi-Step with API** - Full analysis using OpenAI's function calling
+2. **Local Multi-Step** - Local analysis without API (when API is unavailable)
+3. **Single-Step API** - Direct prompt-based generation as final fallback
+
+This ensures you always get meaningful commit messages, even when the API is unavailable.
 
 ## 🌟 Key Features
 
