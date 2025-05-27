@@ -452,7 +452,7 @@ fn process_chunk(
   }
 
   // Fast path for no tokens remaining
-  let total_remaining = remaining_tokens.load(Ordering::Relaxed);
+  let total_remaining = remaining_tokens.load(Ordering::Acquire);
   if total_remaining == 0 {
     return Ok(());
   }
@@ -464,7 +464,7 @@ fn process_chunk(
     if total_token_count <= total_remaining {
       // Try to allocate all tokens at once
       if remaining_tokens
-        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
           if current >= total_token_count {
             Some(current - total_token_count)
           } else {
@@ -474,7 +474,7 @@ fn process_chunk(
         .is_ok()
       {
         // Update processed files counter once
-        processed_files.fetch_add(chunk.len(), Ordering::Relaxed);
+        processed_files.fetch_add(chunk.len(), Ordering::AcqRel);
 
         // Collect all results without truncation
         let chunk_results: Vec<_> = chunk
@@ -499,7 +499,7 @@ fn process_chunk(
     local_processed += 1;
 
     // Recheck remaining tokens to allow early exit
-    let current_remaining = remaining_tokens.load(Ordering::Relaxed);
+    let current_remaining = remaining_tokens.load(Ordering::Acquire);
     if current_remaining == 0 {
       break;
     }
@@ -511,7 +511,7 @@ fn process_chunk(
     if token_count <= 100
       && token_count <= current_remaining
       && remaining_tokens
-        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
           if current >= token_count {
             Some(current - token_count)
           } else {
@@ -526,7 +526,7 @@ fn process_chunk(
 
     // For larger content, do the normal allocation
     // Batch update processed files counter - just once at the end
-    let current_file_num = processed_files.load(Ordering::Relaxed);
+    let current_file_num = processed_files.load(Ordering::Acquire);
     let files_remaining = total_files.saturating_sub(current_file_num + local_processed);
 
     // Calculate tokens per file
@@ -543,7 +543,7 @@ fn process_chunk(
     let allocated_tokens = token_count.min(max_tokens_per_file);
 
     if remaining_tokens
-      .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+      .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
         if current >= allocated_tokens {
           Some(current - allocated_tokens)
         } else {
@@ -573,7 +573,7 @@ fn process_chunk(
 
   // Update processed files counter once at the end
   if local_processed > 0 {
-    processed_files.fetch_add(local_processed, Ordering::Relaxed);
+    processed_files.fetch_add(local_processed, Ordering::AcqRel);
   }
 
   // Batch update the result collection
