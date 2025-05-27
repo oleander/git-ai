@@ -70,7 +70,6 @@ struct Model {
 #[structopt(name = "git-ai")]
 pub struct Args {
   #[structopt(subcommand)]
-  #[allow(dead_code)]
   cmd: Command
 }
 

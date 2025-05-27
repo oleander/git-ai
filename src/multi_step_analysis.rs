@@ -239,7 +239,11 @@ pub fn calculate_impact_scores(files_data: Vec<FileDataForScoring>) -> ScoreResu
   }
 
   // Sort by impact score descending
-  files_with_scores.sort_by(|a, b| b.impact_score.partial_cmp(&a.impact_score).unwrap());
+  files_with_scores.sort_by(|a, b| {
+    b.impact_score
+      .partial_cmp(&a.impact_score)
+      .unwrap_or(std::cmp::Ordering::Equal)
+  });
 
   ScoreResult { files_with_scores }
 }
@@ -468,10 +472,10 @@ fn generate_reasoning(files_with_scores: &[FileWithScore]) -> String {
       .file_category
       .chars()
       .next()
-      .unwrap()
+      .unwrap_or('u')
       .to_uppercase()
       .collect::<String>()
-      + &primary.file_category[1..],
+      + &primary.file_category.get(1..).unwrap_or(""),
     primary.impact_score,
     extract_component_name(&primary.file_path),
     total_files,

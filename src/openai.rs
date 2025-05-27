@@ -82,7 +82,10 @@ pub async fn generate_commit_message(diff: &str) -> Result<String> {
   // Generate a simple commit message based on the diff
   let message = match files_mentioned.len().cmp(&1) {
     std::cmp::Ordering::Equal => {
-      let file = files_mentioned.iter().next().unwrap();
+      let file = files_mentioned
+        .iter()
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("No files mentioned in commit message"))?;
       if lines_added > 0 && lines_removed == 0 {
         format!(
           "Add {} to {}",
@@ -286,7 +289,10 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
           if !commit_messages.is_empty() {
             // For now, return the first message. You could also combine them if needed
             return Ok(Response {
-              response: commit_messages.into_iter().next().unwrap()
+              response: commit_messages
+                .into_iter()
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("No commit messages generated"))?
             });
           }
         }
