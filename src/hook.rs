@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Performance-optimized diff processing with reduced thread contention.
 //!
 //! Key optimizations:
