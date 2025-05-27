@@ -40,7 +40,7 @@ path = "examples/parallel_tool_calls_demo.rs"
 # Core functionality
 anyhow = { version = "1.0.98", features = ["backtrace"] }
 thiserror = "2.0.12"
-tokio = { version = "1.45", features = ["full"] }
+tokio = { version = "1.45.1", features = ["full"] }
 futures = "0.3"
 parking_lot = "0.12.3"
 tracing = "0.1"
@@ -82,6 +82,12 @@ textwrap = "0.16"
 structopt = "0.3.26"
 mustache = "0.9.0"
 maplit = "1.0.2"
+
+[target.'cfg(target_env = "musl")'.dependencies]
+openssl = { version = "0.10", features = ["vendored"] }
+
+[features]
+default = []
 
 [dev-dependencies]
 tempfile = "3.20.0"
