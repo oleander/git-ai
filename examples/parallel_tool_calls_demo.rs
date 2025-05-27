@@ -9,7 +9,7 @@ async fn main() -> Result<()> {
   println!("========================");
 
   // Create mock tools for demonstration
-  let tool1 = ChatCompletionTool {
+  let _tool1 = ChatCompletionTool {
     r#type:   ChatCompletionToolType::Function,
     function: FunctionObject {
       name:        "get_weather".to_string(),
@@ -28,7 +28,7 @@ async fn main() -> Result<()> {
     }
   };
 
-  let tool2 = ChatCompletionTool {
+  let _tool2 = ChatCompletionTool {
     r#type:   ChatCompletionToolType::Function,
     function: FunctionObject {
       name:        "get_time".to_string(),

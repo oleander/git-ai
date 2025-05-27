@@ -41,11 +41,17 @@ fn test_parse_commit_function_response() {
       "files": {
           "src/ai.rs": {
               "type": "added",
-              "summary": "New AI module for generating commit messages"
+              "summary": "New AI module for generating commit messages",
+              "lines_changed": 120,
+              "impact_score": 0.9,
+              "file_category": "source"
           },
           "src/main.rs": {
               "type": "modified",
-              "summary": "Integrated AI module into main application"
+              "summary": "Integrated AI module into main application",
+              "lines_changed": 15,
+              "impact_score": 0.7,
+              "file_category": "source"
           }
       }
   });
