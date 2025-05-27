@@ -57,29 +57,14 @@ impl Model {
       return Ok(0);
     }
 
-    // Very fast path for short text - estimate token count heuristically
-    // Each token is roughly 4 characters in English text
-    if text.len() < 200 {
-      let estimated = (text.len() / 4).max(1);
-      return Ok(estimated);
-    }
-
-    // Medium path for medium text - use faster heuristic
-    if text.len() < 2000 {
-      // Count spaces and punctuation as a rough estimate
-      let spaces = text.chars().filter(|c| c.is_whitespace()).count();
-      let punctuation = text.chars().filter(|c| c.is_ascii_punctuation()).count();
-      let estimated = spaces + punctuation + (text.len() / 8);
-      return Ok(estimated);
-    }
-
-    // Fast path for long text - use cached tokenizer directly for better performance
+    // Always use the proper tokenizer for accurate counts
+    // We cannot afford to underestimate tokens as it may cause API failures
     let tokenizer = TOKENIZER.get_or_init(|| {
       let model_str: &str = self.into();
       get_tokenizer(model_str)
     });
 
-    // Use direct tokenization instead of get_completion_max_tokens which has overhead
+    // Use direct tokenization for accurate token count
     let tokens = tokenizer.encode_ordinary(text);
     Ok(tokens.len())
   }
@@ -121,47 +106,64 @@ impl Model {
     profile!("Walk truncate iteration");
     log::debug!("max_tokens: {max_tokens}, within: {within}");
 
-    // Ultra-fast path: if text is small or max_tokens is large, just return the text
-    if text.len() < 1000 || max_tokens > 1000 {
+    // Check if text already fits within token limit
+    let current_tokens = self.count_tokens(text)?;
+    if current_tokens <= max_tokens {
       return Ok(text.to_string());
     }
 
-    // Fast approximate truncation based on character count instead of tokens
-    // Assuming ~4 chars per token for English text
-    let char_limit = max_tokens * 4;
+    // Binary search approach to find the right truncation point
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let mut left = 0;
+    let mut right = words.len();
+    let mut best_fit = String::new();
+    let mut best_tokens = 0;
 
-    // If text is much longer than our limit, do a quick pre-truncation
-    if text.len() > char_limit * 2 {
-      // Get an iterator over characters limited to our target
-      let truncated_chars: String = text.chars().take(char_limit).collect();
+    // Perform binary search to find optimal word count
+    while left < right {
+      let mid = (left + right + 1) / 2;
+      let candidate = words[..mid].join(" ");
+      let tokens = self.count_tokens(&candidate)?;
 
-      // Find the last space to avoid cutting words
-      let last_space = truncated_chars
-        .rfind(char::is_whitespace)
-        .unwrap_or(truncated_chars.len());
-
-      if last_space > 0 {
-        return Ok(truncated_chars[..last_space].to_string());
+      if tokens <= max_tokens {
+        // This fits, try to find a longer text that still fits
+        best_fit = candidate;
+        best_tokens = tokens;
+        left = mid;
+      } else {
+        // Too many tokens, try shorter text
+        right = mid - 1;
       }
-      return Ok(truncated_chars);
+
+      // If we're close enough to the target, we can stop
+      if best_tokens > 0 && max_tokens.saturating_sub(best_tokens) <= within {
+        break;
+      }
     }
 
-    // For text closer to our target size, use a single-pass approach
-    profile!("Split and join text");
-    let words: Vec<&str> = text.split_whitespace().collect();
+    // If we couldn't find any fitting text, truncate more aggressively
+    if best_fit.is_empty() && !words.is_empty() {
+      // Try with just one word
+      best_fit = words[0].to_string();
+      let tokens = self.count_tokens(&best_fit)?;
 
-    // Estimate the truncation point based on characters
-    let estimated_words = (max_tokens * 2).min(words.len());
+      // If even one word is too long, truncate at character level
+      if tokens > max_tokens {
+        // Estimate character limit based on token limit
+        // Conservative estimate: ~3 chars per token
+        let char_limit = max_tokens * 3;
+        best_fit = text.chars().take(char_limit).collect();
 
-    // Join the first N words
-    Ok(
-      words
-        .iter()
-        .take(estimated_words)
-        .cloned()
-        .collect::<Vec<&str>>()
-        .join(" ")
-    )
+        // Ensure we don't exceed token limit
+        while self.count_tokens(&best_fit)? > max_tokens && !best_fit.is_empty() {
+          // Remove last 10% of characters
+          let new_len = (best_fit.len() * 9) / 10;
+          best_fit = best_fit.chars().take(new_len).collect();
+        }
+      }
+    }
+
+    Ok(best_fit)
   }
 }
 
