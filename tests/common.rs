@@ -87,7 +87,7 @@ impl GitFile {
         if e.code() == git2::ErrorCode::UnbornBranch || e.code() == git2::ErrorCode::NotFound {
           return Err(e);
         } else {
-          panic!("Failed to retrieve HEAD: {}", e);
+          panic!("Failed to retrieve HEAD: {e}");
         },
     };
 

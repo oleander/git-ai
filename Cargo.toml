@@ -1,6 +1,6 @@
 [package]
 name = "git-ai"
-version = "0.2.66"
+version = "1.0.0"
 edition = "2021"
 description = "Git AI: Automates commit messages using ChatGPT. Stage your files, and Git AI generates the messages."
 license = "MIT"
@@ -24,11 +24,23 @@ path = "src/main.rs"
 name = "git-ai-hook"
 path = "src/bin/hook.rs"
 
+[[example]]
+name = "function_calling_demo"
+path = "examples/function_calling_demo.rs"
+
+[[example]]
+name = "multi_step_commit"
+path = "examples/multi_step_commit.rs"
+
+[[example]]
+name = "parallel_tool_calls_demo"
+path = "examples/parallel_tool_calls_demo.rs"
+
 [dependencies]
 # Core functionality
-anyhow = { version = "1.0.95", features = ["backtrace"] }
-thiserror = "2.0.11"
-tokio = { version = "1.43", features = ["full"] }
+anyhow = { version = "1.0.98", features = ["backtrace"] }
+thiserror = "2.0.12"
+tokio = { version = "1.45", features = ["full"] }
 futures = "0.3"
 parking_lot = "0.12.3"
 tracing = "0.1"
@@ -36,50 +48,43 @@ tracing = "0.1"
 # CLI and UI
 
 colored = "3.0.0"
-console = { version = "0.15.10", default-features = false }
+console = { version = "0.15.11", default-features = false }
 indicatif = { version = "0.17.11", default-features = false }
-log = "0.4.25"
-env_logger = { version = "0.11.6", default-features = false }
+log = "0.4.27"
+env_logger = { version = "0.11.8", default-features = false }
 
 # Git integration
-git2 = { version = "0.20.0", default-features = false }
+git2 = { version = "0.20.2", default-features = false }
 
 # Configuration
-config = { version = "0.15.7", default-features = false, features = ["ini"] }
+config = { version = "0.15.11", default-features = false, features = ["ini"] }
 dotenv = "0.15.0"
 serde = { version = "1.0", features = ["derive"] }
-serde_derive = "1.0.217"
+serde_derive = "1.0.219"
 serde_ini = "0.2.0"
 serde_json = "1.0"
 
 # OpenAI integration
-async-openai = { version = "0.27.2", default-features = false }
-tiktoken-rs = "0.6.0"
-reqwest = { version = "0.12.12", default-features = true }
+async-openai = { version = "0.28.1", default-features = false }
+tiktoken-rs = "0.7.0"
+reqwest = { version = "0.12.15", default-features = true }
 
 # System utilities
-openssl-sys = { version = "0.9.105", features = ["vendored"] }
 rayon = "1.10.0"
 num_cpus = "1.16.0"
 rand = "0.9"
-ctrlc = "3.4.5"
 lazy_static = "1.5.0"
 home = "0.5.11"
 dirs = "6.0"
 
 # Syntax highlighting and markdown rendering
-syntect = { version = "5.2", default-features = false, features = [
-"default-fancy",
-] }
-pulldown-cmark = "0.12"
-comrak = "0.35"
 textwrap = "0.16"
 structopt = "0.3.26"
 mustache = "0.9.0"
 maplit = "1.0.2"
 
 [dev-dependencies]
-tempfile = "3.16.0"
+tempfile = "3.20.0"
 
 [profile.release]
 codegen-units = 1

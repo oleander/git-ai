@@ -66,41 +66,6 @@ struct Model {
   value: String
 }
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "git-ai")]
-pub struct Args {
-  #[structopt(subcommand)]
-  #[allow(dead_code)]
-  cmd: Command
-}
-
-#[derive(Debug, StructOpt)]
-pub enum Command {
-  #[structopt(name = "optimize")]
-  Optimize {
-    #[structopt(long, default_value = "resources/prompt.md")]
-    prompt_file: String,
-
-    #[structopt(long, default_value = "stats.json")]
-    stats_file: String,
-
-    #[structopt(long, default_value = "tmp")]
-    temp_dir: String,
-
-    #[structopt(long, default_value = "100")]
-    iterations: u32,
-
-    #[structopt(long, default_value = "0.8")]
-    threshold: f32,
-
-    #[structopt(long, default_value = "ai")]
-    scoring_mode: String,
-
-    #[structopt(long)]
-    verbose: bool
-  }
-}
-
 // Hook installation functions
 fn run_install() -> Result<()> {
   let fs = Filesystem::new()?;
@@ -112,7 +77,7 @@ fn run_install() -> Result<()> {
   }
 
   hook_file.symlink(&hook_bin)?;
-  println!("🔗 Hook symlinked successfully to \x1B[3m{}\x1B[0m", hook_file);
+  println!("🔗 Hook symlinked successfully to \x1B[3m{hook_file}\x1B[0m");
 
   Ok(())
 }
@@ -123,9 +88,9 @@ fn run_uninstall() -> Result<()> {
 
   if hook_file.exists() {
     hook_file.delete()?;
-    println!("🗑️  Hook uninstalled successfully from \x1B[3m{}\x1B[0m", hook_file);
+    println!("🗑️  Hook uninstalled successfully from \x1B[3m{hook_file}\x1B[0m");
   } else {
-    println!("⚠️  No hook found at \x1B[3m{}\x1B[0m", hook_file);
+    println!("⚠️  No hook found at \x1B[3m{hook_file}\x1B[0m");
   }
 
   Ok(())
@@ -156,21 +121,21 @@ fn run_config_reset() -> Result<()> {
 fn run_config_model(value: String) -> Result<()> {
   let mut app = App::new()?;
   app.update_model(value.clone())?;
-  println!("✅ Model set to: {}", value);
+  println!("✅ Model set to: {value}");
   Ok(())
 }
 
 fn run_config_max_tokens(max_tokens: usize) -> Result<()> {
   let mut app = App::new()?;
   app.update_max_tokens(max_tokens)?;
-  println!("✅ Max tokens set to: {}", max_tokens);
+  println!("✅ Max tokens set to: {max_tokens}");
   Ok(())
 }
 
 fn run_config_max_commit_length(max_commit_length: usize) -> Result<()> {
   let mut app = App::new()?;
   app.update_max_commit_length(max_commit_length)?;
-  println!("✅ Max commit length set to: {}", max_commit_length);
+  println!("✅ Max commit length set to: {max_commit_length}");
   Ok(())
 }
 
@@ -183,7 +148,18 @@ fn run_config_openai_api_key(value: String) -> Result<()> {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
+  // Load environment variables from .env file if present
   dotenv().ok();
+
+  // Initialize logging with debug level in debug builds
+  #[cfg(debug_assertions)]
+  {
+    if std::env::var("RUST_LOG").is_err() {
+      std::env::set_var("RUST_LOG", "debug");
+    }
+    env_logger::init();
+    println!("Debug build: Performance profiling enabled");
+  }
 
   let args = Cli::from_args();
 

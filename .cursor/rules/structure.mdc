@@ -1,0 +1,37 @@
+---
+description: Enforce a nested module file structure in Rust crates.  Split each   underscored filename into directory-based modules, adjust imports and   declarations, verify builds, and uphold the Law of Demeter by keeping   modules cohesive and low-coupled.  Warn on future violations.
+globs:
+alwaysApply: false
+---
+
+- modular structure
+  Move any `*_*.rs` file to a nested path cut at the first underscore.
+  `animal_dog.rs` → `animal/dog.rs`. Keep suffixes like `_test.rs`
+  (`foo_bar_test.rs` → `foo/bar_test.rs`). Multiple underscores add
+  levels: `one_two_three.rs` → `one/two/three.rs`.
+
+- update imports and mods
+  After moving, rewrite every `mod`, `use`, and `#[path]`. Create
+  parent files with the 2018+ style (`foo.rs` holding `pub mod bar;`)
+  instead of `foo/mod.rs`.
+
+- law of demeter / cohesion
+  Search for deep paths (`crate::x::y::z::…`). For each:
+
+  - move the item nearer its callers, or
+  - add a local façade (`pub use`) to shorten the path.
+    Goal: most `use` lines have ≤ 2 segments. Run
+    `cargo clippy -W needless_qualified_path -W module_inception` and fix
+    remaining warnings. If two modules cross-import heavily, merge them
+    under a common parent folder.
+
+- build guardrails
+  Execute `cargo check` and `cargo test` before and after the refactor;
+  stop or prompt if either fails. Clippy must pass with `-D warnings`.
+
+- ignore generated files
+  Skip everything in `target/` or paths matched by `.gitignore`.
+
+- enforce convention
+  Flag any new `.rs` file containing an underscore (except `_test.rs`);
+  advise creating a folder plus file instead.

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 use std::os::unix::fs::symlink as symlink_unix;
@@ -47,8 +45,8 @@ impl File {
   /// # Returns
   /// * `Result<()>` - Success or an error if deletion fails
   pub fn delete(&self) -> Result<()> {
-    log::debug!("Removing file at {}", self);
-    fs::remove_file(&self.path).with_context(|| format!("Failed to remove file at {}", self))
+    log::debug!("Removing file at {self}");
+    fs::remove_file(&self.path).with_context(|| format!("Failed to remove file at {self}"))
   }
 
   /// Creates a symbolic link to the target file.
@@ -59,8 +57,8 @@ impl File {
   /// # Returns
   /// * `Result<()>` - Success or an error if link creation fails
   pub fn symlink(&self, target: &File) -> Result<()> {
-    log::debug!("Symlinking {} to {}", target, self);
-    symlink_unix(&target.path, &self.path).with_context(|| format!("Failed to symlink {} to {}", target, self))
+    log::debug!("Symlinking {target} to {self}");
+    symlink_unix(&target.path, &self.path).with_context(|| format!("Failed to symlink {target} to {self}"))
   }
 
   /// Gets the relative path from the current directory.
@@ -134,8 +132,8 @@ impl Dir {
   /// # Returns
   /// * `Result<()>` - Success or an error if creation fails
   pub fn create_dir_all(&self) -> Result<()> {
-    log::debug!("Creating directory at {}", self);
-    fs::create_dir_all(&self.path).with_context(|| format!("Failed to create directory at {}", self))
+    log::debug!("Creating directory at {self}");
+    fs::create_dir_all(&self.path).with_context(|| format!("Failed to create directory at {self}"))
   }
 
   /// Gets the relative path from the current directory.
@@ -216,14 +214,6 @@ impl Filesystem {
   /// * `Result<File>` - The hook binary path or an error
   pub fn git_ai_hook_bin_path(&self) -> Result<File> {
     Ok(File::new(self.git_ai_hook_bin_path.clone()))
-  }
-
-  /// Gets the path to the git hooks directory.
-  ///
-  /// # Returns
-  /// * `Dir` - The hooks directory path
-  pub fn git_hooks_path(&self) -> Dir {
-    Dir::new(self.git_hooks_path.clone())
   }
 
   /// Gets the path to the prepare-commit-msg hook.
