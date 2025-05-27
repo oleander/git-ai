@@ -40,7 +40,7 @@ path = "examples/parallel_tool_calls_demo.rs"
 # Core functionality
 anyhow = { version = "1.0.98", features = ["backtrace"] }
 thiserror = "2.0.12"
-tokio = { version = "1.0.45", features = ["full"] }
+tokio = { version = "1.45.1", features = ["full"] }
 futures = "0.3"
 parking_lot = "0.12.3"
 tracing = "0.1"
