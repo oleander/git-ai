@@ -475,7 +475,7 @@ fn generate_reasoning(files_with_scores: &[FileWithScore]) -> String {
       .unwrap_or('u')
       .to_uppercase()
       .collect::<String>()
-      + &primary.file_category.get(1..).unwrap_or(""),
+      + primary.file_category.get(1..).unwrap_or(""),
     primary.impact_score,
     extract_component_name(&primary.file_path),
     total_files,

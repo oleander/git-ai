@@ -66,40 +66,6 @@ struct Model {
   value: String
 }
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "git-ai")]
-pub struct Args {
-  #[structopt(subcommand)]
-  cmd: Command
-}
-
-#[derive(Debug, StructOpt)]
-pub enum Command {
-  #[structopt(name = "optimize")]
-  Optimize {
-    #[structopt(long, default_value = "resources/prompt.md")]
-    prompt_file: String,
-
-    #[structopt(long, default_value = "stats.json")]
-    stats_file: String,
-
-    #[structopt(long, default_value = "tmp")]
-    temp_dir: String,
-
-    #[structopt(long, default_value = "100")]
-    iterations: u32,
-
-    #[structopt(long, default_value = "0.8")]
-    threshold: f32,
-
-    #[structopt(long, default_value = "ai")]
-    scoring_mode: String,
-
-    #[structopt(long)]
-    verbose: bool
-  }
-}
-
 // Hook installation functions
 fn run_install() -> Result<()> {
   let fs = Filesystem::new()?;

@@ -220,6 +220,7 @@ impl Filesystem {
   ///
   /// # Returns
   /// * `Dir` - The hooks directory path
+  #[allow(dead_code)]
   pub fn git_hooks_path(&self) -> Dir {
     Dir::new(self.git_hooks_path.clone())
   }
