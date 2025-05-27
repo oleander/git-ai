@@ -26,6 +26,14 @@ pub async fn generate_commit_message_multi_step(
 ) -> Result<String> {
   log::info!("Starting multi-step commit message generation");
 
+  // Check if parallel API calls are enabled
+  let config = crate::config::App::new()?;
+  let use_parallel = config.parallel_api_calls.unwrap_or(true);
+
+  if !use_parallel {
+    log::info!("Parallel API calls disabled in config, using sequential processing");
+  }
+
   // Initialize multi-step debug session
   if let Some(session) = debug_output::debug_session() {
     session.init_multi_step_debug();
@@ -40,42 +48,68 @@ pub async fn generate_commit_message_multi_step(
     session.set_total_files_parsed(parsed_files.len());
   }
 
-  // Step 1: Analyze each file individually in parallel
-  log::debug!("Analyzing {} files in parallel", parsed_files.len());
+  // Step 1: Analyze each file individually
+  log::debug!(
+    "Analyzing {} files {}",
+    parsed_files.len(),
+    if use_parallel {
+      "in parallel"
+    } else {
+      "sequentially"
+    }
+  );
 
-  // Create futures for all file analyses using tokio::spawn for true parallelism
-  let analysis_handles: Vec<tokio::task::JoinHandle<_>> = parsed_files
-    .into_iter()
-    .map(|file| {
-      let client = client.clone();
-      let model = model.to_string();
-      let file_path = file.path.clone();
-      let operation = file.operation.clone();
+  let analysis_results = if use_parallel && parsed_files.len() > 1 {
+    // Parallel execution using tokio::spawn
+    let analysis_handles: Vec<tokio::task::JoinHandle<_>> = parsed_files
+      .into_iter()
+      .map(|file| {
+        let client = client.clone();
+        let model = model.to_string();
+        let file_path = file.path.clone();
+        let operation = file.operation.clone();
 
-      // Spawn each analysis as a separate tokio task
-      tokio::spawn(async move {
-        log::debug!("Analyzing file: {file_path}");
-        let start_time = std::time::Instant::now();
-        let payload = format!("{{\"file_path\": \"{file_path}\", \"operation_type\": \"{operation}\", \"diff_content\": \"...\"}}");
+        // Spawn each analysis as a separate tokio task
+        tokio::spawn(async move {
+          log::debug!("Analyzing file: {file_path}");
+          let start_time = std::time::Instant::now();
+          let payload = format!("{{\"file_path\": \"{file_path}\", \"operation_type\": \"{operation}\", \"diff_content\": \"...\"}}");
 
-        let result = call_analyze_function(&client, &model, &file).await;
-        let duration = start_time.elapsed();
-        (file, result, duration, payload)
+          let result = call_analyze_function(&client, &model, &file).await;
+          let duration = start_time.elapsed();
+          (file, result, duration, payload)
+        })
       })
-    })
-    .collect();
+      .collect();
 
-  // Execute all analyses in parallel and wait for completion
-  let mut analysis_results = Vec::new();
-  for handle in analysis_handles {
-    match handle.await {
-      Ok(result) => analysis_results.push(result),
-      Err(e) => {
-        log::error!("Task panicked during file analysis: {}", e);
-        // Continue with other files even if one task panics
+    // Execute all analyses in parallel and wait for completion
+    let mut results = Vec::new();
+    for handle in analysis_handles {
+      match handle.await {
+        Ok(result) => results.push(result),
+        Err(e) => {
+          log::error!("Task panicked during file analysis: {}", e);
+          // Continue with other files even if one task panics
+        }
       }
     }
-  }
+    results
+  } else {
+    // Sequential execution for single file or when parallel is disabled
+    let mut results = Vec::new();
+    for file in parsed_files {
+      let file_path = file.path.clone();
+      let operation = file.operation.clone();
+      log::debug!("Analyzing file: {file_path}");
+      let start_time = std::time::Instant::now();
+      let payload = format!("{{\"file_path\": \"{file_path}\", \"operation_type\": \"{operation}\", \"diff_content\": \"...\"}}");
+
+      let result = call_analyze_function(client, model, &file).await;
+      let duration = start_time.elapsed();
+      results.push((file, result, duration, payload));
+    }
+    results
+  };
 
   // Process results and handle errors
   let mut file_analyses = Vec::new();
