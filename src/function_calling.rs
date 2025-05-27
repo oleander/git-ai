@@ -242,7 +242,11 @@ pub fn parse_commit_function_response(arguments: &str) -> Result<CommitFunctionA
 
   // Log summary statistics
   let total_lines: u32 = args.files.values().map(|f| f.lines_changed).sum();
-  let avg_impact: f32 = args.files.values().map(|f| f.impact_score).sum::<f32>() / args.files.len() as f32;
+  let avg_impact: f32 = if args.files.is_empty() {
+    0.0
+  } else {
+    args.files.values().map(|f| f.impact_score).sum::<f32>() / args.files.len() as f32
+  };
 
   log::debug!("Summary statistics:");
   log::debug!("  Total lines changed: {total_lines}");
