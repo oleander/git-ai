@@ -69,7 +69,7 @@ jobs:
         run: |
           cargo build \
             -Z unstable-options \
-            --profile dev \
+            --profile release-with-debug \
             --artifact-dir bin \
             --target ${{ matrix.target }}
 
