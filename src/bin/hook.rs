@@ -50,7 +50,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use anyhow::{bail, Context, Result};
 use git2::{Oid, Repository};
 use ai::{commit, config};
-use ai::hook::*;
+use ai::hook::{PatchRepository, *};
 use ai::model::Model;
 
 #[derive(Debug, PartialEq)]

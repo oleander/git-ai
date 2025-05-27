@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use tempfile::NamedTempFile;
 use git2::DiffFormat;
 use anyhow::Result;
-use ai::hook::*;
+use ai::hook::{FilePath, PatchRepository, Utf8String};
 use common::*;
 
 #[test]

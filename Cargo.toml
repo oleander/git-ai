@@ -18,6 +18,11 @@ path = "src/main.rs"
 name = "git-ai-hook"
 path = "src/bin/hook.rs"
 
+[[bench]]
+name = "thread_lock_benchmark"
+path = "benches/thread_lock_benchmark.rs"
+harness = false
+
 [dependencies]
 anyhow = { version = "1.0.86", default-features = false }
 async-openai = { version = "0.18.3", default-features = false }
