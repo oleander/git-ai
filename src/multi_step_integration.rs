@@ -26,20 +26,12 @@ pub async fn generate_commit_message_multi_step(
 ) -> Result<String> {
   log::info!("Starting multi-step commit message generation");
 
-  // Check if parallel API calls are enabled
-  let config = crate::config::App::new()?;
-  let use_parallel = config.parallel_api_calls.unwrap_or(true);
-
-  if !use_parallel {
-    log::info!("Parallel API calls disabled in config, using sequential processing");
-  }
-
   // Initialize multi-step debug session
   if let Some(session) = debug_output::debug_session() {
     session.init_multi_step_debug();
   }
 
-  // Parse the diff to extract individual files
+  // Parse the diff into individual files
   let parsed_files = parse_diff(diff_content)?;
   log::info!("Parsed {} files from diff", parsed_files.len());
 
@@ -52,15 +44,15 @@ pub async fn generate_commit_message_multi_step(
   log::debug!(
     "Analyzing {} files {}",
     parsed_files.len(),
-    if use_parallel {
+    if parsed_files.len() > 1 {
       "in parallel"
     } else {
       "sequentially"
     }
   );
 
-  let analysis_results = if use_parallel && parsed_files.len() > 1 {
-    // Parallel execution using tokio::spawn
+  let analysis_results = if parsed_files.len() > 1 {
+    // Parallel execution using tokio::spawn for multiple files
     let analysis_handles: Vec<tokio::task::JoinHandle<_>> = parsed_files
       .into_iter()
       .map(|file| {
@@ -95,7 +87,7 @@ pub async fn generate_commit_message_multi_step(
     }
     results
   } else {
-    // Sequential execution for single file or when parallel is disabled
+    // Sequential execution for single file
     let mut results = Vec::new();
     for file in parsed_files {
       let file_path = file.path.clone();
