@@ -216,15 +216,6 @@ impl Filesystem {
     Ok(File::new(self.git_ai_hook_bin_path.clone()))
   }
 
-  /// Gets the path to the git hooks directory.
-  ///
-  /// # Returns
-  /// * `Dir` - The hooks directory path
-  #[allow(dead_code)]
-  pub fn git_hooks_path(&self) -> Dir {
-    Dir::new(self.git_hooks_path.clone())
-  }
-
   /// Gets the path to the prepare-commit-msg hook.
   ///
   /// # Returns
