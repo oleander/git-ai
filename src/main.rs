@@ -1,68 +1,68 @@
 mod config;
 mod filesystem;
 
-use structopt::StructOpt;
+use clap::{Parser, Subcommand};
 use anyhow::Result;
 use dotenv::dotenv;
 
 use crate::config::App;
 use crate::filesystem::Filesystem;
 
-#[derive(StructOpt)]
-#[structopt(name = "git-ai", about = "A git extension that uses OpenAI to generate commit messages")]
+#[derive(Parser)]
+#[command(name = "git-ai", about = "A git extension that uses OpenAI to generate commit messages")]
 enum Cli {
-  #[structopt(about = "Installs the git-ai hook")]
+  #[command(subcommand)]
   Hook(HookSubcommand),
-  #[structopt(about = "Sets or gets configuration values")]
+  #[command(subcommand)]
   Config(ConfigSubcommand)
 }
 
-#[derive(StructOpt)]
+#[derive(Subcommand)]
 enum HookSubcommand {
-  #[structopt(about = "Installs the git-ai hook")]
+  #[command(about = "Installs the git-ai hook")]
   Install,
-  #[structopt(about = "Uninstalls the git-ai hook")]
+  #[command(about = "Uninstalls the git-ai hook")]
   Uninstall,
-  #[structopt(about = "Reinstalls the git-ai hook")]
+  #[command(about = "Reinstalls the git-ai hook")]
   Reinstall
 }
 
-#[derive(StructOpt)]
+#[derive(Subcommand)]
 enum ConfigSubcommand {
-  #[structopt(about = "Sets a configuration value")]
+  #[command(subcommand)]
   Set(SetSubcommand),
 
-  #[structopt(about = "Resets the internal configuration to the default values")]
+  #[command(about = "Resets the internal configuration to the default values")]
   Reset
 }
 
-#[derive(StructOpt)]
+#[derive(Subcommand)]
 enum SetSubcommand {
-  #[structopt(about = "Sets the model to use")]
+  #[command(about = "Sets the model to use")]
   Model(Model),
 
-  #[structopt(about = "Sets the maximum number of tokens to use for the diff")]
+  #[command(about = "Sets the maximum number of tokens to use for the diff")]
   MaxTokens {
-    #[structopt(help = "The maximum number of tokens", name = "max-tokens")]
+    #[arg(help = "The maximum number of tokens", value_name = "max-tokens")]
     max_tokens: usize
   },
 
-  #[structopt(about = "Sets the maximum length of the commit message")]
+  #[command(about = "Sets the maximum length of the commit message")]
   MaxCommitLength {
-    #[structopt(help = "The maximum length of the commit message", name = "max-commit-length")]
+    #[arg(help = "The maximum length of the commit message", value_name = "max-commit-length")]
     max_commit_length: usize
   },
 
-  #[structopt(about = "Sets the OpenAI API key")]
+  #[command(about = "Sets the OpenAI API key")]
   OpenaiApiKey {
-    #[structopt(help = "The OpenAI API key", name = "VALUE")]
+    #[arg(help = "The OpenAI API key", value_name = "VALUE")]
     value: String
   }
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct Model {
-  #[structopt(help = "The value to set", name = "VALUE")]
+  #[arg(help = "The value to set", value_name = "VALUE")]
   value: String
 }
 
@@ -161,7 +161,7 @@ async fn main() -> Result<()> {
     println!("Debug build: Performance profiling enabled");
   }
 
-  let args = Cli::from_args();
+  let args = Cli::parse();
 
   match args {
     Cli::Hook(sub) =>
