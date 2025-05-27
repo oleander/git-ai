@@ -236,7 +236,12 @@ impl DebugSession {
         }
       } else if let Some(ref files) = self.files_analyzed {
         let mut file_list: Vec<(&String, &FileChange)> = files.files.iter().collect();
-        file_list.sort_by(|a, b| b.1.impact_score.partial_cmp(&a.1.impact_score).unwrap());
+        file_list.sort_by(|a, b| {
+          b.1
+            .impact_score
+            .partial_cmp(&a.1.impact_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let total_files = file_list.len();
         for (files_shown, (path, change)) in file_list.iter().enumerate() {
@@ -320,7 +325,11 @@ impl DebugSession {
           eprintln!("    │ Results:");
 
           let mut sorted_files = score_result.clone();
-          sorted_files.sort_by(|a, b| b.impact_score.partial_cmp(&a.impact_score).unwrap());
+          sorted_files.sort_by(|a, b| {
+            b.impact_score
+              .partial_cmp(&a.impact_score)
+              .unwrap_or(std::cmp::Ordering::Equal)
+          });
 
           for (i, file) in sorted_files.iter().enumerate() {
             let prefix = if i == sorted_files.len() - 1 {
@@ -445,7 +454,12 @@ impl DebugSession {
 
       // Sort files by impact score
       let mut sorted_files: Vec<(&String, &FileChange)> = files.files.iter().collect();
-      sorted_files.sort_by(|a, b| b.1.impact_score.partial_cmp(&a.1.impact_score).unwrap());
+      sorted_files.sort_by(|a, b| {
+        b.1
+          .impact_score
+          .partial_cmp(&a.1.impact_score)
+          .unwrap_or(std::cmp::Ordering::Equal)
+      });
 
       for (path, change) in sorted_files.iter() {
         eprintln!();

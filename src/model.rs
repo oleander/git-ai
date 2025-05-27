@@ -212,7 +212,7 @@ impl From<String> for Model {
 fn get_tokenizer(_model_str: &str) -> CoreBPE {
   // TODO: This should be based on the model string, but for now we'll just use cl100k_base
   // which is used by gpt-3.5-turbo and gpt-4
-  tiktoken_rs::cl100k_base().map_err(|e| anyhow::anyhow!("Failed to create tokenizer: {}", e))?
+  tiktoken_rs::cl100k_base().expect("Failed to create tokenizer")
 }
 
 pub async fn run(settings: Settings, content: String) -> Result<String> {

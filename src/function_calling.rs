@@ -221,7 +221,12 @@ pub fn parse_commit_function_response(arguments: &str) -> Result<CommitFunctionA
 
   // Sort files by impact score for better debug output
   let mut sorted_files: Vec<(&String, &FileChange)> = args.files.iter().collect();
-  sorted_files.sort_by(|a, b| b.1.impact_score.partial_cmp(&a.1.impact_score).unwrap());
+  sorted_files.sort_by(|a, b| {
+    b.1
+      .impact_score
+      .partial_cmp(&a.1.impact_score)
+      .unwrap_or(std::cmp::Ordering::Equal)
+  });
 
   for (path, change) in sorted_files {
     log::debug!(
