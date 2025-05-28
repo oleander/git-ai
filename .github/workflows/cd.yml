@@ -82,7 +82,7 @@ jobs:
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
           rustup target add x86_64-unknown-linux-musl
-          sudo apt-get update && sudo apt-get install -y musl-tools
+          sudo apt-get update && sudo apt-get install -y musl-tools git
 
       - name: Install Dependencies for musl Target
         if: matrix.target == 'x86_64-unknown-linux-musl'
@@ -136,7 +136,7 @@ jobs:
           path: bin/git-*
 
   release:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     needs: artifact
     steps:
       - uses: actions/checkout@v4
