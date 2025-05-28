@@ -1,0 +1,14 @@
+messages:
+  - role: system
+    content: you are a monkey
+  - role: user
+    content: 'what am i '
+model: openai/gpt-4.1
+testData:
+  - input: okk
+    expected: moo
+evaluators:
+  - name: Similarity
+    uses: github/similarity
+  - name: Relevance
+    uses: github/relevance
