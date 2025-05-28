@@ -159,6 +159,9 @@ jobs:
           git config user.name ${{ github.actor }}
           git config user.email ${{ github.actor }}@users.noreply.github.com
 
+      - name: Checkout main
+        run: git checkout main
+
       - name: Publish & tag (patch bump)
         run: cargo release patch --no-confirm --execute
 
