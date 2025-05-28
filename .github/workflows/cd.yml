@@ -163,7 +163,7 @@ jobs:
         run: git checkout main
 
       - name: Publish & tag (patch bump)
-        run: cargo release patch --no-confirm --execute
+        run: cargo release patch --no-confirm --execute --allow-branch main
 
       - name: Download all artifacts
         run: gh run download ${{ github.run_id }}
