@@ -38,9 +38,32 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
     steps:
+      - name: Check if should skip this matrix combination
+        id: check_skip
+        run: |
+          # Skip macOS targets when running in act (Linux containers)
+          if [[ -n "${ACT}" && "${{ matrix.os }}" == "macos-latest" ]]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Skipping macOS target in act environment"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.check_skip.outputs.skip != 'true'
+
+      - name: Install Node.js for act
+        if: steps.check_skip.outputs.skip != 'true' && env.ACT == 'true'
+        run: |
+          # Install Node.js manually in act container
+          curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+          sudo apt-get install -y nodejs
+          # Verify installation
+          node --version
+          npm --version
 
       - name: Cache cargo registry
+        if: steps.check_skip.outputs.skip != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -53,6 +76,7 @@ jobs:
             ${{ runner.os }}-cargo-registry-${{ env.RUST_CACHE_VERSION }}-
 
       - name: Cache cargo target
+        if: steps.check_skip.outputs.skip != 'true'
         uses: actions/cache@v4
         with:
           path: target
@@ -62,6 +86,7 @@ jobs:
             ${{ runner.os }}-${{ matrix.target }}-cargo-target-${{ env.RUST_CACHE_VERSION }}-
 
       - name: Cache Rust toolchain
+        if: steps.check_skip.outputs.skip != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -73,32 +98,68 @@ jobs:
             ${{ runner.os }}-rust-toolchain-nightly-
             ${{ runner.os }}-rust-toolchain-
 
+      - name: Install Node
+        if: steps.check_skip.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+
       - name: Setup Rust
+        if: steps.check_skip.outputs.skip != 'true'
         uses: dtolnay/rust-toolchain@nightly
         with:
           targets: ${{ matrix.target }}
 
+      - name: Check if running in act
+        id: check_act
+        if: steps.check_skip.outputs.skip != 'true'
+        run: |
+          if [[ -n "${ACT}" ]]; then
+            echo "running_in_act=true" >> $GITHUB_OUTPUT
+          else
+            echo "running_in_act=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Add x86_64-unknown-linux-musl target
-        if: matrix.target == 'x86_64-unknown-linux-musl'
+        if: matrix.target == 'x86_64-unknown-linux-musl' && steps.check_act.outputs.running_in_act != 'true' && steps.check_skip.outputs.skip != 'true'
         run: |
           rustup target add x86_64-unknown-linux-musl
-          sudo apt-get update && sudo apt-get install -y musl-tools git
+          sudo apt-get update && sudo apt-get install -y musl-tools
 
       - name: Install Dependencies for musl Target
-        if: matrix.target == 'x86_64-unknown-linux-musl'
+        if: matrix.target == 'x86_64-unknown-linux-musl' && steps.check_act.outputs.running_in_act != 'true' && steps.check_skip.outputs.skip != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y musl-tools musl-dev perl make pkg-config libssl-dev
+          sudo apt-get install -y musl-tools musl-dev perl make pkg-config
+          # Set up environment for musl cross-compilation
           echo "CC_x86_64_unknown_linux_musl=musl-gcc" >> $GITHUB_ENV
           echo "CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc" >> $GITHUB_ENV
+          # Configure OpenSSL build to avoid -m64 flag
+          echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
+          echo "OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-musl" >> $GITHUB_ENV
+          echo "OPENSSL_INCLUDE_DIR=/usr/include" >> $GITHUB_ENV
+
+      - name: Skip musl build in act
+        if: matrix.target == 'x86_64-unknown-linux-musl' && steps.check_act.outputs.running_in_act == 'true' && steps.check_skip.outputs.skip != 'true'
+        run: |
+          echo "Skipping musl build in act due to cross-compilation issues"
+          mkdir -p bin
+          echo '#!/bin/sh' > bin/git-ai
+          echo 'echo "Placeholder for musl build in act"' >> bin/git-ai
+          chmod +x bin/git-ai
+          cp bin/git-ai bin/git-ai-hook
 
       - name: Install Dependencies for Linux Target
-        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        if: matrix.target == 'x86_64-unknown-linux-gnu' && steps.check_skip.outputs.skip != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
 
       - name: Build for target
+        if: ${{ !(matrix.target == 'x86_64-unknown-linux-musl' && steps.check_act.outputs.running_in_act == 'true') && steps.check_skip.outputs.skip != 'true' }}
         run: |
           cargo build \
             -Z unstable-options \
@@ -107,6 +168,7 @@ jobs:
             --target ${{ matrix.target }}
 
       - name: Package artifacts
+        if: steps.check_skip.outputs.skip != 'true'
         run: |
           mkdir -p dist
           if [[ "${{ matrix.target }}" == *"-windows-"* ]]; then
@@ -122,6 +184,7 @@ jobs:
           fi
 
       - name: Upload packaged artifacts
+        if: steps.check_skip.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: git-ai-${{ matrix.target }}-package
@@ -129,6 +192,7 @@ jobs:
           path: git-ai-${{ matrix.target }}.*
 
       - name: Upload raw artifacts
+        if: steps.check_skip.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: git-ai-${{ matrix.target }}-raw

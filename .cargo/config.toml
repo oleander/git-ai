@@ -1,3 +1,9 @@
 [env]
 
 TMPDIR = "/tmp"
+
+[target.x86_64-unknown-linux-musl]
+linker = "musl-gcc"
+
+[target.x86_64-unknown-linux-musl.openssl-sys]
+rustc-link-lib = ["static=ssl", "static=crypto"]
