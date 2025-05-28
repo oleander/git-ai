@@ -103,7 +103,7 @@ jobs:
         run: cargo binstall -y cargo-release
 
       - name: Publish & tag (patch bump)
-        run: cargo release patch --no-confirm --execute
+        run: cargo release minor --no-confirm --execute
 
 # ─────────────────────────────────────────────────────────────
 # 3.  Build binaries for multiple platforms & draft GitHub Release (tag push)
@@ -169,7 +169,7 @@ jobs:
 
   # Build for other platforms only on tag releases
   # The following jobs only run when a tag is pushed, not during PR testing
-  
+
   # Build for Linux aarch64
   build-linux-aarch64:
     needs: release
