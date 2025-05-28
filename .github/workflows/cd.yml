@@ -20,7 +20,7 @@ env:
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
   ACTIONS_RUNTIME_TOKEN: dummy
   CARGO_TERM_COLOR: always
-  RUST_CACHE_VERSION: 1  # Increment to bust cache
+  RUST_CACHE_VERSION: 1
 
 jobs:
   artifact:
