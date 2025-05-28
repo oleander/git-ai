@@ -1,4 +1,4 @@
-name: Continuous Delivery
+name: CD
 
 on:
   push:
@@ -18,11 +18,13 @@ permissions:
 env:
   CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  ACTIONS_RUNTIME_TOKEN: dummy
   CARGO_TERM_COLOR: always
 
 jobs:
   artifact:
     runs-on: ${{ matrix.os }}
+    continue-on-error: false
     strategy:
       matrix:
         include:
@@ -37,41 +39,60 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@nightly
         with:
           targets: ${{ matrix.target }}
 
-      - name: Setup Dependencies for Linux/Musl
+      - name: Add x86_64-unknown-linux-musl target
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          rustup target add x86_64-unknown-linux-musl
+          sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Install Dependencies for musl Target
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
           sudo apt-get update
           sudo apt-get install -y musl-tools musl-dev perl make pkg-config libssl-dev
+          # Set up environment for musl compilation
+          echo "CC_x86_64_unknown_linux_musl=musl-gcc" >> $GITHUB_ENV
           echo "CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc" >> $GITHUB_ENV
 
-      - name: Setup Dependencies for Linux GNU
+      - name: Install Dependencies for Linux Target
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
 
-      - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+      - name: Build for target
+        run: |
+          cargo build \
+            -Z unstable-options \
+            --profile release-with-debug \
+            --artifact-dir bin \
+            --target ${{ matrix.target }}
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload and compress artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: git-ai-${{ matrix.target }}
           if-no-files-found: error
-          path: target/${{ matrix.target }}/release/git-ai
+          path: bin/git-*
 
   release:
     runs-on: ubuntu-latest
     needs: artifact
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GH_TOKEN }}
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Configure git email
+        run: |
+          git config user.name ${{ github.actor }}
+          git config user.email ${{ github.actor }}@users.noreply.github.com
 
       - name: Install cargo-binstall
         run: curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
@@ -79,29 +100,29 @@ jobs:
       - name: Install cargo-release
         run: cargo binstall -y cargo-release
 
-      - name: Configure git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
       - name: Release to crates.io
-        run: cargo release patch --no-confirm
+        if: github.ref == 'refs/heads/main'
+        run: cargo release patch --no-confirm  --execute
 
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
+      - name: Test release to crates.io (dry run)
+        if: github.ref != 'refs/heads/main'
+        run: cargo release patch --no-confirm  --no-push
 
-      - name: Package artifacts
+      - name: Download all artifacts
+        if: github.ref == 'refs/heads/main'
+        run: gh run download ${{ github.run_id }}
+
+      - name: Zip each downloaded directory
+        if: github.ref == 'refs/heads/main'
         run: |
-          mkdir release
-          for dir in artifacts/git-ai-*; do
-            target=$(basename $dir)
-            tar -czf release/${target}.tar.gz -C $dir git-ai
+          for dir in $(ls -d git-ai-*); do
+            tar -czf ${dir}.tar.gz ${dir}
           done
 
-      - name: Upload Release
+      - name: Uploads compressed artifacts
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          files: release/*.tar.gz
+          tag_name: v${{ steps.app.outputs.version }}
           fail_on_unmatched_files: true
+          files: git-ai-*.tar.gz
