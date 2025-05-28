@@ -103,7 +103,7 @@ jobs:
         run: cargo binstall -y cargo-release
 
       - name: Publish & tag (patch bump)
-        run: cargo release minor --no-confirm --execute
+        run: cargo release minor --no-confirm --execute --allow-branch HEAD
 
 # ─────────────────────────────────────────────────────────────
 # 3.  Build binaries for multiple platforms & draft GitHub Release (tag push)
