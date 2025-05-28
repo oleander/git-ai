@@ -1,4 +1,4 @@
-name: CD
+name: Build & Release
 
 on:
   push:
@@ -106,10 +106,32 @@ jobs:
             --artifact-dir bin \
             --target ${{ matrix.target }}
 
-      - name: Upload and compress artifacts
+      - name: Package artifacts
+        run: |
+          mkdir -p dist
+          if [[ "${{ matrix.target }}" == *"-windows-"* ]]; then
+            cp bin/git-ai.exe dist/
+            cd dist
+            zip -r ../git-ai-${{ matrix.target }}.zip .
+            cd ..
+          else
+            cp bin/git-ai dist/
+            cd dist
+            tar -czf ../git-ai-${{ matrix.target }}.tar.gz .
+            cd ..
+          fi
+
+      - name: Upload packaged artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: git-ai-${{ matrix.target }}
+          name: git-ai-${{ matrix.target }}-package
+          if-no-files-found: error
+          path: git-ai-${{ matrix.target }}.*
+
+      - name: Upload raw artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: git-ai-${{ matrix.target }}-raw
           if-no-files-found: error
           path: bin/git-*
 
@@ -165,23 +187,63 @@ jobs:
       - name: Build & publish
         run: cargo release minor --no-confirm --execute --allow-branch main
 
-      - name: Download all artifacts
-        run: gh run download ${{ github.run_id }}
-
-      - name: Zip each downloaded directory
-        run: |
-          for dir in $(ls -d git-ai-*); do
-            tar -czf ${dir}.tar.gz ${dir}
-          done
+      - name: Download all packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: git-ai-*-package
+          path: packages
+          merge-multiple: true
 
       - name: Get version
         id: app
         run: echo "version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')" >> $GITHUB_OUTPUT
 
+      - name: Generate cargo-binstall metadata.json
+        run: |
+          cat > metadata.json << EOF
+          {
+            "name": "git-ai",
+            "version": "${{ steps.app.outputs.version }}",
+            "package": {
+              "targets": [
+                {
+                  "name": "git-ai",
+                  "bins": ["git-ai"]
+                }
+              ],
+              "platforms": {
+                "x86_64-unknown-linux-gnu": {
+                  "bins": {
+                    "git-ai": "https://github.com/${{ github.repository }}/releases/download/v${{ steps.app.outputs.version }}/git-ai-x86_64-unknown-linux-gnu.tar.gz"
+                  }
+                },
+                "x86_64-unknown-linux-musl": {
+                  "bins": {
+                    "git-ai": "https://github.com/${{ github.repository }}/releases/download/v${{ steps.app.outputs.version }}/git-ai-x86_64-unknown-linux-musl.tar.gz"
+                  }
+                },
+                "x86_64-apple-darwin": {
+                  "bins": {
+                    "git-ai": "https://github.com/${{ github.repository }}/releases/download/v${{ steps.app.outputs.version }}/git-ai-x86_64-apple-darwin.tar.gz"
+                  }
+                },
+                "aarch64-apple-darwin": {
+                  "bins": {
+                    "git-ai": "https://github.com/${{ github.repository }}/releases/download/v${{ steps.app.outputs.version }}/git-ai-aarch64-apple-darwin.tar.gz"
+                  }
+                }
+              }
+            }
+          }
+          EOF
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.app.outputs.version }}
-          fail_on_unmatched_files: true
-          files: git-ai-*.tar.gz
+          fail_on_unmatched_files: false
+          files: |
+            packages/git-ai-*.tar.gz
+            packages/git-ai-*.zip
+            metadata.json
           generate_release_notes: true
