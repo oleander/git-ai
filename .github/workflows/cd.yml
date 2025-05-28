@@ -55,7 +55,7 @@ jobs:
             ${{ runner.os }}-${{ matrix.target }}-cargo-
             ${{ runner.os }}-cargo-
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           targets: ${{ matrix.target }}
 
