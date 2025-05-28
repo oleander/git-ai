@@ -145,6 +145,6 @@ jobs:
         # if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.app.outputs.version }}
+          # tag_name: v${{ steps.app.outputs.version }}
           fail_on_unmatched_files: true
           files: git-ai-*.tar.gz
