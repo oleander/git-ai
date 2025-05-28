@@ -162,7 +162,7 @@ jobs:
       - name: Checkout main
         run: git checkout main
 
-      - name: Publish & tag (patch bump)
+      - name: Build & publish
         run: cargo release minor --no-confirm --execute --allow-branch main
 
       - name: Download all artifacts
