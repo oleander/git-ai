@@ -46,6 +46,7 @@ use std::str::FromStr;
 use std::time::Duration;
 use std::path::PathBuf;
 
+#[cfg(debug_assertions)]
 use colored::Colorize;
 use structopt::StructOpt;
 use indicatif::{ProgressBar, ProgressStyle};

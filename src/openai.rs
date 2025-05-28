@@ -208,6 +208,10 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
   match generate_commit_message_multi_step(&client, &model, &request.prompt, config::APP.max_commit_length).await {
     Ok(message) => return Ok(Response { response: message }),
     Err(e) => {
+      // Check if it's an API key error and propagate it
+      if e.to_string().contains("invalid_api_key") || e.to_string().contains("Incorrect API key") {
+        return Err(e);
+      }
       log::warn!("Multi-step approach failed, falling back to single-step: {e}");
     }
   }
@@ -334,6 +338,15 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
       Err(e) => {
         last_error = Some(e);
         log::warn!("OpenAI API attempt {attempt} failed");
+
+        // Check if it's an API key error - fail immediately without retrying
+        if let OpenAIError::ApiError(ref api_err) = &last_error.as_ref().unwrap() {
+          if api_err.code.as_deref() == Some("invalid_api_key") {
+            let error_msg = format!("Invalid OpenAI API key: {}", api_err.message);
+            log::error!("{error_msg}");
+            return Err(anyhow!(error_msg));
+          }
+        }
 
         if attempt < MAX_ATTEMPTS {
           let delay = Duration::from_millis(500 * attempt as u64);
