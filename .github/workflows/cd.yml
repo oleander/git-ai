@@ -128,7 +128,7 @@ jobs:
 
       - name: Release to crates.io
         # if: github.ref == 'refs/heads/main'
-        run: cargo release patch --no-confirm --execute --allow-branch oleander-patch-1
+        run: cargo release patch --no-confirm --execute --allow-branch HEAD
 
       - name: Download all artifacts
         # if: github.ref == 'refs/heads/main'
