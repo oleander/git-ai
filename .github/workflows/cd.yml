@@ -157,7 +157,7 @@ jobs:
 
       - name: Build release binary
         run: |
-          cargo build --release --locked --target ${{ env.TARGET }}
+          cargo build --release --locked --target ${{ env.TARGET }} --bins
           mkdir -p dist
           cp target/${{ env.TARGET }}/release/git-ai dist/
           cd dist
