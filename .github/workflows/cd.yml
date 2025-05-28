@@ -1,10 +1,10 @@
 name: CD
 
 on:
-  pull_request:               # CI + (optional) publish
+  pull_request:                # CI + (optional) publish
   push:
-    tags: ['v*']              # create GitHub Release
-  workflow_dispatch:          # manual runs if you want
+    tags: ['v*']               # create GitHub Release
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -21,24 +21,15 @@ env:
   ACTIONS_RUNTIME_TOKEN: dummy
   CARGO_TERM_COLOR:      always
 
-# ─────────────────────────────────────────────────────────────
-# 1.  CI build for every PR   (all requested targets)
-# ─────────────────────────────────────────────────────────────
 jobs:
+# ─────────────────────────────────────────────────────────────
+# 1.  CI build (PR only)  – single target
+# ─────────────────────────────────────────────────────────────
   artifact:
     if: github.event_name == 'pull_request'
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-latest
-            target: x86_64-apple-darwin
-          - os: macos-latest
-            target: aarch64-apple-darwin
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-
+    runs-on: ubuntu-latest
+    env:
+      TARGET: x86_64-unknown-linux-gnu
     steps:
       - uses: actions/checkout@v4
 
@@ -49,25 +40,20 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key:  ${{ runner.os }}-${{ matrix.target }}-cargo-${{
+          key:  ${{ runner.os }}-${{ env.TARGET }}-cargo-${{
                  hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.target }}-cargo-
+            ${{ runner.os }}-${{ env.TARGET }}-cargo-
             ${{ runner.os }}-cargo-
 
       - uses: dtolnay/rust-toolchain@nightly
         with:
-          targets: ${{ matrix.target }}
+          targets: ${{ env.TARGET }}
 
-      - name: Extra Linux deps
-        if: matrix.os == 'ubuntu-latest'
+      - name: Install Linux build deps
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
-
-      - name: Add Apple target (cross-compile to ARM)
-        if: startsWith(matrix.target, 'aarch64-apple')
-        run: rustup target add aarch64-apple-darwin
 
       - name: Build
         run: |
@@ -75,13 +61,13 @@ jobs:
             -Z unstable-options \
             --profile release-with-debug \
             --artifact-dir bin \
-            --target ${{ matrix.target }}
+            --target ${{ env.TARGET }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: git-ai-${{ matrix.target }}
-          if-no-files-found: error
+          name: git-ai-${{ env.TARGET }}
           path: bin/git-*
+          if-no-files-found: error
 
 # ─────────────────────────────────────────────────────────────
 # 2.  Publish crate **from PR** (same-repo branches only)
@@ -108,29 +94,40 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Install cargo-binstall
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-binstall
+
       - name: Install cargo-release
         run: cargo binstall -y cargo-release
 
-      - name: Publish & tag
+      - name: Publish & tag (patch bump)
         run: cargo release patch --no-confirm --execute
 
 # ─────────────────────────────────────────────────────────────
-# 3.  GitHub Release (runs on the tag push)
+# 3.  Build binaries for multiple platforms & draft GitHub Release (tag push)
 # ─────────────────────────────────────────────────────────────
   release:
     if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-latest
-            target: x86_64-apple-darwin
-          - os: macos-latest
-            target: aarch64-apple-darwin
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+
+  # Build for Linux x86_64
+  build-linux-x86_64:
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    env:
+      TARGET: x86_64-unknown-linux-gnu
     steps:
       - uses: actions/checkout@v4
 
@@ -141,52 +138,264 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key:  ${{ runner.os }}-${{ matrix.target }}-cargo-${{
-                 hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ env.TARGET }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.target }}-cargo-
+            ${{ runner.os }}-${{ env.TARGET }}-cargo-
             ${{ runner.os }}-cargo-
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: ${{ env.TARGET }}
 
-      - name: Extra Linux deps
-        if: matrix.os == 'ubuntu-latest'
+      - name: Install Linux build deps
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
 
-      - name: Add Apple target (cross-compile to ARM)
-        if: startsWith(matrix.target, 'aarch64-apple')
-        run: rustup target add aarch64-apple-darwin
-
       - name: Build release binary
         run: |
-          cargo build --release --locked --target ${{ matrix.target }}
-          mkdir dist
-          cp target/${{ matrix.target }}/release/git-ai dist/
-          tar -C dist -czf \
-            git-ai-${{ matrix.target }}.tar.gz git-ai
+          cargo build --release --locked --target ${{ env.TARGET }}
+          mkdir -p dist
+          cp target/${{ env.TARGET }}/release/git-ai dist/
+          cd dist
+          tar -czf ../git-ai-${{ env.TARGET }}.tar.gz git-ai
+          cd ..
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload binary to release
+        uses: softprops/action-gh-release@v2
         with:
-          name: bin-${{ matrix.target }}
-          path: git-ai-${{ matrix.target }}.tar.gz
-          if-no-files-found: error
+          fail_on_unmatched_files: false
+          files: git-ai-${{ env.TARGET }}.tar.gz
 
-  publish-release:
+  # Build for other platforms only on tag releases
+  # The following jobs only run when a tag is pushed, not during PR testing
+  
+  # Build for Linux aarch64
+  build-linux-aarch64:
     needs: release
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    env:
+      TARGET: aarch64-unknown-linux-gnu
     steps:
-      - name: Download all target artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
+      - uses: actions/checkout@v4
 
-      - name: Create / update GitHub Release
+      - name: Cache cargo + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ env.TARGET }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ env.TARGET }}-cargo-
+            ${{ runner.os }}-cargo-
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ env.TARGET }}
+
+      - name: Install cross-compilation dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+
+      - name: Build release binary
+        run: |
+          PKG_CONFIG_ALLOW_CROSS=1 cargo build --release --locked --target ${{ env.TARGET }}
+          mkdir -p dist
+          cp target/${{ env.TARGET }}/release/git-ai dist/
+          cd dist
+          tar -czf ../git-ai-${{ env.TARGET }}.tar.gz git-ai
+          cd ..
+
+      - name: Upload binary to release
         uses: softprops/action-gh-release@v2
         with:
-          fail_on_unmatched_files: true
-          files: dist/**/*.tar.gz
+          fail_on_unmatched_files: false
+          files: git-ai-${{ env.TARGET }}.tar.gz
+
+  # Build for macOS x86_64
+  build-macos-x86_64:
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: macos-latest
+    env:
+      TARGET: x86_64-apple-darwin
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache cargo + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ env.TARGET }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ env.TARGET }}-cargo-
+            ${{ runner.os }}-cargo-
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ env.TARGET }}
+
+      - name: Build release binary
+        run: |
+          cargo build --release --locked --target ${{ env.TARGET }}
+          mkdir -p dist
+          cp target/${{ env.TARGET }}/release/git-ai dist/
+          cd dist
+          tar -czf ../git-ai-${{ env.TARGET }}.tar.gz git-ai
+          cd ..
+
+      - name: Upload binary to release
+        uses: softprops/action-gh-release@v2
+        with:
+          fail_on_unmatched_files: false
+          files: git-ai-${{ env.TARGET }}.tar.gz
+
+  # Build for macOS aarch64 (Apple Silicon)
+  build-macos-aarch64:
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: macos-latest
+    env:
+      TARGET: aarch64-apple-darwin
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache cargo + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ env.TARGET }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ env.TARGET }}-cargo-
+            ${{ runner.os }}-cargo-
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ env.TARGET }}
+
+      - name: Build release binary
+        run: |
+          cargo build --release --locked --target ${{ env.TARGET }}
+          mkdir -p dist
+          cp target/${{ env.TARGET }}/release/git-ai dist/
+          cd dist
+          tar -czf ../git-ai-${{ env.TARGET }}.tar.gz git-ai
+          cd ..
+
+      - name: Upload binary to release
+        uses: softprops/action-gh-release@v2
+        with:
+          fail_on_unmatched_files: false
+          files: git-ai-${{ env.TARGET }}.tar.gz
+
+  # Build for Windows x86_64
+  build-windows-x86_64:
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: windows-latest
+    env:
+      TARGET: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache cargo + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ env.TARGET }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ env.TARGET }}-cargo-
+            ${{ runner.os }}-cargo-
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ env.TARGET }}
+
+      - name: Build release binary
+        run: |
+          cargo build --release --locked --target %TARGET%
+          mkdir dist
+          copy target\%TARGET%\release\git-ai.exe dist\
+          powershell Compress-Archive -Path dist\git-ai.exe -DestinationPath git-ai-%TARGET%.zip
+        shell: cmd
+
+      - name: Upload binary to release
+        uses: softprops/action-gh-release@v2
+        with:
+          fail_on_unmatched_files: false
+          files: git-ai-${{ env.TARGET }}.zip
+
+  # Generate cargo-binstall compatible metadata
+  cargo-binstall-metadata:
+    needs: [build-linux-x86_64, build-linux-aarch64, build-macos-x86_64, build-macos-aarch64, build-windows-x86_64]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+
+      - name: Generate cargo-binstall metadata.json
+        run: |
+          cat > metadata.json << EOF
+          {
+            "name": "git-ai",
+            "version": "${{ env.VERSION }}",
+            "package": {
+              "targets": [
+                {
+                  "name": "git-ai",
+                  "bins": ["git-ai"]
+                }
+              ],
+              "platforms": {
+                "x86_64-unknown-linux-gnu": {
+                  "bins": {
+                    "git-ai": "https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/git-ai-x86_64-unknown-linux-gnu.tar.gz"
+                  }
+                },
+                "aarch64-unknown-linux-gnu": {
+                  "bins": {
+                    "git-ai": "https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/git-ai-aarch64-unknown-linux-gnu.tar.gz"
+                  }
+                },
+                "x86_64-apple-darwin": {
+                  "bins": {
+                    "git-ai": "https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/git-ai-x86_64-apple-darwin.tar.gz"
+                  }
+                },
+                "aarch64-apple-darwin": {
+                  "bins": {
+                    "git-ai": "https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/git-ai-aarch64-apple-darwin.tar.gz"
+                  }
+                },
+                "x86_64-pc-windows-msvc": {
+                  "bins": {
+                    "git-ai": "https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/git-ai-x86_64-pc-windows-msvc.zip"
+                  }
+                }
+              }
+            }
+          }
+          EOF
+
+      - name: Upload metadata.json to release
+        uses: softprops/action-gh-release@v2
+        with:
+          fail_on_unmatched_files: false
+          files: metadata.json
