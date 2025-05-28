@@ -248,12 +248,13 @@ jobs:
       - name: Build release binary
         run: |
           git checkout main
-          cargo build --release --locked --target ${{ env.TARGET }} --bins
           mkdir -p dist
-          cp target/${{ env.TARGET }}/release/git-ai dist/
+          cargo build --release --locked --target ${{ env.TARGET }} --bins
+          cp target/${{ env.TARGET }}/release/git-ai* dist/
           cd dist
           tar -czf ../git-ai-${{ env.TARGET }}.tar.gz git-ai
           cd ..
+          git checkout -
 
       - name: Upload binary to release
         uses: softprops/action-gh-release@v2
