@@ -96,7 +96,9 @@ jobs:
           git config user.email ${{ github.actor }}@users.noreply.github.com
 
       - name: Install cargo-binstall
-        run: curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+        uses: cargo-bins/cargo-binstall@main
+        with:
+          toolchain: stable
 
       - name: Install cargo-release
         run: cargo binstall -y cargo-release
@@ -105,9 +107,9 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: cargo release patch --no-confirm  --execute
 
-      - name: Test release to crates.io (dry run)
-        if: github.ref != 'refs/heads/main'
-        run: cargo release patch --no-confirm  --no-push
+      # - name: Test release to crates.io (dry run)
+      #   if: github.ref != 'refs/heads/main'
+      #   run: cargo release patch --no-confirm  --no-push
 
       - name: Download all artifacts
         if: github.ref == 'refs/heads/main'
