@@ -3,7 +3,7 @@ use async_openai::config::OpenAIConfig;
 use async_openai::types::{ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs};
 use async_openai::Client;
 use serde_json::Value;
-use futures::future::join_all;
+use tokio;
 
 use crate::multi_step_analysis::{
   create_analyze_function_tool, create_generate_function_tool, create_score_function_tool, FileDataForScoring, FileWithScore
@@ -30,7 +30,7 @@ pub async fn generate_commit_message_multi_step(
     session.init_multi_step_debug();
   }
 
-  // Parse the diff to extract individual files
+  // Parse the diff into individual files
   let parsed_files = parse_diff(diff_content)?;
   log::info!("Parsed {} files from diff", parsed_files.len());
 
@@ -39,29 +39,68 @@ pub async fn generate_commit_message_multi_step(
     session.set_total_files_parsed(parsed_files.len());
   }
 
-  // Step 1: Analyze each file individually in parallel
-  log::debug!("Analyzing {} files in parallel", parsed_files.len());
+  // Step 1: Analyze each file individually
+  log::debug!(
+    "Analyzing {} files {}",
+    parsed_files.len(),
+    if parsed_files.len() > 1 {
+      "in parallel"
+    } else {
+      "sequentially"
+    }
+  );
 
-  // Create futures for all file analyses
-  let analysis_futures: Vec<_> = parsed_files
-    .iter()
-    .map(|file| {
+  let analysis_results = if parsed_files.len() > 1 {
+    // Parallel execution using tokio::spawn for multiple files
+    let analysis_handles: Vec<tokio::task::JoinHandle<_>> = parsed_files
+      .into_iter()
+      .map(|file| {
+        let client = client.clone();
+        let model = model.to_string();
+        let file_path = file.path.clone();
+        let operation = file.operation.clone();
+
+        // Spawn each analysis as a separate tokio task
+        tokio::spawn(async move {
+          log::debug!("Analyzing file: {file_path}");
+          let start_time = std::time::Instant::now();
+          let payload = format!("{{\"file_path\": \"{file_path}\", \"operation_type\": \"{operation}\", \"diff_content\": \"...\"}}");
+
+          let result = call_analyze_function(&client, &model, &file).await;
+          let duration = start_time.elapsed();
+          (file, result, duration, payload)
+        })
+      })
+      .collect();
+
+    // Execute all analyses in parallel and wait for completion
+    let mut results = Vec::new();
+    for handle in analysis_handles {
+      match handle.await {
+        Ok(result) => results.push(result),
+        Err(e) => {
+          log::error!("Task panicked during file analysis: {}", e);
+          // Continue with other files even if one task panics
+        }
+      }
+    }
+    results
+  } else {
+    // Sequential execution for single file
+    let mut results = Vec::new();
+    for file in parsed_files {
       let file_path = file.path.clone();
       let operation = file.operation.clone();
-      async move {
-        log::debug!("Analyzing file: {file_path}");
-        let start_time = std::time::Instant::now();
-        let payload = format!("{{\"file_path\": \"{file_path}\", \"operation_type\": \"{operation}\", \"diff_content\": \"...\"}}");
+      log::debug!("Analyzing file: {file_path}");
+      let start_time = std::time::Instant::now();
+      let payload = format!("{{\"file_path\": \"{file_path}\", \"operation_type\": \"{operation}\", \"diff_content\": \"...\"}}");
 
-        let result = call_analyze_function(client, model, file).await;
-        let duration = start_time.elapsed();
-        (file, result, duration, payload)
-      }
-    })
-    .collect();
-
-  // Execute all analyses in parallel
-  let analysis_results = join_all(analysis_futures).await;
+      let result = call_analyze_function(client, model, &file).await;
+      let duration = start_time.elapsed();
+      results.push((file, result, duration, payload));
+    }
+    results
+  };
 
   // Process results and handle errors
   let mut file_analyses = Vec::new();
