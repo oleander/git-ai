@@ -598,5 +598,4 @@ index abc..def 100644
   let request = create_commit_request(diff, remaining_tokens, model).unwrap();
 
   assert!(request.max_tokens > 0, "Should have tokens available for response");
-  assert!(request.max_tokens <= u16::MAX, "Should not exceed u16 limit");
 }
