@@ -24,15 +24,7 @@ jobs:
           components: rustfmt, clippy
           toolchain: nightly
 
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-nightly-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/checkout@v5
 
       - name: Run clippy
         uses: actions-rs/cargo@v1
@@ -65,24 +57,7 @@ jobs:
           override: true
           profile: minimal
 
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-${{ matrix.rust }}-
-
-      - name: Install fish on linux
-        if: startsWith(matrix.os, 'ubuntu')
-        run: sudo apt-get install fish
-
-      - name: Install fish on macos
-        if: startsWith(matrix.os, 'macos')
-        run: brew install fish
+      - uses: actions/checkout@v5
 
       - name: Run integration tests
         run: |
