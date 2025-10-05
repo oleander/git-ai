@@ -1,5 +1,5 @@
 # Use an official Rust image as a parent image
-FROM rust:latest
+FROM rust:latest AS base
 
 # Install dependencies
 RUN apt-get update && apt-get install -y git fish
@@ -18,3 +18,37 @@ COPY ./scripts/integration-tests scripts/integration-tests
 
 # Run the script
 CMD ["fish", "./scripts/integration-tests"]
+
+# Target for testing PRs with GH CLI
+FROM rust:latest AS pr-tester
+
+# Install wget and GH CLI
+RUN apt-get update && apt-get install -y git fish wget \
+    && mkdir -p -m 755 /etc/apt/keyrings \
+    && wget -nv -O /tmp/githubcli-archive-keyring.gpg https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    && cat /tmp/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+    && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt-get update \
+    && apt-get install -y gh \
+    && rm -rf /var/lib/apt/lists/* \
+    && git config --global user.email "test@example.com" \
+    && git config --global user.name "Test User"
+
+RUN rustup default nightly
+RUN rustup component add rust-std clippy rustc rustfmt --toolchain nightly
+
+# Copy .git directory into /source
+COPY .git /source/.git
+
+# Clone from local source into working directory
+WORKDIR /app
+
+RUN git clone --branch main /source /app --local
+RUN git remote set-url origin https://github.com/oleander/git-ai.git
+RUN cargo fetch
+RUN cargo build
+
+# Default command that can be overridden
+SHELL ["/bin/bash", "-lc"]
+CMD ["bash"]
