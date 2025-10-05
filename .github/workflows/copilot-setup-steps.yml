@@ -35,6 +35,8 @@ jobs:
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
 
       - name: Setup Rust nightly toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
