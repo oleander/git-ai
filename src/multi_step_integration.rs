@@ -441,7 +441,7 @@ pub async fn call_analyze_function(client: &Client<OpenAIConfig>, model: &str, f
 }
 
 /// Call the score function via OpenAI
-async fn call_score_function(
+pub async fn call_score_function(
   client: &Client<OpenAIConfig>, model: &str, files_data: Vec<FileDataForScoring>
 ) -> Result<Vec<FileWithScore>> {
   let tools = vec![create_score_function_tool()?];
@@ -488,7 +488,7 @@ async fn call_score_function(
 }
 
 /// Call the generate function via OpenAI
-async fn call_generate_function(
+pub async fn call_generate_function(
   client: &Client<OpenAIConfig>, model: &str, files_with_scores: Vec<FileWithScore>, max_length: usize
 ) -> Result<Value> {
   let tools = vec![create_generate_function_tool()?];
