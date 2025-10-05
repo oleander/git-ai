@@ -10,29 +10,22 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v5
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
 
       - name: Setup nightly toolchain
         uses: actions-rs/toolchain@v1
         with:
           components: rustfmt, clippy
           toolchain: nightly
-
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-nightly-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run clippy
         uses: actions-rs/cargo@v1
@@ -45,6 +38,7 @@ jobs:
         with:
           command: fmt
           args: -- --check
+
   test:
     needs: lint
     strategy:
@@ -55,8 +49,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     continue-on-error: false
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
 
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
@@ -65,29 +61,18 @@ jobs:
           override: true
           profile: minimal
 
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-${{ matrix.rust }}-
-
-      - name: Install fish on linux
+      - name: Install fish (Linux)
         if: startsWith(matrix.os, 'ubuntu')
-        run: sudo apt-get install fish
+        run: sudo apt install fish
 
-      - name: Install fish on macos
+      - name: Install fish (macOS)
         if: startsWith(matrix.os, 'macos')
         run: brew install fish
 
       - name: Run integration tests
-        run: |
-          ./scripts/integration-tests
-          cargo build --release
-          cargo test --release
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: fish ./scripts/integration-tests
+
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test

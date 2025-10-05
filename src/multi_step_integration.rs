@@ -175,6 +175,39 @@ pub async fn generate_commit_message_multi_step(
   Ok(final_message)
 }
 
+/// Extracts the file path from git diff header parts.
+/// Handles various git prefixes (a/, b/, c/, i/) and /dev/null for deleted files.
+///
+/// # Arguments
+/// * `parts` - The whitespace-split parts from a "diff --git" line
+///
+/// # Returns
+/// * `Option<String>` - The extracted path without prefixes, or None if parsing fails
+fn extract_file_path_from_diff_parts(parts: &[&str]) -> Option<String> {
+  if parts.len() < 4 {
+    return None;
+  }
+
+  // Helper to strip git prefixes (a/, b/, c/, i/)
+  let strip_prefix = |s: &str| {
+    s.trim_start_matches("a/")
+      .trim_start_matches("b/")
+      .trim_start_matches("c/")
+      .trim_start_matches("i/")
+      .to_string()
+  };
+
+  let new_path = strip_prefix(parts[3]);
+  let old_path = strip_prefix(parts[2]);
+
+  // Prefer new path unless it's /dev/null (deleted file)
+  Some(if new_path == "/dev/null" || new_path == "dev/null" {
+    old_path
+  } else {
+    new_path
+  })
+}
+
 /// Parse git diff into individual files
 pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
   let mut files = Vec::new();
@@ -234,20 +267,11 @@ pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
 
       // Extract file path more carefully
       let parts: Vec<&str> = line.split_whitespace().collect();
-      if parts.len() >= 4 {
-        let a_path = parts[2].trim_start_matches("a/");
-        let b_path = parts[3].trim_start_matches("b/");
-
-        // Use b_path (new) if available, otherwise use a_path (old)
-        let path = if !b_path.is_empty() {
-          b_path
-        } else {
-          a_path
-        };
+      if let Some(path) = extract_file_path_from_diff_parts(&parts) {
         log::debug!("Found new file in diff: {path}");
         current_file = Some(ParsedFile {
-          path:         path.to_string(),
-          operation:    "modified".to_string(), // Default, will be updated
+          path,
+          operation: "modified".to_string(), // Default, will be updated
           diff_content: String::new()
         });
       }
@@ -314,15 +338,15 @@ pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
         let full_section = format!("diff --git{section}");
 
         // Extract file path from the section more carefully
-        let mut path = "unknown";
         let mut found_path = false;
 
         // Safer approach: iterate through lines and find the path
+        let mut extracted_path = String::new();
         for section_line in full_section.lines().take(3) {
           if section_line.starts_with("diff --git") {
             let parts: Vec<&str> = section_line.split_whitespace().collect();
-            if parts.len() >= 4 {
-              path = parts[3].trim_start_matches("b/");
+            if let Some(p) = extract_file_path_from_diff_parts(&parts) {
+              extracted_path = p;
               found_path = true;
               break;
             }
@@ -330,9 +354,9 @@ pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
         }
 
         if found_path {
-          log::debug!("Found file in section {i}: {path}");
+          log::debug!("Found file in section {i}: {extracted_path}");
           files.push(ParsedFile {
-            path:         path.to_string(),
+            path:         extracted_path,
             operation:    "modified".to_string(), // Default
             diff_content: full_section
           });
@@ -696,6 +720,61 @@ index a67ebbe..da223be 100644
     assert!(!files[0]
       .diff_content
       .contains("0472ffa1665c4c5573fb8f7698c9965122eda675"));
+  }
+
+  #[test]
+  fn test_parse_diff_with_c_i_prefixes() {
+    // Test with c/ and i/ prefixes that appear in git hook diffs
+    let diff = r#"diff --git c/test.md i/test.md
+new file mode 100644
+index 0000000..6c61a60
+--- /dev/null
++++ i/test.md
+@@ -0,0 +1 @@
++# Test File
+
+diff --git c/test.js i/test.js
+new file mode 100644
+index 0000000..a730e61
+--- /dev/null
++++ i/test.js
+@@ -0,0 +1 @@
++console.log('Hello');
+"#;
+
+    let files = parse_diff(diff).unwrap();
+    assert_eq!(files.len(), 2);
+    assert_eq!(files[0].path, "test.md", "Should extract clean path without i/ prefix");
+    assert_eq!(files[0].operation, "added");
+    assert_eq!(files[1].path, "test.js", "Should extract clean path without i/ prefix");
+    assert_eq!(files[1].operation, "added");
+
+    // Verify files contain diff content
+    assert!(files[0].diff_content.contains("# Test File"));
+    assert!(files[1].diff_content.contains("console.log"));
+  }
+
+  #[test]
+  fn test_parse_diff_with_deleted_file() {
+    // Test with a deleted file (where b path is /dev/null)
+    let diff = r#"diff --git a/deleted.txt b/dev/null
+deleted file mode 100644
+index 1234567..0000000
+--- a/deleted.txt
++++ /dev/null
+@@ -1,3 +0,0 @@
+-This file
+-will be
+-deleted
+"#;
+
+    let files = parse_diff(diff).unwrap();
+    assert_eq!(files.len(), 1);
+    assert_eq!(files[0].path, "deleted.txt", "Should use a path for deleted files");
+    assert_eq!(files[0].operation, "deleted");
+
+    // Verify file contains diff content
+    assert!(files[0].diff_content.contains("This file"));
   }
 
   #[test]

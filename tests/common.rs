@@ -80,7 +80,7 @@ impl GitFile {
     Ok(())
   }
 
-  fn find_last_commit(&self) -> Result<git2::Commit, git2::Error> {
+  fn find_last_commit(&self) -> Result<git2::Commit<'_>, git2::Error> {
     let head = match self.repo.head() {
       Ok(head) => head,
       Err(e) =>

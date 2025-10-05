@@ -398,23 +398,25 @@ impl PatchDiff for Diff<'_> {
 
       // Process line by line origin more efficiently
       match line.origin() {
-        '+' | '-' => {
-          // Most common case - just get/create entry and append content
+        '+' | '-' | ' ' => {
+          // Added, removed, or context lines - append with origin prefix
           let entry = files
             .entry(path)
             .or_insert_with(|| String::with_capacity(DEFAULT_STRING_CAPACITY));
+
+          // Add the origin character for proper diff format
+          match line.origin() {
+            '+' => entry.push('+'),
+            '-' => entry.push('-'),
+            ' ' => entry.push(' '),
+            _ => {}
+          }
           entry.push_str(&content);
         }
         _ => {
-          // Context line - less common but still needs efficient handling
-          let mut buf = String::with_capacity(CONTEXT_PREFIX.len() + content.len());
-          buf.push_str(CONTEXT_PREFIX);
-          buf.push_str(&content);
-
-          let entry = files
-            .entry(path)
-            .or_insert_with(|| String::with_capacity(DEFAULT_STRING_CAPACITY));
-          entry.push_str(&buf);
+          // Other lines (headers, etc.) - skip them as they're not part of the actual diff content
+          // The git diff headers are already included by the diff format
+          log::trace!("Skipping diff line with origin: {:?}", line.origin());
         }
       }
 

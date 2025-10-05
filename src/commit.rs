@@ -13,7 +13,13 @@ const INSTRUCTION_TEMPLATE: &str = include_str!("../resources/prompt.md");
 
 /// Returns the instruction template for the AI model.
 /// This template guides the model in generating appropriate commit messages.
-fn get_instruction_template() -> Result<String> {
+///
+/// # Returns
+/// * `Result<String>` - The rendered template or an error
+///
+/// Note: This function is public only for testing purposes
+#[doc(hidden)]
+pub fn get_instruction_template() -> Result<String> {
   profile!("Generate instruction template");
   let max_length = config::APP.max_commit_length.unwrap_or(72).to_string();
   let template = mustache::compile_str(INSTRUCTION_TEMPLATE)
@@ -34,7 +40,10 @@ fn get_instruction_template() -> Result<String> {
 ///
 /// # Returns
 /// * `Result<openai::Request>` - The prepared request
-fn create_commit_request(diff: String, max_tokens: usize, model: Model) -> Result<openai::Request> {
+///
+/// Note: This function is public only for testing purposes
+#[doc(hidden)]
+pub fn create_commit_request(diff: String, max_tokens: usize, model: Model) -> Result<openai::Request> {
   profile!("Prepare OpenAI request");
   let template = get_instruction_template()?;
   Ok(openai::Request {
