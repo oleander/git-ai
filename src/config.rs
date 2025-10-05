@@ -12,7 +12,7 @@ use console::Emoji;
 const DEFAULT_TIMEOUT: i64 = 30;
 const DEFAULT_MAX_COMMIT_LENGTH: i64 = 72;
 const DEFAULT_MAX_TOKENS: i64 = 2024;
-pub const DEFAULT_MODEL: &str = "gpt-4o-mini";
+pub const DEFAULT_MODEL: &str = "gpt-4.1"; // Matches Model::default()
 pub const DEFAULT_TEMPERATURE: f64 = 0.7;
 const DEFAULT_API_KEY: &str = "<PLACE HOLDER FOR YOUR API KEY>";
 

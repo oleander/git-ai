@@ -2,10 +2,6 @@
 name: "Copilot Setup Steps"
 
 on:
-  workflow_dispatch:
-  push:
-    paths:
-      - .github/workflows/copilot-setup-steps.yml
   pull_request:
     paths:
       - .github/workflows/copilot-setup-steps.yml
@@ -33,15 +29,29 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
+      - name: Setup Rust nightly toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: rustfmt, clippy
+
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
 
-      - name: Setup Rust nightly toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+      # Fish shell is required for integration tests in tests/ directory
+      - name: Install fish shell (for integration tests)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fish
 
-      - run: cargo install --path . --debug
-      - run: git ai hook install
-      - run: git ai config set openai-api-key ${{ secrets.OPENAI_API_KEY }}
-      - run: git ai config set model gpt-4.1
+      - name: Install git-ai binary
+        run: cargo install --path . --debug
+
+      - name: Setup git-ai configuration
+        run: |
+          git ai hook install
+          git ai config set openai-api-key ${{ secrets.OPENAI_API_KEY }}
+          git ai config set model gpt-4.1-nano
+
+      - name: Verify installation
+        run: git ai --version
