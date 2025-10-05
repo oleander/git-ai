@@ -80,10 +80,10 @@ pub async fn generate(patch: String, remaining_tokens: usize, _model: Model, set
 
   // Use the provided settings, or fall back to global config
   let config = settings.unwrap_or(&config::APP_CONFIG);
-  
+
   // Use the new strategy pattern for generation
   let message = crate::generation::fallback::generate_with_fallback(&patch, config).await?;
-  
+
   Ok(openai::Response { response: message })
 }
 
@@ -138,7 +138,11 @@ mod tests {
     }
 
     // Should succeed with local fallback
-    assert!(result.is_ok(), "Expected fallback to local generation to succeed, got error: {:?}", result.err());
+    assert!(
+      result.is_ok(),
+      "Expected fallback to local generation to succeed, got error: {:?}",
+      result.err()
+    );
     let response = result.unwrap();
     assert!(!response.response.is_empty(), "Expected non-empty commit message");
   }
@@ -164,7 +168,11 @@ mod tests {
     .await;
 
     // Should succeed with local fallback
-    assert!(result.is_ok(), "Expected fallback to local generation to succeed, got error: {:?}", result.err());
+    assert!(
+      result.is_ok(),
+      "Expected fallback to local generation to succeed, got error: {:?}",
+      result.err()
+    );
     let response = result.unwrap();
     assert!(!response.response.is_empty(), "Expected non-empty commit message");
   }
