@@ -12,7 +12,7 @@ use colored::Colorize;
 
 use crate::profile;
 // use crate::config::format_prompt; // Temporarily comment out
-use crate::config::App as Settings; // Use App as Settings
+use crate::config::AppConfig;
 
 // Cached tokenizer for performance
 static TOKENIZER: OnceLock<CoreBPE> = OnceLock::new();
@@ -252,7 +252,7 @@ fn get_tokenizer(_model_str: &str) -> CoreBPE {
   tiktoken_rs::cl100k_base().expect("Failed to create tokenizer")
 }
 
-pub async fn run(settings: Settings, content: String) -> Result<String> {
+pub async fn run(settings: AppConfig, content: String) -> Result<String> {
   let model_str = settings.model.as_deref().unwrap_or(DEFAULT_MODEL_NAME);
 
   let client = async_openai::Client::new();

@@ -5,7 +5,7 @@ use structopt::StructOpt;
 use anyhow::Result;
 use dotenv::dotenv;
 
-use crate::config::App;
+use crate::config::AppConfig;
 use crate::filesystem::Filesystem;
 
 #[derive(StructOpt)]
@@ -119,28 +119,28 @@ fn run_config_reset() -> Result<()> {
 }
 
 fn run_config_model(value: String) -> Result<()> {
-  let mut app = App::new()?;
+  let mut app = AppConfig::new()?;
   app.update_model(value.clone())?;
   println!("✅ Model set to: {value}");
   Ok(())
 }
 
 fn run_config_max_tokens(max_tokens: usize) -> Result<()> {
-  let mut app = App::new()?;
+  let mut app = AppConfig::new()?;
   app.update_max_tokens(max_tokens)?;
   println!("✅ Max tokens set to: {max_tokens}");
   Ok(())
 }
 
 fn run_config_max_commit_length(max_commit_length: usize) -> Result<()> {
-  let mut app = App::new()?;
+  let mut app = AppConfig::new()?;
   app.update_max_commit_length(max_commit_length)?;
   println!("✅ Max commit length set to: {max_commit_length}");
   Ok(())
 }
 
 fn run_config_openai_api_key(value: String) -> Result<()> {
-  let mut app = App::new()?;
+  let mut app = AppConfig::new()?;
   app.update_openai_api_key(value)?;
   println!("✅ OpenAI API key updated");
   Ok(())
