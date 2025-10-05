@@ -50,6 +50,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
 
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
