@@ -1,5 +1,7 @@
 # GitHub Copilot Instructions for Git AI
 
+> **Note**: This file is specifically tailored for GitHub Copilot's AI assistant. For general Claude Code guidance, see [CLAUDE.md](../CLAUDE.md) in the repository root.
+
 ## Project Overview
 
 Git AI is a Rust-based tool that automates intelligent commit message generation using AI. It uses a sophisticated multi-step analysis process to analyze git diffs, score file impacts, and generate meaningful commit messages via OpenAI's API.
@@ -143,27 +145,35 @@ fn test_parse_commit_function_response_invalid_json() {
     assert!(result.is_err());
 }
 
-// Multi-step integration tests (src/multi_step_integration.rs)
+// Multi-step integration tests (src/multi_step_integration.rs:726)
 #[test]
 fn test_parse_diff_with_c_i_prefixes() {
-    let diff = r#"diff --git a/src/config.rs b/src/config.rs
-index abc123..def456 100644
---- a/src/config.rs
-+++ b/src/config.rs
-@@ -1,3 +1,4 @@
-+use anyhow::Result;
- use serde::Deserialize;
+    // Test with c/ and i/ prefixes that appear in git hook diffs
+    let diff = r#"diff --git c/test.md i/test.md
+new file mode 100644
+index 0000000..6c61a60
+--- /dev/null
++++ i/test.md
+@@ -0,0 +1 @@
++# Test File
+
+diff --git c/test.js i/test.js
+new file mode 100644
+index 0000000..a730e61
+--- /dev/null
++++ i/test.js
+@@ -0,0 +1 @@
++console.log('Hello');
 "#;
+
     let files = parse_diff(diff).unwrap();
-    assert_eq!(files.len(), 1);
-    assert_eq!(files[0].path, "src/config.rs");
-    assert_eq!(files[0].operation, "modified");
+    assert_eq!(files.len(), 2);
 }
 
-// Model token tests (tests/model_token_test.rs)
+// Model token tests (tests/model_token_test.rs:8)
 #[test]
 fn test_token_counting_accuracy() {
-    let model = Model::Gpt4;
+    let model = Model::GPT4;
     let text = "Hello world";
     let tokens = model.count_tokens(text).unwrap();
     assert!(tokens > 0);
@@ -221,10 +231,10 @@ index abc123..def456 100644
 async fn test_end_to_end_commit_generation() {
     let _temp_repo = setup_test_repo();
     let diff = create_test_diff("// New content");
-    
+
     let result = generate_commit_message_local(diff, Some(72));
     assert!(result.is_ok());
-    
+
     let message = result.unwrap();
     assert!(message.len() <= 72);
     assert!(!message.is_empty());
@@ -436,100 +446,67 @@ Always include verification steps in your suggestions:
 
 ### AI Provider Integration
 
-#### OpenAI Integration (`src/openai.rs`)
+#### OpenAI Integration (src/openai.rs)
+
+The OpenAI integration uses `async-openai` client for API communication. See src/openai.rs for the full implementation.
 
 ```rust
+// Example API call pattern (simplified from src/model.rs:220)
 use async_openai::Client;
 use async_openai::types::{
-    CreateChatCompletionRequest, 
-    ChatCompletionRequestMessage,
-    ChatCompletionTool
+    CreateChatCompletionRequestArgs,
+    ChatCompletionRequestUserMessageArgs
 };
 
-pub async fn call_with_config(
-    client: &Client<async_openai::config::OpenAIConfig>,
-    model: &Model,
-    messages: Vec<ChatCompletionRequestMessage>,
-    tools: Option<Vec<ChatCompletionTool>>,
-    max_tokens: Option<u16>
-) -> Result<String> {
-    let request = CreateChatCompletionRequest {
-        model: model.to_string(),
-        messages,
-        tools,
-        max_tokens: max_tokens.map(|t| t as u32),
-        temperature: Some(0.1), // Low for consistency
-        ..Default::default()
-    };
+pub async fn run(settings: Settings, content: String) -> Result<String> {
+    let client = async_openai::Client::new();
+    let model: Model = settings.model.as_deref().unwrap_or("gpt-4o-mini").into();
+
+    let request = CreateChatCompletionRequestArgs::default()
+        .model(model.to_string())
+        .messages([ChatCompletionRequestUserMessageArgs::default()
+            .content(content)
+            .build()?
+            .into()])
+        .temperature(0.7)
+        .max_tokens((model.context_size() - tokens) as u16)
+        .build()?;
 
     let response = client.chat().create(request).await?;
-    // Handle structured outputs and function calls
-    parse_openai_response(response)
+    Ok(response.choices[0].message.content.clone().unwrap_or_default())
 }
 ```
 
-#### Ollama Integration (`src/ollama.rs`)
+#### Ollama Integration (src/ollama.rs)
+
+**Note**: Ollama support is planned but not yet implemented in the codebase. The tool currently supports OpenAI models only.
+
+#### Model-Specific Optimizations (src/model.rs)
+
+See src/model.rs:43 for the Model enum definition and src/model.rs:52 for token counting implementation.
 
 ```rust
-// Local model support for privacy and offline use
-pub struct OllamaClient {
-    base_url: String,
-    model: String,
-}
-
-impl OllamaClient {
-    pub async fn generate(&self, prompt: &str) -> Result<String> {
-        // HTTP client for Ollama REST API
-        let client = reqwest::Client::new();
-        let response = client
-            .post(&format!("{}/api/generate", self.base_url))
-            .json(&json!({
-                "model": self.model,
-                "prompt": prompt,
-                "stream": false
-            }))
-            .send()
-            .await?;
-        
-        let result: OllamaResponse = response.json().await?;
-        Ok(result.response)
-    }
-}
-```
-
-#### Model-Specific Optimizations
-
-```rust
+// Simplified from src/model.rs:43-80
 impl Model {
+    /// Counts tokens using tiktoken for accurate API usage
     pub fn count_tokens(&self, text: &str) -> Result<usize> {
-        match self {
-            Model::Gpt4 | Model::Gpt4o | Model::Gpt4oMini | Model::Gpt41 => {
-                // Use tiktoken for OpenAI models
-                tiktoken_count_tokens(text, self.encoding())
-            }
-            Model::Ollama(_) => {
-                // Rough estimation for local models
-                estimate_tokens_by_chars(text)
-            }
+        if text.is_empty() {
+            return Ok(0);
         }
+
+        let tokenizer = TOKENIZER.get_or_init(|| {
+            let model_str: &str = self.into();
+            get_tokenizer(model_str)
+        });
+
+        let tokens = tokenizer.encode_ordinary(text);
+        Ok(tokens.len())
     }
 
-    pub fn max_context_length(&self) -> usize {
-        match self {
-            Model::Gpt4 => 8192,
-            Model::Gpt4o => 128000,
-            Model::Gpt4oMini => 128000,
-            Model::Gpt41 => 32768,
-            Model::Ollama(_) => 4096, // Conservative default
-        }
-    }
-
-    pub fn recommended_max_tokens(&self) -> u16 {
-        match self {
-            Model::Gpt4oMini => 256,  // Faster responses
-            Model::Gpt4o => 1024,     // Higher quality
-            _ => 512,                 // Balanced default
-        }
+    /// Gets maximum context size for the model (src/model.rs:76)
+    pub fn context_size(&self) -> usize {
+        let model_str: &str = self.into();
+        get_context_size(model_str)  // From tiktoken-rs
     }
 }
 ```
@@ -567,12 +544,12 @@ git-ai --help                    # Show help information
 
 ### Configuration Keys Reference
 
-| Key | Default | Description | Example |
-|-----|---------|-------------|---------|
-| `openai-api-key` | (required) | OpenAI API key | `sk-...` |
-| `model` | `gpt-4.1` | AI model to use | `gpt-4o`, `gpt-4o-mini`, `gpt-4` |
-| `max-tokens` | `512` | API request token limit | `256`, `1024` |
-| `max-commit-length` | `72` | Commit message character limit | `50`, `100` |
+| Key                 | Default       | Description                                           | Example                      |
+| ------------------- | ------------- | ----------------------------------------------------- | ---------------------------- |
+| `openai-api-key`    | (required)    | OpenAI API key                                        | `sk-...`                     |
+| `model`             | `gpt-4o-mini` | AI model to use (see src/config.rs:15)                | `gpt-4o`, `gpt-4.1`, `gpt-4` |
+| `max-tokens`        | `2024`        | API request token limit (see src/config.rs:14)        | `256`, `1024`                |
+| `max-commit-length` | `72`          | Commit message character limit (see src/config.rs:13) | `50`, `100`                  |
 
 ## Development Workflow
 
@@ -720,7 +697,7 @@ pub fn create_analyze_function_tool() -> Result<ChatCompletionTool> {
                     "description": "Relative path to the file"
                 },
                 "diff_content": {
-                    "type": "string", 
+                    "type": "string",
                     "description": "The git diff content for this specific file only"
                 },
                 "operation_type": {
@@ -733,9 +710,9 @@ pub fn create_analyze_function_tool() -> Result<ChatCompletionTool> {
         }))
         .build()?;
 
-    Ok(ChatCompletionTool { 
-        r#type: ChatCompletionToolType::Function, 
-        function 
+    Ok(ChatCompletionTool {
+        r#type: ChatCompletionToolType::Function,
+        function
     })
 }
 ```
@@ -799,14 +776,14 @@ cargo run --example multi_step_commit
 
 Git AI provides comprehensive debug output when `RUST_LOG=debug` is set:
 
-```
+```text
 === GIT AI HOOK DEBUG SESSION ===
 
 📋 INITIALIZATION
   Args:        commit_msg_file='.git/COMMIT_EDITMSG', source=None, sha1=None
   Build:       Debug build with performance profiling enabled
 
-⚙️  SETUP & PREPARATION  
+⚙️  SETUP & PREPARATION
   │ Generate instruction template     1.56ms    ✓
   │ Count tokens                      306.13ms  ✓
   │ Calculate instruction tokens      307.77ms  ✓
@@ -932,12 +909,12 @@ let sorted_files: Vec<_> = files
 
 ### Model Selection Guidelines
 
-| Model | Use Case | Speed | Quality | Cost |
-|-------|----------|--------|---------|------|
-| `gpt-4.1` | Default, balanced performance | Medium | High | Medium |
-| `gpt-4o` | Best quality, complex diffs | Slow | Highest | High |
-| `gpt-4o-mini` | Fast iteration, simple diffs | Fast | Good | Low |
-| `gpt-4` | Stable, proven performance | Medium | High | High |
+| Model         | Use Case                                    | Speed  | Quality | Cost   |
+| ------------- | ------------------------------------------- | ------ | ------- | ------ |
+| `gpt-4o-mini` | Default model, fast iteration, simple diffs | Fast   | Good    | Low    |
+| `gpt-4.1`     | Balanced performance                        | Medium | High    | Medium |
+| `gpt-4o`      | Best quality, complex diffs                 | Slow   | Highest | High   |
+| `gpt-4`       | Stable, proven performance                  | Medium | High    | High   |
 
 ### Fallback Strategy Implementation
 
@@ -1299,7 +1276,7 @@ let result = tokio::task::spawn_blocking(|| {
 
 **All public functions**:
 
-```rust
+````rust
 /// Parses a git diff into individual file changes.
 ///
 /// Handles various diff formats including standard git diff output,
@@ -1325,7 +1302,7 @@ let result = tokio::task::spawn_blocking(|| {
 /// # Ok::<(), anyhow::Error>(())
 /// ```
 pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>>
-```
+````
 
 **Module docs**:
 
@@ -1432,6 +1409,7 @@ config = "0.15.11"
 ```
 
 **When adding**:
+
 - ✅ Justify new dependencies
 - ✅ Use minimal feature flags
 - ✅ Prefer maintained crates
@@ -1441,7 +1419,7 @@ config = "0.15.11"
 
 When providing feedback:
 
-```
+```text
 ❌ Line 42: Using unwrap() can panic
 ✅ Fix: option.ok_or_else(|| anyhow!("no value"))?
 📝 Why: Provides better error context and prevents panics
