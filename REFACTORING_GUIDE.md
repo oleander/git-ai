@@ -29,7 +29,7 @@ This guide provides comprehensive instructions for improving the maintainability
 
 **Files to Refactor:**
 
-- `src/hook.rs` (725 lines) - Too large, mixing diff processing, traits, and parallel logic
+- `src/hook.rs` (very large file) - Too large, mixing diff processing, traits, and parallel logic
 - Multiple overlapping multi-step modules (`multi_step_analysis.rs`, `multi_step_integration.rs`, `simple_multi_step.rs`)
 
 **Action Items:**
