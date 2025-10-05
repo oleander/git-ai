@@ -6,7 +6,7 @@ use async_openai::Client;
 use crate::{config, debug_output, openai, profile};
 use crate::model::Model;
 use crate::config::AppConfig;
-use crate::multi_step_integration::{generate_commit_message_local, generate_commit_message_multi_step};
+use crate::multi_step_integration::{generate_commit_message_local, generate_commit_message_multi_step, generate_commit_message_parallel};
 
 /// The instruction template included at compile time
 const INSTRUCTION_TEMPLATE: &str = include_str!("../resources/prompt.md");
@@ -117,16 +117,25 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
             let client = Client::with_config(config);
             let model_str = model.to_string();
 
-            match generate_commit_message_multi_step(&client, &model_str, &patch, max_length).await {
+            // Try parallel approach first
+            match generate_commit_message_parallel(&client, &model_str, &patch, max_length).await {
               Ok(message) => return Ok(openai::Response { response: message }),
               Err(e) => {
                 // Check if it's an API key error
                 if e.to_string().contains("invalid_api_key") || e.to_string().contains("Incorrect API key") {
                   bail!("Invalid OpenAI API key. Please check your API key configuration.");
                 }
-                log::warn!("Multi-step generation with custom settings failed: {e}");
-                if let Some(session) = debug_output::debug_session() {
-                  session.set_multi_step_error(e.to_string());
+                log::warn!("Parallel generation with custom settings failed, trying multi-step: {e}");
+                
+                // Fallback to old multi-step approach
+                match generate_commit_message_multi_step(&client, &model_str, &patch, max_length).await {
+                  Ok(message) => return Ok(openai::Response { response: message }),
+                  Err(e2) => {
+                    log::warn!("Multi-step generation with custom settings also failed: {e2}");
+                    if let Some(session) = debug_output::debug_session() {
+                      session.set_multi_step_error(e2.to_string());
+                    }
+                  }
                 }
               }
             }
@@ -145,16 +154,25 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
         let client = Client::new();
         let model_str = model.to_string();
 
-        match generate_commit_message_multi_step(&client, &model_str, &patch, max_length).await {
+        // Try parallel approach first
+        match generate_commit_message_parallel(&client, &model_str, &patch, max_length).await {
           Ok(message) => return Ok(openai::Response { response: message }),
           Err(e) => {
             // Check if it's an API key error
             if e.to_string().contains("invalid_api_key") || e.to_string().contains("Incorrect API key") {
               bail!("Invalid OpenAI API key. Please check your API key configuration.");
             }
-            log::warn!("Multi-step generation failed: {e}");
-            if let Some(session) = debug_output::debug_session() {
-              session.set_multi_step_error(e.to_string());
+            log::warn!("Parallel generation failed, trying multi-step: {e}");
+            
+            // Fallback to old multi-step approach
+            match generate_commit_message_multi_step(&client, &model_str, &patch, max_length).await {
+              Ok(message) => return Ok(openai::Response { response: message }),
+              Err(e2) => {
+                log::warn!("Multi-step generation also failed: {e2}");
+                if let Some(session) = debug_output::debug_session() {
+                  session.set_multi_step_error(e2.to_string());
+                }
+              }
             }
           }
         }
