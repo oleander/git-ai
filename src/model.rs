@@ -246,11 +246,10 @@ impl From<String> for Model {
 
 fn get_tokenizer(model_str: &str) -> CoreBPE {
   match model_str {
-    "gpt-4" | "gpt-4o" | "gpt-4o-mini" | "gpt-4.1" => {
-      tiktoken_rs::cl100k_base()
-    }
+    "gpt-4" | "gpt-4o" | "gpt-4o-mini" | "gpt-4.1" => tiktoken_rs::cl100k_base(),
     _ => tiktoken_rs::cl100k_base() // fallback
-  }.expect("Failed to create tokenizer")
+  }
+  .expect("Failed to create tokenizer")
 }
 
 pub async fn run(settings: AppConfig, content: String) -> Result<String> {
@@ -274,13 +273,17 @@ pub async fn run(settings: AppConfig, content: String) -> Result<String> {
     );
   }
 
-  let temperature_value = settings.temperature.unwrap_or(crate::config::DEFAULT_TEMPERATURE);
+  let temperature_value = settings
+    .temperature
+    .unwrap_or(crate::config::DEFAULT_TEMPERATURE);
 
   log::info!(
     "Using model: {}, Tokens: {}, Max tokens: {}, Temperature: {}",
     model_str.yellow(),
     tokens.to_string().green(),
-    (settings.max_tokens.unwrap_or(model.context_size() - tokens)).to_string().green(),
+    (settings.max_tokens.unwrap_or(model.context_size() - tokens))
+      .to_string()
+      .green(),
     temperature_value.to_string().blue() // Use temperature_value
   );
 

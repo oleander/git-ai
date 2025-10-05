@@ -3,7 +3,6 @@ use serde_json::json;
 use async_openai::types::{ChatCompletionTool, ChatCompletionToolType, FunctionObjectArgs};
 use anyhow::Result;
 
-
 /// File analysis result from the analyze function
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileAnalysisResult {
