@@ -27,7 +27,7 @@ const DEFAULT_MODEL_NAME: &str = "gpt-4.1";
 
 /// Represents the available AI models for commit message generation.
 /// Each model has different capabilities and token limits.
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, Default)]
 pub enum Model {
   /// Standard GPT-4 model
   GPT4,
@@ -37,7 +37,9 @@ pub enum Model {
   GPT4oMini,
   /// Default model - GPT-4.1 latest version
   #[default]
-  GPT41
+  GPT41,
+  /// Custom model name for any other OpenAI model
+  Custom(String)
 }
 
 impl Model {
@@ -60,8 +62,8 @@ impl Model {
     // Always use the proper tokenizer for accurate counts
     // We cannot afford to underestimate tokens as it may cause API failures
     let tokenizer = TOKENIZER.get_or_init(|| {
-      let model_str: &str = self.into();
-      get_tokenizer(model_str)
+      let model_str = String::from(self);
+      get_tokenizer(&model_str)
     });
 
     // Use direct tokenization for accurate token count
@@ -75,8 +77,16 @@ impl Model {
   /// * `usize` - The maximum number of tokens the model can process
   pub fn context_size(&self) -> usize {
     profile!("Get context size");
-    let model_str: &str = self.into();
-    get_context_size(model_str)
+    
+    // For custom models, we don't know the context size, so use a reasonable default
+    // that works for most modern OpenAI models (GPT-4 family context size)
+    match self {
+      Model::Custom(_) => 128000, // Default to GPT-4 context size for custom models
+      _ => {
+        let model_str = String::from(self);
+        get_context_size(&model_str)
+      }
+    }
   }
 
   /// Truncates the given text to fit within the specified token limit.
@@ -167,14 +177,22 @@ impl Model {
   }
 }
 
-impl From<&Model> for &str {
+impl From<&Model> for String {
   fn from(model: &Model) -> Self {
     match model {
-      Model::GPT4o => MODEL_GPT4_OPTIMIZED,
-      Model::GPT4 => MODEL_GPT4,
-      Model::GPT4oMini => MODEL_GPT4_MINI,
-      Model::GPT41 => MODEL_GPT4_1
+      Model::GPT4o => MODEL_GPT4_OPTIMIZED.to_string(),
+      Model::GPT4 => MODEL_GPT4.to_string(),
+      Model::GPT4oMini => MODEL_GPT4_MINI.to_string(),
+      Model::GPT41 => MODEL_GPT4_1.to_string(),
+      Model::Custom(name) => name.clone()
     }
+  }
+}
+
+// Keep the old impl for backwards compatibility where possible
+impl Model {
+  pub fn as_str(&self) -> String {
+    self.into()
   }
 }
 
@@ -187,21 +205,21 @@ impl FromStr for Model {
       "gpt-4" => Ok(Model::GPT4),
       "gpt-4o-mini" => Ok(Model::GPT4oMini),
       "gpt-4.1" => Ok(Model::GPT41),
-      model => bail!("Invalid model name: {}", model)
+      model => Ok(Model::Custom(model.to_string()))
     }
   }
 }
 
 impl Display for Model {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", <&str>::from(self))
+    write!(f, "{}", String::from(self))
   }
 }
 
 // Implement conversion from string types to Model with fallback to default
 impl From<&str> for Model {
   fn from(s: &str) -> Self {
-    s.parse().unwrap_or_default()
+    s.parse().unwrap_or_else(|_| Model::Custom(s.to_string()))
   }
 }
 

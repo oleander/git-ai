@@ -117,7 +117,7 @@ impl Args {
     }
 
     let patch = repo
-      .to_patch(tree, remaining_tokens, model)
+      .to_patch(tree, remaining_tokens, model.clone())
       .context("Failed to get patch")?;
 
     let response = commit::generate(patch.to_string(), remaining_tokens, model, None).await?;
@@ -190,7 +190,7 @@ impl Args {
         }
 
         let patch = repo
-          .to_patch(tree, remaining_tokens, model)
+          .to_patch(tree, remaining_tokens, model.clone())
           .context("Failed to get patch")?;
 
         let response = commit::generate(patch.to_string(), remaining_tokens, model, None).await?;
