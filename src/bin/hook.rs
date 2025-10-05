@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+
 
 // .git/hooks/prepare-commit-msg
 //
@@ -54,7 +54,7 @@ use anyhow::{bail, Context, Result};
 use git2::{Oid, Repository};
 use ai::{commit, config, debug_output};
 use ai::hook::*;
-use ai::model::Model;
+
 
 #[derive(Debug, PartialEq)]
 enum Source {
@@ -90,43 +90,7 @@ struct Args {
 }
 
 impl Args {
-  async fn handle_commit(&self, repo: &Repository, pb: &ProgressBar, model: Model, remaining_tokens: usize) -> Result<()> {
-    let tree = match self.sha1.as_deref() {
-      Some("HEAD") | None => repo.head().ok().and_then(|head| head.peel_to_tree().ok()),
-      Some(sha1) => {
-        // Try to resolve the reference first
-        if let Ok(obj) = repo.revparse_single(sha1) {
-          obj.peel_to_tree().ok()
-        } else {
-          // If not a reference, try as direct OID
-          repo
-            .find_object(Oid::from_str(sha1)?, None)
-            .ok()
-            .and_then(|obj| obj.peel_to_tree().ok())
-        }
-      }
-    };
 
-    let diff = repo.to_diff(tree.clone())?;
-    if diff.is_empty()? {
-      if self.sha1.as_deref() == Some("HEAD") {
-        // For amend operations, we want to keep the existing message
-        return Ok(());
-      }
-      bail!("No changes to commit");
-    }
-
-    let patch = repo
-      .to_patch(tree, remaining_tokens, model)
-      .context("Failed to get patch")?;
-
-    let response = commit::generate(patch.to_string(), remaining_tokens, model, None).await?;
-    std::fs::write(&self.commit_msg_file, response.response.trim())?;
-
-    pb.finish_and_clear();
-
-    Ok(())
-  }
 
   async fn execute(&self) -> Result<()> {
     use Source::*;
