@@ -6,6 +6,40 @@ description: Sync all open pull requests with origin/main to keep them up-to-dat
 
 This rule provides a systematic approach to keeping all open pull requests synchronized with the main branch using the Docker-based `just pr` command for isolated testing.
 
+## AI-Assisted Workflow (Recommended)
+
+When the user asks to sync PRs, follow this automated workflow:
+
+### Step 1: Query Open PRs via MCP
+Use the GitHub MCP server to get all currently open PRs:
+```
+mcp_github_list_pull_requests(owner: "oleander", repo: "git-ai", state: "open")
+```
+
+### Step 2: Create Todos for Each PR
+Create a todo item for each open PR to track progress:
+```
+todo_write with todos for each PR number found, e.g.:
+- "Sync PR #74: [title]" (status: pending)
+- "Sync PR #75: [title]" (status: pending)
+- etc.
+```
+
+### Step 3: Sync Each PR Sequentially
+For each PR, run the sync command and update the todo status:
+```bash
+just sync-pr <PR_NUMBER> "cargo fmt --all && git add -A && git commit --amend --no-edit"
+```
+
+Update todo status to `in_progress` before running, then `completed` after success.
+
+### Benefits of AI-Assisted Workflow
+- **Always current**: MCP server queries live GitHub data
+- **Tracked progress**: Todos show what's completed and what's pending
+- **Error handling**: Can pause and resume if a PR fails
+- **Visibility**: User can see progress in real-time via todo list
+- **No manual updates**: No need to maintain hardcoded PR numbers in Justfile
+
 ## Why Sync PRs?
 
 - Prevents merge conflicts from accumulating
