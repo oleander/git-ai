@@ -1,0 +1,46 @@
+---
+name: "Copilot Setup Steps"
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}-copilot-setup-steps
+  cancel-in-progress: true
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  CARGO_TERM_COLOR: always
+
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+      packages: write
+      pull-requests: write
+      issues: write
+      checks: write
+      deployments: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup Rust nightly toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - run: cargo fetch
+      - run: cargo install --path . --debug
+      - run: git ai hook install
+      - run: git ai config set openai-api-key ${{ secrets.OPENAI_API_KEY }}
+
