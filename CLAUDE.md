@@ -99,7 +99,6 @@ The project is structured into several core components:
 3. **Diff Processing** (`src/hook.rs`): Handles parsing and processing Git diffs, with performance optimizations for handling large diffs through parallel processing and token management.
 
 4. **API Integration**:
-
    - **OpenAI** (`src/openai.rs`): Manages communication with the OpenAI API, handling request creation, error handling, and response parsing.
    - **Ollama** (`src/ollama.rs`): Provides integration with local Ollama models as an alternative to OpenAI.
 
@@ -122,7 +121,6 @@ The project is structured into several core components:
 1. **Hook Installation**: When `git-ai hook install` is run, the tool symlinks its executable to the repository's `.git/hooks/prepare-commit-msg` hook.
 
 2. **Commit Message Generation**:
-
    - When a user runs `git commit` without specifying a message
    - The hook intercepts the commit process
    - Retrieves the staged changes (diff)
@@ -131,7 +129,6 @@ The project is structured into several core components:
    - Uses the AI response as the commit message
 
 3. **Multi-Step Analysis Process**:
-
    - **Parse**: Splits the git diff into individual files
    - **Analyze**: Examines each file for lines added/removed, file type, and change significance
    - **Score**: Calculates impact scores based on operation type, file category, and lines changed
@@ -139,7 +136,6 @@ The project is structured into several core components:
    - **Select**: Chooses the best message based on highest impact
 
 4. **Performance Optimization**:
-
    - Parallel processing for large diffs
    - Token management to ensure API limits aren't exceeded
    - String pooling to reduce memory allocations
@@ -200,31 +196,37 @@ The commit message will be automatically generated based on the staged changes.
 Based on the project's Cursor rules:
 
 ### Formatting
+
 - Use `rustfmt.toml` with `edition = "2021"` and `max_width = 100`
 - Keep imports grouped: std → external → internal, then alphabetized
 - Run `cargo fmt` before committing
 
 ### Naming
+
 - snake_case for items and functions
 - SCREAMING_SNAKE_CASE for constants
 - PascalCase for types and traits
 - crate names use kebab-case
 
 ### Error Handling
+
 - Use `thiserror` for typed errors; `anyhow::Result<T>` for binaries
 - Prefer `?` operator over `unwrap`/`expect` in library code
 
 ### Module Organization
+
 - Files with underscores should be nested directories (e.g., `foo_bar.rs` → `foo/bar.rs`)
 - Public re-exports go in `lib.rs` for clean API surface
 - Avoid deep module trees (>3 levels)
 
 ### Testing
+
 - Each module should have `#[cfg(test)] mod tests { use super::*; ... }`
 - Integration tests in `tests/` directory use only public API
 - Run tests with debugging: `RUST_LOG=debug cargo test`
 
 ### Performance
+
 - Use parallel processing for large operations (see `multi_step_integration.rs` using `join_all`)
 - Token management and smart truncation for API limits
 - Profile with `profiling.rs` utilities
