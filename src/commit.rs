@@ -6,7 +6,7 @@ use async_openai::Client;
 use crate::{config, debug_output, openai, profile};
 use crate::model::Model;
 use crate::config::AppConfig;
-use crate::multi_step_integration::{generate_commit_message_local, generate_commit_message_multi_step};
+use crate::generation::multi_step::{generate_with_api, generate_local};
 
 /// The instruction template included at compile time
 const INSTRUCTION_TEMPLATE: &str = include_str!("../resources/prompt.md");
@@ -117,7 +117,7 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
             let client = Client::with_config(config);
             let model_str = model.to_string();
 
-            match generate_commit_message_multi_step(&client, &model_str, &patch, max_length).await {
+            match generate_with_api(&client, &model_str, &patch, max_length).await {
               Ok(message) => return Ok(openai::Response { response: message }),
               Err(e) => {
                 // Check if it's an API key error
@@ -145,7 +145,7 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
         let client = Client::new();
         let model_str = model.to_string();
 
-        match generate_commit_message_multi_step(&client, &model_str, &patch, max_length).await {
+        match generate_with_api(&client, &model_str, &patch, max_length).await {
           Ok(message) => return Ok(openai::Response { response: message }),
           Err(e) => {
             // Check if it's an API key error
@@ -163,7 +163,7 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
   }
 
   // Try local multi-step generation
-  match generate_commit_message_local(&patch, max_length) {
+  match generate_local(&patch, max_length) {
     Ok(message) => return Ok(openai::Response { response: message }),
     Err(e) => {
       log::warn!("Local multi-step generation failed: {e}");

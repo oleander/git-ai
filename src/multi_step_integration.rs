@@ -402,7 +402,7 @@ pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
 }
 
 /// Call the analyze function via OpenAI
-async fn call_analyze_function(client: &Client<OpenAIConfig>, model: &str, file: &ParsedFile) -> Result<Value> {
+pub async fn call_analyze_function(client: &Client<OpenAIConfig>, model: &str, file: &ParsedFile) -> Result<Value> {
   let tools = vec![create_analyze_function_tool()?];
 
   let system_message = ChatCompletionRequestSystemMessageArgs::default()
