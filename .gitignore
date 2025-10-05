@@ -10,3 +10,4 @@ finetune_verify.jsonl
 finetune_train.jsonl
 
 **/.claude/settings.local.json
+test-repo/

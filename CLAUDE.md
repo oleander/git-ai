@@ -111,9 +111,11 @@ The project is structured into several core components:
 
 8. **Function Calling** (`src/function_calling.rs`): Implements OpenAI function calling for structured commit message generation with reasoning and file change summaries.
 
-9. **Multi-Step Analysis** (`src/multi_step_analysis.rs` and `src/multi_step_integration.rs`): Implements the sophisticated divide-and-conquer approach that analyzes files individually, calculates impact scores, and generates multiple commit message candidates.
+9. **Multi-Step Analysis** (`src/multi_step_analysis.rs` and `src/multi_step_integration.rs`): Implements the sophisticated divide-and-conquer approach that analyzes files individually, calculates impact scores, and generates multiple commit message candidates. The integration module uses parallel processing via `join_all` to analyze multiple files concurrently.
 
 10. **Profiling** (`src/profiling.rs`): Performance profiling utilities to measure execution time of various operations.
+
+11. **Debug Output** (`src/debug_output.rs`): Provides debugging session tracking for multi-step analysis, including file analysis results, timings, and payloads.
 
 ## Key Workflows
 
@@ -160,6 +162,12 @@ cargo test
 # Run specific tests
 cargo test test_empty_diff
 
+# Run specific test with debugging output
+RUST_LOG=debug cargo test --lib -- multi_step_integration::tests::test_parse_diff_with_c_i_prefixes --exact --nocapture
+
+# Run all multi-step integration tests
+RUST_LOG=debug cargo test --lib multi_step_integration::tests --no-fail-fast
+
 # Run comprehensive tests
 ./scripts/comprehensive-tests
 
@@ -186,3 +194,37 @@ git commit --all --no-edit
 ```
 
 The commit message will be automatically generated based on the staged changes.
+
+## Code Style and Conventions
+
+Based on the project's Cursor rules:
+
+### Formatting
+- Use `rustfmt.toml` with `edition = "2021"` and `max_width = 100`
+- Keep imports grouped: std → external → internal, then alphabetized
+- Run `cargo fmt` before committing
+
+### Naming
+- snake_case for items and functions
+- SCREAMING_SNAKE_CASE for constants
+- PascalCase for types and traits
+- crate names use kebab-case
+
+### Error Handling
+- Use `thiserror` for typed errors; `anyhow::Result<T>` for binaries
+- Prefer `?` operator over `unwrap`/`expect` in library code
+
+### Module Organization
+- Files with underscores should be nested directories (e.g., `foo_bar.rs` → `foo/bar.rs`)
+- Public re-exports go in `lib.rs` for clean API surface
+- Avoid deep module trees (>3 levels)
+
+### Testing
+- Each module should have `#[cfg(test)] mod tests { use super::*; ... }`
+- Integration tests in `tests/` directory use only public API
+- Run tests with debugging: `RUST_LOG=debug cargo test`
+
+### Performance
+- Use parallel processing for large operations (see `multi_step_integration.rs` using `join_all`)
+- Token management and smart truncation for API limits
+- Profile with `profiling.rs` utilities
