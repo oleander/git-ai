@@ -44,15 +44,6 @@ jobs:
       - name: Install fish shell (for integration tests)
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fish
 
-      - name: Verify formatting compliance
-        run: cargo fmt --check
-
-      - name: Run clippy to catch issues early
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: Validate code compiles
-        run: cargo check --all-targets --all-features
-
       - name: Install git-ai binary
         run: cargo install --path . --debug
 
