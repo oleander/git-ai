@@ -3,12 +3,10 @@
 **/*.log
 *.log
 http-cacache/
-.git
 .gitignore
 .dockerignore
 Dockerfile
 **/Dockerfile
-**/.git
 **/.gitignore
 **/.dockerignore
 .editorconfig

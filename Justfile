@@ -28,6 +28,8 @@ integration-test:
     docker build -t git-ai-test .
     docker run --rm git-ai-test -e OPENAI_API_KEY=$OPENAI_API_KEY
 
+# just pr "gh pr checkout 74 && cargo fmt --all"
+# just pr "gh pr checkout 74 && cargo build"
 pr CMD:
     docker build --target pr-tester -t git-ai-pr-tester .
     docker run -i --rm -e GITHUB_TOKEN=$(gh auth token) git-ai-pr-tester bash -c "{{CMD}}"
