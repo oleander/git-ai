@@ -89,7 +89,7 @@ fn test_create_request_preserves_model() {
   let models = vec![Model::GPT4oMini, Model::GPT4o, Model::GPT4, Model::GPT41];
 
   for model in models {
-    let result = create_commit_request(diff.clone(), 1000, model.clone());
+    let result = create_commit_request(diff.clone(), 1000, model);
     assert!(result.is_ok(), "Should work with model {:?}", model);
 
     let request = result.unwrap();
@@ -598,5 +598,5 @@ index abc..def 100644
   let request = create_commit_request(diff, remaining_tokens, model).unwrap();
 
   assert!(request.max_tokens > 0, "Should have tokens available for response");
-  assert!(request.max_tokens <= u16::MAX as u16, "Should not exceed u16 limit");
+  assert!(request.max_tokens <= u16::MAX, "Should not exceed u16 limit");
 }
