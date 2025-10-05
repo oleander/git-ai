@@ -495,227 +495,300 @@ Follow these rules when refactoring or adding new code.
 
 ### Formatting (rustfmt.toml - Mandatory)
 
-**Source**: `rustfmt.toml` - These are **mandatory** formatting rules:
+**Source**: `rustfmt.toml` - Enforced by CI
 
 ```toml
-max_width = 140                    # Wider than Rust default (100)
-tab_spaces = 2                     # 2-space indentation
-trailing_comma = "Never"           # No trailing commas
-imports_granularity = "Module"     # Group imports by module
-group_imports = "StdExternalCrate" # Order: std → external → crate
-fn_call_width = 90                 # Wrap function calls at 90 chars
-struct_lit_width = 50              # Wrap struct literals at 50
-use_field_init_shorthand = true    # Use { field } not { field: field }
-reorder_imports = false            # Maintain manual import order
-force_multiline_blocks = true      # Multi-line block expressions
+max_width = 140
+tab_spaces = 2
+hard_tabs = false
+edition = "2021"
+style_edition = "2021"
+
+imports_granularity = "Module"
+imports_layout = "Horizontal"
+group_imports = "StdExternalCrate"
+imports_indent = "Block"
+reorder_imports = false
+reorder_modules = false
+
+fn_params_layout = "Compressed"
+fn_call_width = 90
+attr_fn_like_width = 120
+reorder_impl_items = true
+
+struct_lit_single_line = true
+struct_lit_width = 50
+struct_field_align_threshold = 40
+use_field_init_shorthand = true
+
+enum_discrim_align_threshold = 40
+match_block_trailing_comma = false
+match_arm_blocks = false
+
+overflow_delimited_expr = true
+use_small_heuristics = "Max"
+force_multiline_blocks = true
+chain_width = 60
+trailing_comma = "Never"
 ```
 
-**Verification**: Run `cargo fmt -- --check` before committing.
+**Verify**: `cargo fmt -- --check`
 
-### Naming Standards (Based on Actual Codebase)
+### Naming Conventions
 
-The project uses **descriptive multi-word names** when they provide clarity:
+**Types** - Descriptive, clear names (multi-word acceptable):
 
 ```rust
-// ✅ Current acceptable patterns
-pub struct FileAnalysisResult { ... }
-pub struct CommitFunctionArgs { ... }
-pub struct ParsedFile { ... }
-pub enum HookError { ... }
-pub fn parse_diff(content: &str) -> Result<Vec<ParsedFile>>
-pub fn generate_commit_message(diff: &str) -> Result<String>
+// ✅ Clear and descriptive (from actual codebase)
+struct FileAnalysisResult { /* ... */ }
+struct CommitFunctionArgs { /* ... */ }
+struct ParsedFile { /* ... */ }
+enum HookError { /* ... */ }
 
-// ✅ Constants are SCREAMING_SNAKE_CASE with context
+// ⚠️ Refactor candidates (overly verbose)
+struct FileDataForScoring { /* ... */ }  // → FileData
+struct FileWithScore { /* ... */ }       // → ScoredFile
+```
+
+**Functions** - Verb phrases, context-appropriate length:
+
+```rust
+// ✅ Descriptive verbs (from codebase)
+fn parse_diff(content: &str) -> Result<Vec<ParsedFile>>
+fn generate_commit_message(diff: &str) -> Result<String>
+fn create_analyze_function_tool() -> Result<ChatCompletionTool>
+
+// ❌ Generic without context
+fn process() -> Result<()>
+fn handle() -> Result<()>
+```
+
+**Constants** - SCREAMING_SNAKE_CASE, descriptive:
+
+```rust
+// ✅ From actual codebase
 const MAX_POOL_SIZE: usize = 1000;
 const DEFAULT_STRING_CAPACITY: usize = 8192;
 const PARALLEL_CHUNK_SIZE: usize = 25;
-
-// ❌ Avoid overly generic names
-pub fn process() -> Result<()>  // Process what?
-const MAX: usize = 1000;        // Max what?
 ```
 
-**Module scoping**: Use modules to provide context, not just long type names:
+**Modules** - Scope types, enable short names within:
 
 ```rust
-// ✅ Planned refactoring pattern
 mod diff {
-    pub struct Parser { ... }
-    pub fn parse() -> Result<ParsedFile>
+    pub struct Parser { /* ... */ }
+    pub fn parse() -> Result<ParsedFile>  // Short in context
 }
 
 mod generation {
-    pub struct Strategy { ... }
+    pub struct Strategy { /* ... */ }
     pub fn generate() -> Result<String>
 }
 ```
 
-### Type System Patterns
+### Type System
 
-**Derive macros** - Standard pattern observed in codebase:
+**Newtypes for domain modeling**:
 
 ```rust
-// ✅ Common derives (verify what's actually needed)
+struct ImpactScore(f32);
+struct TokenCount(usize);
+struct UserId(i64);
+```
+
+**Exhaustive enums over booleans**:
+
+```rust
+// ✅ From codebase
+enum OperationType { Added, Modified, Deleted, Renamed, Binary }
+
+// ❌ Anti-pattern
+struct File { is_added: bool, is_modified: bool }
+```
+
+**Typestate pattern**:
+
+```rust
+struct Validated;
+struct Email<S = Unvalidated> {
+    value: String,
+    _state: PhantomData<S>
+}
+```
+
+**Standard derives** (from codebase):
+
+```rust
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FileAnalysisResult { ... }
-
 #[derive(Error, Debug)]
-pub enum HookError { ... }
-
-// ✅ Add useful derives
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Default)]  // When sensible default exists
+#[derive(PartialEq, Eq)]  // Add Eq if PartialEq
 ```
 
-**Newtype pattern** for domain modeling:
+### Error Handling
+
+**thiserror for libraries**:
 
 ```rust
-// ✅ Use newtypes for type safety
-pub struct ImpactScore(f32);
-pub struct TokenCount(usize);
-```
-
-**Exhaustive enums** over booleans:
-
-```rust
-// ✅ Use enums for states
-pub enum OperationType {
-    Added, Modified, Deleted, Renamed, Binary
-}
-
-// ❌ Don't use multiple booleans for state
-struct File {
-    is_added: bool,
-    is_modified: bool,  // What if both are false? Or both true?
-}
-```
-
-### Error Handling (anyhow + thiserror)
-
-**Current state**: Project uses both appropriately
-
-- **9 instances of `unwrap()`/`expect()`** across 4 files - should be reduced
-
-```rust
-// ✅ thiserror for library errors (typed)
+// ✅ From codebase (hook.rs)
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum HookError {
-    #[error("Failed to open repository")]
+    #[error("failed to open repository")]
     OpenRepository,
-
+    #[error("failed to get patch")]
+    GetPatch,
     #[error(transparent)]
-    Anyhow(#[from] anyhow::Error),
+    Anyhow(#[from] anyhow::Error)
 }
+```
 
-// ✅ anyhow for application code with context
+**anyhow for applications**:
+
+```rust
+// ✅ Pattern from codebase
 use anyhow::{Context, Result, bail};
 
 pub fn generate(diff: &str) -> Result<String> {
     let parsed = parse_diff(diff)
-        .context("Failed to parse git diff")?;  // Always add context
+        .context("failed to parse git diff")?;
 
     if parsed.is_empty() {
-        bail!("Empty diff provided");
+        bail!("empty diff provided");
     }
-
     Ok(result)
 }
-
-// ❌ Avoid unwrap in production code
-let value = option.unwrap();  // Can panic!
-
-// ✅ Use ? operator with context
-let value = option
-    .ok_or_else(|| anyhow!("No value found"))?;
 ```
 
-### Performance Patterns (From Codebase)
+**Eliminate unwrap/expect**:
 
-**Pre-allocate capacity** - Found throughout codebase:
+**Current issue**: 9 instances across 4 files - should be reduced
 
 ```rust
-// ✅ Always pre-allocate when size is known or estimable
+// ❌ Avoid in production code
+let value = option.unwrap();
+let value = result.expect("this should never fail");
+
+// ✅ Use ? operator with context
+let value = option.ok_or_else(|| anyhow!("no value found"))?;
+let value = result.context("operation failed")?;
+```
+
+### API Design
+
+**Accept borrowed, return owned**:
+
+```rust
+// ✅ From codebase pattern
+fn process(input: &str) -> String
+fn parse(diff: &str) -> Result<Vec<ParsedFile>>
+```
+
+**Trait bounds for flexibility**:
+
+```rust
+fn process(path: impl AsRef<Path>) -> Result<()>
+fn with_config(config: impl Into<Config>) -> Self
+```
+
+**Must-use for important returns**:
+
+```rust
+#[must_use = "commit message should be used or logged"]
+pub fn generate_commit_message(diff: &str) -> Result<String>
+```
+
+### Performance
+
+**Pre-allocate** (pattern from codebase):
+
+```rust
+// ✅ Always pre-allocate when size is known
 let mut files = HashMap::with_capacity(ESTIMATED_FILES_COUNT);
 let mut results = Vec::with_capacity(total_files);
 let mut buffer = String::with_capacity(DEFAULT_STRING_CAPACITY);
 ```
 
-**Use iterators** over manual loops:
+**Iterators over loops**:
 
 ```rust
-// ✅ Iterator chains are clearer
+// ✅ Iterator chains
 let scored: Vec<_> = files
     .into_iter()
     .filter(|f| f.lines_changed > 0)
-    .map(|f| calculate_score(f))
+    .map(calculate_score)
     .collect();
 ```
 
 **Inline hot paths**:
 
 ```rust
-// ✅ Inline small, frequently-called functions
+// ✅ Small, frequently-called functions
 #[inline]
-pub fn calculate_single_score(data: &FileData) -> f32 {
-    // Small function in tight loop
-}
+pub fn calculate_score(data: &FileData) -> f32 { /* ... */ }
 
-// ❌ Don't inline large or cold functions
+// ❌ Don't inline large functions
 #[inline]  // Bloats binary
 pub async fn generate_commit_message(diff: &str) -> Result<String> {
     // 100+ lines
 }
 ```
 
-### Async Patterns (Tokio)
-
-**Structured concurrency** with `join_all`:
-
-```rust
-use futures::future::join_all;
-
-// ✅ Concurrent operations with structured control
-let futures: Vec<_> = files
-    .iter()
-    .map(|file| analyze_file(client, file))
-    .collect();
-
-let results = join_all(futures).await;
-
-// ❌ Avoid unnecessary spawning
-for file in files {
-    tokio::spawn(analyze_file(client, file)); // Loses control
-}
-```
-
-### Parallel Processing (Rayon)
-
-**Current usage**: Heavy use of `rayon = "1.10.0"` for CPU-bound work:
+**Parallel processing** (Rayon - from codebase):
 
 ```rust
 use rayon::prelude::*;
 
-// ✅ Parallel iterator for independent operations
+// ✅ Parallel iterator for CPU-bound work
 let results: Vec<_> = files
     .par_iter()
-    .map(|file| process_file(file))
+    .map(process_file)
     .collect();
 
 // ✅ Chunking for better cache locality
 let chunks: Vec<_> = files.chunks(PARALLEL_CHUNK_SIZE).collect();
-chunks.par_iter().try_for_each(|chunk| process_chunk(chunk))?;
+chunks.par_iter().try_for_each(process_chunk)?;
 ```
 
-### Documentation Standards
+### Async (Tokio 1.45.1)
 
-**Every public function** must have documentation:
+**Structured concurrency** (from multi_step_integration.rs):
 
-````rust
+```rust
+use futures::future::join_all;
+
+// ✅ join! over spawn
+let futures: Vec<_> = files
+    .iter()
+    .map(|f| analyze_file(client, f))
+    .collect();
+
+let results = join_all(futures).await;
+
+// ❌ Unstructured spawning
+for file in files {
+    tokio::spawn(analyze_file(client, file));
+}
+```
+
+**spawn_blocking for CPU-bound**:
+
+```rust
+let result = tokio::task::spawn_blocking(|| {
+    heavy_computation()
+}).await?;
+```
+
+### Documentation (Required)
+
+**All public functions**:
+
+```rust
 /// Parses a git diff into individual file changes.
 ///
 /// Handles various diff formats including standard git diff output,
-/// diffs with commit hashes, and various path prefixes (a/, b/, c/, i/).
+/// diffs with commit hashes, and various path prefixes.
 ///
 /// # Arguments
 /// * `diff_content` - Raw git diff text to parse
@@ -724,94 +797,104 @@ chunks.par_iter().try_for_each(|chunk| process_chunk(chunk))?;
 /// * `Result<Vec<ParsedFile>>` - Parsed file changes
 ///
 /// # Errors
-/// Returns error if diff format is unrecognizable
+/// Returns error if diff format is unrecognizable or file paths
+/// cannot be extracted.
 ///
 /// # Examples
 /// ```rust,no_run
 /// use git_ai::diff::parse_diff;
 ///
+/// let diff = "diff --git a/file.txt b/file.txt\n...";
 /// let files = parse_diff(diff)?;
 /// assert!(!files.is_empty());
 /// # Ok::<(), anyhow::Error>(())
 /// ```
-pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
-    // Implementation
-}
-````
-
-**Module-level docs** for all modules:
-
-````rust
-//! Git diff parsing and processing.
-//!
-//! This module handles parsing git diffs into structured data.
-//!
-//! # Examples
-//! ```rust,no_run
-//! use git_ai::diff::parse_diff;
-//! let files = parse_diff(diff)?;
-//! ```
-````
-
-### Pre-Commit Checklist
-
-**Before committing any code, verify**:
-
-```bash
-# 1. Format check (must pass)
-cargo fmt -- --check
-
-# 2. Linting (zero warnings required)
-cargo clippy --all-targets --all-features -- -D warnings
-
-# 3. Tests (all must pass)
-cargo test --all-features
-
-# 4. Release build
-cargo build --release
-
-# 5. Documentation builds
-cargo doc --no-deps
+pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>>
 ```
 
-**Manual verification**:
+**Module docs**:
 
-- [ ] All public functions documented with examples
-- [ ] No `unwrap()` or `expect()` in library code (or explicitly justified)
-- [ ] Error messages are helpful and actionable
-- [ ] Names are clear and descriptive
-- [ ] Follows rustfmt.toml formatting
-- [ ] Zero clippy warnings
-- [ ] Tests pass
-- [ ] No performance regressions
+```rust
+//! Git diff parsing and processing.
+//!
+//! Handles parsing git diffs into structured data and
+//! processing them with token management for LLM consumption.
+```
 
-### Anti-Patterns to Avoid
+### Validation Commands
+
+**Must pass before commit**:
+
+```bash
+# Individual checks
+cargo clippy --all-targets --all-features -- -D warnings
+cargo fmt -- --check
+cargo test --all-features
+cargo doc --no-deps
+
+# Comprehensive pre-PR check
+cargo fmt -- --check && \
+cargo clippy --all-targets --all-features -- -D warnings && \
+cargo test --all-features && \
+cargo build --release && \
+cargo doc --no-deps
+
+# Watch during development
+cargo watch -x test -x clippy
+```
+
+### Quality Checklist
+
+When reviewing code:
+
+- [ ] **Clippy**: Zero warnings (`-D warnings`)
+- [ ] **Format**: Follows rustfmt.toml exactly
+- [ ] **Docs**: All public items with examples
+- [ ] **Errors**: Context chains, no unwrap in libs (9 to remove)
+- [ ] **Tests**: Pass with coverage
+- [ ] **Names**: Clear, descriptive, appropriate length
+- [ ] **Performance**: No regressions
+- [ ] **Dependencies**: Justified, minimal features
+
+### Code Smells to Avoid
 
 ```rust
 // ❌ Boolean parameters (use enum)
 fn process(diff: &str, fast: bool, cached: bool)
 
-// ✅ Use enum for clarity
+// ✅ Enum for clarity
 enum ProcessMode { Fast, Cached, Normal }
 fn process(diff: &str, mode: ProcessMode)
 
 // ❌ Mutable statics
 static mut COUNTER: usize = 0;
 
-// ✅ Use LazyLock with atomic
+// ✅ LazyLock + Atomic
 use std::sync::LazyLock;
 static COUNTER: LazyLock<AtomicUsize> = LazyLock::new(|| AtomicUsize::new(0));
 
 // ❌ Stringly-typed APIs
 fn set_model(model: &str)  // What strings are valid?
 
-// ✅ Use enums for type safety
+// ✅ Type-safe enums
 fn set_model(model: Model)
+
+// ❌ Public fields without builder
+pub struct Config { pub api_key: String }
+
+// ✅ Encapsulated with methods
+pub struct Config { api_key: String }
+impl Config {
+    pub fn with_api_key(mut self, key: String) -> Self {
+        self.api_key = key;
+        self
+    }
+}
 ```
 
-### Dependencies
+### Dependencies (Current Stack)
 
-**Current stack** (from Cargo.toml):
+**From Cargo.toml**:
 
 ```toml
 # Core
@@ -819,11 +902,13 @@ anyhow = "1.0.98"          # Application errors
 thiserror = "2.0.12"       # Library errors
 tokio = "1.45.1"           # Async runtime
 rayon = "1.10.0"           # Data parallelism
+futures = "0.3"            # Async utilities
+parking_lot = "0.12.3"     # Fast locks
 
-# Git & OpenAI
-git2 = "0.20.2"
-async-openai = "0.29"
-tiktoken-rs = "0.7.0"
+# Git & AI
+git2 = "0.20.2"            # Git operations
+async-openai = "0.29"      # OpenAI API
+tiktoken-rs = "0.7.0"      # Token counting
 
 # Config & Serialization
 serde = "1.0"
@@ -831,28 +916,20 @@ serde_json = "1.0"
 config = "0.15.11"
 ```
 
-**When adding dependencies**:
-
+**When adding**:
 - ✅ Justify new dependencies
-- ✅ Use minimal feature flags (`default-features = false`)
+- ✅ Use minimal feature flags
 - ✅ Prefer maintained crates
-- ❌ Avoid duplicating existing functionality
+- ❌ Avoid duplicating functionality
 
-### Quality Verification Commands
+### Code Review Output Format
 
-```bash
-# Comprehensive check before PR
-cargo fmt -- --check && \
-cargo clippy --all-targets --all-features -- -D warnings && \
-cargo test --all-features && \
-cargo build --release && \
-cargo doc --no-deps
+When providing feedback:
 
-# Watch mode during development
-cargo watch -x test -x clippy
-
-# Check specific test
-cargo test test_name -- --nocapture
+```
+❌ Line 42: Using unwrap() can panic
+✅ Fix: option.ok_or_else(|| anyhow!("no value"))?
+📝 Why: Provides better error context and prevents panics
 ```
 
 ---
