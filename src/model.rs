@@ -192,12 +192,33 @@ impl FromStr for Model {
   type Err = anyhow::Error;
 
   fn from_str(s: &str) -> Result<Self> {
-    match s.trim().to_lowercase().as_str() {
+    let normalized = s.trim().to_lowercase();
+    match normalized.as_str() {
       "gpt-4.1" => Ok(Model::GPT41),
       "gpt-4.1-mini" => Ok(Model::GPT41Mini),
       "gpt-4.1-nano" => Ok(Model::GPT41Nano),
       "gpt-4.5" => Ok(Model::GPT45),
-      model => bail!("Invalid model name: {}", model)
+      // Backward compatibility for deprecated models - map to closest GPT-4.1 equivalent
+      "gpt-4" | "gpt-4o" => {
+        log::warn!(
+          "Model '{}' is deprecated. Mapping to 'gpt-4.1'. \
+          Please update your configuration with: git ai config set model gpt-4.1",
+          s
+        );
+        Ok(Model::GPT41)
+      }
+      "gpt-4o-mini" | "gpt-3.5-turbo" => {
+        log::warn!(
+          "Model '{}' is deprecated. Mapping to 'gpt-4.1-mini'. \
+          Please update your configuration with: git ai config set model gpt-4.1-mini",
+          s
+        );
+        Ok(Model::GPT41Mini)
+      }
+      model => bail!(
+        "Invalid model name: '{}'. Supported models: gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4.5",
+        model
+      )
     }
   }
 }
@@ -211,7 +232,13 @@ impl Display for Model {
 // Implement conversion from string types to Model with fallback to default
 impl From<&str> for Model {
   fn from(s: &str) -> Self {
-    s.parse().unwrap_or_default()
+    s.parse().unwrap_or_else(|e| {
+      log::error!(
+        "Failed to parse model '{}': {}. Falling back to default model 'gpt-4.1'.",
+        s, e
+      );
+      Model::default()
+    })
   }
 }
 
