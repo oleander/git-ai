@@ -8,7 +8,7 @@ This rule provides a systematic approach to keeping all open pull requests synch
 
 ## AI-Assisted Workflow (Recommended)
 
-When the user asks to sync PRs, follow this automated workflow:
+When the user asks to sync PRs (phrases like "sync all open prs", "update all PRs", "sync prs with main"), follow this automated workflow:
 
 ### Step 1: Query Open PRs via MCP
 Use the GitHub MCP server to get all currently open PRs:
@@ -16,22 +16,36 @@ Use the GitHub MCP server to get all currently open PRs:
 mcp_github_list_pull_requests(owner: "oleander", repo: "git-ai", state: "open")
 ```
 
+Extract PR numbers and titles from the response.
+
 ### Step 2: Create Todos for Each PR
-Create a todo item for each open PR to track progress:
+Create a todo item for each open PR to track progress. Use the first PR as `in_progress` to start immediately:
 ```
-todo_write with todos for each PR number found, e.g.:
-- "Sync PR #74: [title]" (status: pending)
-- "Sync PR #75: [title]" (status: pending)
-- etc.
+todo_write({
+  merge: false,
+  todos: [
+    { id: "sync-pr-74", content: "Sync PR #74: [title]", status: "in_progress" },
+    { id: "sync-pr-75", content: "Sync PR #75: [title]", status: "pending" },
+    // ... etc
+  ]
+})
 ```
 
 ### Step 3: Sync Each PR Sequentially
-For each PR, run the sync command and update the todo status:
+For each PR, run the sync command in parallel with updating the todo status:
+
+**In the same tool call batch**, run both:
+1. Update the current PR to `in_progress` and previous to `completed`
+2. Execute the sync command
+
 ```bash
 just sync-pr <PR_NUMBER> "cargo fmt --all && git add -A && git commit --amend --no-edit"
 ```
 
-Update todo status to `in_progress` before running, then `completed` after success.
+This ensures efficient execution by batching todo updates with command execution.
+
+### Step 4: Complete Final PR
+After the last PR syncs successfully, mark it as `completed`.
 
 ### Benefits of AI-Assisted Workflow
 - **Always current**: MCP server queries live GitHub data
@@ -39,6 +53,52 @@ Update todo status to `in_progress` before running, then `completed` after succe
 - **Error handling**: Can pause and resume if a PR fails
 - **Visibility**: User can see progress in real-time via todo list
 - **No manual updates**: No need to maintain hardcoded PR numbers in Justfile
+
+### Implementation Details for AI
+
+When the user requests to sync PRs (e.g., "sync all open prs", "update all PRs", etc.):
+
+```typescript
+// 1. Query GitHub for open PRs
+const prs = await mcp_github_list_pull_requests({
+  owner: "oleander",
+  repo: "git-ai",
+  state: "open"
+});
+
+// 2. Create todos for all PRs
+await todo_write({
+  merge: false,
+  todos: prs.map(pr => ({
+    id: `sync-pr-${pr.number}`,
+    content: `Sync PR #${pr.number}: ${pr.title}`,
+    status: "pending"
+  }))
+});
+
+// 3. Sync each PR sequentially
+for (const pr of prs) {
+  // Mark as in_progress
+  await todo_write({
+    merge: true,
+    todos: [{ id: `sync-pr-${pr.number}`, status: "in_progress" }]
+  });
+
+  // Run sync command
+  await run_terminal_cmd({
+    command: `just sync-pr ${pr.number} "cargo fmt --all && git add -A && git commit --amend --no-edit"`,
+    is_background: false
+  });
+
+  // Mark as completed
+  await todo_write({
+    merge: true,
+    todos: [{ id: `sync-pr-${pr.number}`, status: "completed" }]
+  });
+}
+```
+
+**Error Handling**: If a sync fails, leave the todo as `in_progress` and report the error to the user. They can then manually resolve conflicts and ask you to continue with remaining PRs.
 
 ## Why Sync PRs?
 
@@ -390,18 +450,29 @@ After syncing each PR:
 
 ## Quick Reference
 
+### AI-Assisted (Recommended)
+```
+User: "Sync all open PRs"
+AI:
+  1. Uses MCP GitHub server to query open PRs
+  2. Creates todos for each PR
+  3. Runs sync-pr for each PR automatically
+  4. Updates todo status as each completes
+```
+
+### Manual Commands
 ```bash
 # List open PRs
 gh pr list
 
-# Sync all open PRs at once (recommended)
-just sync-all-prs
+# Sync multiple PRs at once (pass PR numbers)
+just sync-all-prs 74 75 76 78 79 80 88
 
-# Sync a single PR with default behavior
+# Sync a single PR with auto-formatting
+just sync-pr <PR_NUMBER> "cargo fmt --all && git add -A && git commit --amend --no-edit"
+
+# Sync a single PR with default behavior (just testing)
 just sync-pr <PR_NUMBER>
-
-# Sync a single PR with custom commands
-just sync-pr <PR_NUMBER> "cargo fmt --all && cargo test && git add -A && git commit --amend --no-edit"
 
 # Run any command in a PR's Docker environment
 just pr <PR_NUMBER> "cargo test"
@@ -429,19 +500,26 @@ pr PR_NUMBER CMD:
     docker build --build-arg PR_NUMBER={{PR_NUMBER}} --build-arg GH_TOKEN=$(gh auth token) --target pr-tester -t git-ai-pr-tester .
     docker run -i --rm -e GITHUB_TOKEN=$(gh auth token) git-ai-pr-tester bash -c "{{CMD}}"
 
-# Sync a single PR with origin/main
+# Sync a single PR with origin/main (with customizable command)
 sync-pr PR_NUM CMD = "date":
     just pr {{PR_NUM}} "git fetch origin && git merge origin/main --no-edit && {{CMD}} && cargo fmt --check && cargo check && git push origin --force"
 
-# Sync all open PRs with origin/main
-sync-all-prs:
-    just sync-pr 74 "cargo fmt --all && git add -A && git commit --amend --no-edit"
-    just sync-pr 75 "cargo fmt --all && git add -A && git commit --amend --no-edit"
-    just sync-pr 76 "cargo fmt --all && git add -A && git commit --amend --no-edit"
-    # ... (continues for all open PRs)
+# Sync multiple PRs (accepts variadic PR numbers)
+sync-all-prs *PR_NUMBERS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for pr_num in {{PR_NUMBERS}}; do
+      echo "=== Syncing PR #$pr_num ==="
+      just sync-pr "$pr_num" "cargo fmt --all && git add -A && git commit --amend --no-edit" || echo "✗ PR #$pr_num failed"
+      echo ""
+    done
+    echo "✓ Sync complete"
 ```
 
-**Note**: Update the `sync-all-prs` recipe when PRs are opened/closed by running:
-```bash
-gh pr list --json number --jq '.[].number'
-```
+### Key Features
+
+- **`pr`**: Low-level Docker execution for any command in a PR's environment
+- **`sync-pr`**: High-level sync with customizable post-merge commands
+- **`sync-all-prs`**: Batch operation that accepts PR numbers as arguments
+- **Default command**: `sync-pr` uses `"date"` by default for testing; pass custom commands for real syncs
+- **Auto-formatting**: Use `"cargo fmt --all && git add -A && git commit --amend --no-edit"` to fix formatting after merge
