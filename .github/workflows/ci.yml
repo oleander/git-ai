@@ -14,7 +14,7 @@ env:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest-arm
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - uses: Swatinem/rust-cache@v2
@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [macos-latest, ubuntu-latest-arm]
+        os: [macos-latest, ubuntu-latest]
         rust: [nightly, stable]
     runs-on: ${{ matrix.os }}
     continue-on-error: false
