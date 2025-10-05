@@ -2,7 +2,7 @@ use ai::model::Model;
 
 #[test]
 fn test_token_counting_accuracy() {
-  let model = Model::GPT4;
+  let model = Model::GPT41;
 
   // Test various text lengths to ensure we're not underestimating
   let test_cases = vec![
@@ -46,7 +46,7 @@ fn test_token_counting_accuracy() {
 
 #[test]
 fn test_no_underestimation_for_context_limit() {
-  let model = Model::GPT4;
+  let model = Model::GPT41;
 
   // Create text that would be underestimated by the old heuristics
   // Old heuristic: ~4 chars per token, but actual can be much different
@@ -79,7 +79,7 @@ fn test_no_underestimation_for_context_limit() {
 
 #[test]
 fn test_token_counting_consistency() {
-  let model = Model::GPT4;
+  let model = Model::GPT41;
 
   // Test that the same text always returns the same token count
   let test_text = "The quick brown fox jumps over the lazy dog. This is a test sentence with various words.";
@@ -95,7 +95,7 @@ fn test_token_counting_consistency() {
 
 #[test]
 fn test_long_text_token_counting() {
-  let model = Model::GPT4;
+  let model = Model::GPT41;
 
   // Test with a longer text to ensure we're using the tokenizer properly
   let long_text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(50);
