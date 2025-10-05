@@ -489,11 +489,11 @@ Follow these rules when refactoring or adding new code.
 
 ---
 
-## Detailed Code Quality Standards
+## Code Quality Standards
 
-> Based on actual codebase patterns and `rustfmt.toml` configuration
+> **Cross-referenced with actual codebase** - All rules verified against Git AI v1.0.9
 
-### Formatting Rules (Enforced)
+### Formatting (rustfmt.toml - Mandatory)
 
 **Source**: `rustfmt.toml` - These are **mandatory** formatting rules:
 
