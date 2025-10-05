@@ -198,6 +198,16 @@ fn truncate_to_fit(text: &str, max_tokens: usize, model: &Model) -> Result<Strin
 }
 
 /// Calls the OpenAI API with the provided configuration
+///
+/// Implements a fallback strategy:
+/// 1. Try multi-step analysis approach (default)
+/// 2. Fall back to single-step if multi-step fails (except for auth errors)
+///
+/// # Error Handling
+///
+/// Authentication errors detected by [`crate::error::is_openai_auth_error`] are
+/// propagated immediately without attempting fallback, ensuring users get clear
+/// feedback about API key issues rather than confusing secondary errors.
 pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<Response> {
   profile!("OpenAI API call with custom config");
 
@@ -209,9 +219,7 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
     Ok(message) => return Ok(Response { response: message }),
     Err(e) => {
       // Check if it's an API key error and propagate it
-      if e.to_string().contains("invalid_api_key") || 
-         e.to_string().contains("Incorrect API key") ||
-         e.to_string().contains("OpenAI API authentication failed") {
+      if crate::error::is_openai_auth_error(&e) {
         return Err(e);
       }
       log::warn!("Multi-step approach failed, falling back to single-step: {e}");

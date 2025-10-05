@@ -20,6 +20,22 @@ pub struct ParsedFile {
 }
 
 /// Main entry point for multi-step commit message generation
+///
+/// This function uses a sophisticated divide-and-conquer approach:
+/// 1. Parse the diff into individual files
+/// 2. Analyze each file concurrently using the OpenAI API
+/// 3. Calculate impact scores for each file
+/// 4. Generate multiple commit message candidates
+/// 5. Select the best message based on impact scores
+///
+/// # Error Handling
+///
+/// Authentication failures are detected early and propagated immediately to provide
+/// clear feedback to users. Uses [`crate::error::is_openai_auth_error`] to identify
+/// API key issues and other authentication problems.
+///
+/// Other errors (non-auth) are logged as warnings and processing continues with
+/// remaining files to maximize the chance of generating a useful commit message.
 pub async fn generate_commit_message_multi_step(
   client: &Client<OpenAIConfig>, model: &str, diff_content: &str, max_length: Option<usize>
 ) -> Result<String> {
@@ -90,14 +106,7 @@ pub async fn generate_commit_message_multi_step(
       }
       Err(e) => {
         // Check if it's an API key or authentication error - if so, propagate it immediately
-        let error_str = e.to_string();
-        if error_str.contains("invalid_api_key") || 
-           error_str.contains("Incorrect API key") || 
-           error_str.contains("Invalid API key") ||
-           error_str.contains("authentication") ||
-           error_str.contains("unauthorized") ||
-           // Detect HTTP errors that typically indicate auth issues when calling OpenAI
-           (error_str.contains("http error") && error_str.contains("error sending request")) {
+        if crate::error::is_openai_auth_error(&e) {
           return Err(anyhow::anyhow!("OpenAI API authentication failed: {}. Please check your API key configuration.", e));
         }
         log::warn!("Failed to analyze file {}: {}", file.path, e);

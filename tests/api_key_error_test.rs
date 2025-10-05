@@ -25,15 +25,15 @@ index 0000000..0000000
 
     // Verify the behavior - it should return an error, not continue with other files
     assert!(result.is_err(), "Expected API key error to be propagated as error, not warning");
-    
+
     let error_message = result.unwrap_err().to_string();
     println!("Actual error message: '{}'", error_message);
-    
-    // Now it should properly detect authentication failures
+
+    // Verify it returns the specific authentication error message with actionable guidance
     assert!(
-        error_message.contains("OpenAI API authentication failed") || 
-        error_message.contains("API key"),
-        "Expected error message to indicate authentication failure, got: {}",
+        error_message.contains("OpenAI API authentication failed") &&
+        error_message.contains("Please check your API key configuration"),
+        "Expected specific authentication error message with guidance, got: {}",
         error_message
     );
 }
