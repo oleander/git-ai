@@ -1,4 +1,3 @@
-
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -7,7 +6,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use rayon::prelude::*;
-
 use git2::{Diff, DiffFormat, DiffOptions, Repository, Tree};
 use anyhow::{Context, Result};
 use thiserror::Error;
@@ -43,10 +41,6 @@ pub enum HookError {
   #[error(transparent)]
   Anyhow(#[from] anyhow::Error)
 }
-
-
-
-
 
 // File operations traits
 pub trait FilePath {
@@ -327,8 +321,6 @@ impl PatchDiff for Diff<'_> {
 
     // Pre-allocate HashMap with estimated capacity
     let mut files = HashMap::with_capacity(ESTIMATED_FILES_COUNT);
-
-
 
     // Create thread-local cache for paths to avoid allocations
     thread_local! {
@@ -638,7 +630,3 @@ impl PatchRepository for Repository {
       .minimal(true);
   }
 }
-
-
-
-

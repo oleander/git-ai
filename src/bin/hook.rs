@@ -1,5 +1,3 @@
-
-
 // .git/hooks/prepare-commit-msg
 //
 // git commit --amend --no-edit
@@ -55,7 +53,6 @@ use git2::{Oid, Repository};
 use ai::{commit, config, debug_output};
 use ai::hook::*;
 
-
 #[derive(Debug, PartialEq)]
 enum Source {
   Message,
@@ -90,8 +87,6 @@ struct Args {
 }
 
 impl Args {
-
-
   async fn execute(&self) -> Result<()> {
     use Source::*;
 
