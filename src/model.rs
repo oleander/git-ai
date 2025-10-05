@@ -18,28 +18,26 @@ use crate::config::App as Settings; // Use App as Settings
 static TOKENIZER: OnceLock<CoreBPE> = OnceLock::new();
 
 // Model identifiers - using screaming case for constants
-const MODEL_GPT4: &str = "gpt-4";
-const MODEL_GPT4_OPTIMIZED: &str = "gpt-4o";
-const MODEL_GPT4_MINI: &str = "gpt-4o-mini";
 const MODEL_GPT4_1: &str = "gpt-4.1";
+const MODEL_GPT4_1_MINI: &str = "gpt-4.1-mini";
+const MODEL_GPT4_1_NANO: &str = "gpt-4.1-nano";
+const MODEL_GPT4_5: &str = "gpt-4.5";
 // TODO: Get this from config.rs or a shared constants module
 const DEFAULT_MODEL_NAME: &str = "gpt-4.1";
 
 /// Represents the available AI models for commit message generation.
 /// Each model has different capabilities and token limits.
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Serialize, Deserialize, Default)]
 pub enum Model {
-  /// Standard GPT-4 model
-  GPT4,
-  /// Optimized GPT-4 model for better performance
-  GPT4o,
-  /// Mini version of optimized GPT-4 for faster processing
-  GPT4oMini,
   /// Default model - GPT-4.1 latest version
   #[default]
   GPT41,
-  /// Custom model name for any other OpenAI model
-  Custom(String)
+  /// Mini version of GPT-4.1 for faster processing
+  GPT41Mini,
+  /// Nano version of GPT-4.1 for very fast processing
+  GPT41Nano,
+  /// GPT-4.5 model for advanced capabilities
+  GPT45
 }
 
 impl Model {
@@ -77,16 +75,8 @@ impl Model {
   /// * `usize` - The maximum number of tokens the model can process
   pub fn context_size(&self) -> usize {
     profile!("Get context size");
-    
-    // For custom models, we don't know the context size, so use a reasonable default
-    // that works for most modern OpenAI models (GPT-4 family context size)
-    match self {
-      Model::Custom(_) => 128000, // Default to GPT-4 context size for custom models
-      _ => {
-        let model_str = String::from(self);
-        get_context_size(&model_str)
-      }
-    }
+    let model_str = String::from(self);
+    get_context_size(&model_str)
   }
 
   /// Truncates the given text to fit within the specified token limit.
@@ -180,11 +170,10 @@ impl Model {
 impl From<&Model> for String {
   fn from(model: &Model) -> Self {
     match model {
-      Model::GPT4o => MODEL_GPT4_OPTIMIZED.to_string(),
-      Model::GPT4 => MODEL_GPT4.to_string(),
-      Model::GPT4oMini => MODEL_GPT4_MINI.to_string(),
       Model::GPT41 => MODEL_GPT4_1.to_string(),
-      Model::Custom(name) => name.clone()
+      Model::GPT41Mini => MODEL_GPT4_1_MINI.to_string(),
+      Model::GPT41Nano => MODEL_GPT4_1_NANO.to_string(),
+      Model::GPT45 => MODEL_GPT4_5.to_string()
     }
   }
 }
@@ -201,11 +190,11 @@ impl FromStr for Model {
 
   fn from_str(s: &str) -> Result<Self> {
     match s.trim().to_lowercase().as_str() {
-      "gpt-4o" => Ok(Model::GPT4o),
-      "gpt-4" => Ok(Model::GPT4),
-      "gpt-4o-mini" => Ok(Model::GPT4oMini),
       "gpt-4.1" => Ok(Model::GPT41),
-      model => Ok(Model::Custom(model.to_string()))
+      "gpt-4.1-mini" => Ok(Model::GPT41Mini),
+      "gpt-4.1-nano" => Ok(Model::GPT41Nano),
+      "gpt-4.5" => Ok(Model::GPT45),
+      model => bail!("Invalid model name: {}", model)
     }
   }
 }
@@ -219,7 +208,7 @@ impl Display for Model {
 // Implement conversion from string types to Model with fallback to default
 impl From<&str> for Model {
   fn from(s: &str) -> Self {
-    s.parse().unwrap_or_else(|_| Model::Custom(s.to_string()))
+    s.parse().unwrap_or_default()
   }
 }
 

@@ -231,7 +231,7 @@ mod tests {
     let result = generate(
       "diff --git a/test.txt b/test.txt\n+Hello World".to_string(),
       1024,
-      Model::GPT4oMini,
+      Model::GPT41Mini,
       Some(&settings)
     )
     .await;
@@ -265,7 +265,7 @@ mod tests {
     let result = generate(
       "diff --git a/test.txt b/test.txt\n+Hello World".to_string(),
       1024,
-      Model::GPT4oMini,
+      Model::GPT41Mini,
       Some(&settings)
     )
     .await;
