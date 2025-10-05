@@ -398,7 +398,7 @@ impl PatchDiff for Diff<'_> {
 
       // Process line by line origin more efficiently
       match line.origin() {
-        '+' | '-' => {
+        '+' | '-' | ' ' => {
           // Added, removed, or context lines - append with origin prefix
           let entry = files
             .entry(path)
