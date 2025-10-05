@@ -10,9 +10,7 @@ use crate::multi_step_analysis::{
 };
 use crate::function_calling::{create_commit_function_tool, CommitFunctionArgs};
 use crate::debug_output;
-use crate::diff::parser::{ParsedFile, parse_diff};
-
-
+use crate::diff::parser::{parse_diff, ParsedFile};
 
 /// Main entry point for multi-step commit message generation
 pub async fn generate_commit_message_multi_step(
@@ -169,8 +167,6 @@ pub async fn generate_commit_message_multi_step(
 
   Ok(final_message)
 }
-
-
 
 /// Call the analyze function via OpenAI
 async fn call_analyze_function(client: &Client<OpenAIConfig>, model: &str, file: &ParsedFile) -> Result<Value> {

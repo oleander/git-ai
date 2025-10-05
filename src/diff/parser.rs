@@ -5,9 +5,9 @@ use anyhow::Result;
 /// Represents a parsed file from a git diff
 #[derive(Debug, Clone)]
 pub struct ParsedFile {
-  pub path: String,
-  pub operation: String,
-  pub diff_content: String,
+  pub path:         String,
+  pub operation:    String,
+  pub diff_content: String
 }
 
 /// Extracts file path from diff header parts

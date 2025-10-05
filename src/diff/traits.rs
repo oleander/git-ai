@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::{Read, Write};
+
 use anyhow::Result;
 
 /// Extension trait for PathBuf to support file operations needed for commits

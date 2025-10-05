@@ -11,7 +11,7 @@ use num_cpus;
 
 use crate::model::Model;
 use crate::profile;
-use crate::diff::traits::{Utf8String, DiffDeltaPath};
+use crate::diff::traits::{DiffDeltaPath, Utf8String};
 
 // Constants
 
@@ -40,7 +40,6 @@ pub enum HookError {
   #[error(transparent)]
   Anyhow(#[from] anyhow::Error)
 }
-
 
 // Patch generation traits
 pub trait PatchDiff {

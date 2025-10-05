@@ -6,5 +6,5 @@
 pub mod parser;
 pub mod traits;
 
-pub use parser::{ParsedFile, parse_diff};
-pub use traits::{FilePath, Utf8String, DiffDeltaPath};
+pub use parser::{parse_diff, ParsedFile};
+pub use traits::{DiffDeltaPath, FilePath, Utf8String};
