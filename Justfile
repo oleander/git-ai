@@ -27,3 +27,7 @@ integration-test:
     source .secrets
     docker build -t git-ai-test .
     docker run --rm git-ai-test -e OPENAI_API_KEY=$OPENAI_API_KEY
+
+pr CMD:
+    docker build --target pr-tester -t git-ai-pr-tester .
+    docker run -i --rm -e GITHUB_TOKEN=$(gh auth token) git-ai-pr-tester bash -c "{{CMD}}"
