@@ -43,4 +43,3 @@ jobs:
       - run: git ai hook install
       - run: git ai config set openai-api-key ${{ secrets.OPENAI_API_KEY }}
       - run: git ai config set model gpt-4.1
-
