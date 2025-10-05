@@ -663,7 +663,7 @@ pub fn generate(diff: &str) -> Result<String> {
 
 **Eliminate unwrap/expect**:
 
-**Current issue**: 9 instances across 4 files - should be reduced
+**Guidance**: Minimize or eliminate the use of `unwrap` and `expect` in production code. Prefer error handling patterns that propagate errors with context.
 
 ```rust
 // ❌ Avoid in production code
