@@ -46,8 +46,18 @@ WORKDIR /app
 
 RUN git clone --branch main /source /app --local
 RUN git remote set-url origin https://github.com/oleander/git-ai.git
+RUN git pull origin main
 RUN cargo fetch
 RUN cargo build
+RUN cargo clippy
+
+ARG PR_NUMBER
+ARG GH_TOKEN
+ENV GH_TOKEN=$GH_TOKEN
+RUN gh pr checkout $PR_NUMBER
+RUN cargo fetch
+RUN cargo build
+RUN cargo clippy
 
 # Default command that can be overridden
 SHELL ["/bin/bash", "-lc"]

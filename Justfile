@@ -28,6 +28,12 @@ integration-test:
     docker build -t git-ai-test .
     docker run --rm git-ai-test -e OPENAI_API_KEY=$OPENAI_API_KEY
 
-pr CMD:
-    docker build --target pr-tester -t git-ai-pr-tester .
+# just pr 74 "cargo fmt --all"
+# just pr 74 "cargo build"
+pr PR_NUMBER CMD:
+    docker build --build-arg PR_NUMBER={{PR_NUMBER}} --build-arg GH_TOKEN=$(gh auth token) --target pr-tester -t git-ai-pr-tester .
     docker run -i --rm -e GITHUB_TOKEN=$(gh auth token) git-ai-pr-tester bash -c "{{CMD}}"
+
+# Sync a specific PR with origin/main
+sync-pr PR_NUM:
+    just pr {{PR_NUM}} "git merge origin/main --no-edit && cargo fmt --check && cargo check && git push origin HEAD"
