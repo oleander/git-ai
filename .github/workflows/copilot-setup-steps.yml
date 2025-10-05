@@ -272,7 +272,7 @@ jobs:
         run: |
           echo "Running integration tests in dry-run mode..."
           # Set up a test environment without API key
-          export OPENAI_API_KEY="test-key-for-dry-run"
+          export OPENAI_API_KEY="DUMMY_KEY_FOR_TESTING"
           
           # Create a simple test that doesn't require API calls
           mkdir -p /tmp/git-ai-integration-test
