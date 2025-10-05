@@ -5,6 +5,7 @@
 Git AI is a Rust-based tool that automates intelligent commit message generation using AI. It uses a sophisticated multi-step analysis process to analyze git diffs, score file impacts, and generate meaningful commit messages via OpenAI's API.
 
 ### Core Philosophy
+
 - **Multi-step analysis over single-shot prompts**: Divide-and-conquer approach analyzing files individually
 - **Intelligent fallbacks**: Graceful degradation from API → Local → Single-step
 - **Performance-first**: Parallel processing, efficient token management, smart truncation
@@ -13,6 +14,7 @@ Git AI is a Rust-based tool that automates intelligent commit message generation
 ## Architecture Components
 
 ### Key Modules
+
 - `src/main.rs` - CLI interface and configuration management
 - `src/bin/hook.rs` - Git prepare-commit-msg hook entry point
 - `src/hook.rs` - Core hook logic, diff processing, parallel optimization (725 lines)
@@ -28,16 +30,19 @@ Git AI is a Rust-based tool that automates intelligent commit message generation
 ## Coding Conventions
 
 ### Rust Standards
+
 - **Edition**: 2021
 - **Minimum Rust version**: 1.70+
 - **Style**: Follow `rustfmt.toml` formatting rules
 - **Module structure**: Prefer nested module organization (see `structure` rule)
 
 ### Error Handling
+
 - Use `anyhow::Result` for application-level errors with context
 - Use `thiserror` for defining custom error types
 - Always add context with `.context()` or `.with_context()` when propagating errors
 - Example:
+
   ```rust
   use anyhow::{Context, Result};
 
@@ -50,17 +55,20 @@ Git AI is a Rust-based tool that automates intelligent commit message generation
   ```
 
 ### Async Patterns
+
 - Use `tokio` runtime with full features
 - Prefer `async/await` over manual futures
 - Use `futures` crate for stream operations and combinators
 - All API calls should be async
 
 ### Parallelism
+
 - Use `rayon` for CPU-bound parallel operations (file analysis)
 - Use `tokio::spawn` for concurrent async tasks
 - Example: Parallel file analysis in `multi_step_analysis.rs`
 
 ### Code Organization
+
 - Keep functions focused and single-purpose
 - Extract complex logic into helper functions
 - Use descriptive variable names (avoid abbreviations)
@@ -77,6 +85,7 @@ When working with the multi-step system, follow this flow:
 5. **Select** - Choose best message based on highest impact files
 
 ### Scoring Formula
+
 ```rust
 // Operation weights
 add: 0.3, modify: 0.2, delete: 0.25, rename: 0.1, binary: 0.05
@@ -90,18 +99,21 @@ source: 0.4, test: 0.2, config: 0.25, build: 0.3, docs: 0.1, binary: 0.05
 ## Testing Requirements
 
 ### Unit Tests
+
 - Write tests for all public functions
 - Use `#[cfg(test)]` modules in the same file
 - Test both success and error cases
 - Example location: `tests/model_token_test.rs`, `tests/patch_test.rs`
 
 ### Integration Tests
+
 - Place in `tests/` directory
 - Use `tests/common.rs` for shared test utilities
 - Test end-to-end workflows
 - Run via `./scripts/integration-tests`
 
 ### Test Naming
+
 ```rust
 #[test]
 fn test_parse_diff_with_multiple_files() { /* ... */ }
@@ -117,6 +129,7 @@ fn test_score_calculation_for_high_impact_source_file() { /* ... */ }
 **Critical**: Run the complete test suite before AND after making any changes to ensure nothing breaks.
 
 #### Step 1: Baseline Verification (Before Changes)
+
 ```bash
 # Run all unit and integration tests to establish baseline
 cargo test --all
@@ -138,12 +151,14 @@ cargo fmt -- --check
 ```
 
 #### Step 2: Make Your Changes
+
 - Implement your feature or fix
 - Add new tests for new functionality
 - Update existing tests if behavior changes
 - Add documentation for public APIs
 
 #### Step 3: Post-Change Verification
+
 ```bash
 # Run the same test suite again
 cargo test --all
@@ -168,6 +183,7 @@ just local-install
 #### Step 4: Verify Specific Scenarios
 
 **If you modified hook logic** (`src/hook.rs`, `src/bin/hook.rs`):
+
 ```bash
 ./scripts/hook-stress-test
 # Test with actual git commits in a test repository
@@ -177,6 +193,7 @@ git commit --no-edit
 ```
 
 **If you modified multi-step analysis** (`src/multi_step_*.rs`):
+
 ```bash
 # Run specific multi-step tests
 cargo test multi_step
@@ -185,6 +202,7 @@ cargo run --example multi_step_commit
 ```
 
 **If you modified OpenAI integration** (`src/openai.rs`, `src/function_calling.rs`):
+
 ```bash
 # Run function calling tests
 cargo test function_calling
@@ -193,6 +211,7 @@ cargo run --example function_calling_demo
 ```
 
 **If you modified commit message generation** (`src/commit.rs`):
+
 ```bash
 # Run commit-related tests
 cargo test commit
@@ -248,12 +267,14 @@ Always include verification steps in your suggestions:
 ## Performance Considerations
 
 ### Token Management
+
 - Default max tokens: 512
 - Track token usage with `tiktoken-rs`
 - Truncate diffs intelligently (keep file boundaries)
 - Prioritize high-impact files in limited contexts
 
 ### Optimization Strategies
+
 - Parallel file analysis with `rayon`
 - Lazy evaluation where possible
 - Cache API responses when appropriate
@@ -262,11 +283,13 @@ Always include verification steps in your suggestions:
 ## Configuration Management
 
 ### Settings Format
+
 - Use INI format via `config` crate
 - Store in `~/.config/git-ai/config.ini`
 - Support environment variables via `dotenv`
 
 ### Required Settings
+
 - `openai-api-key` - OpenAI API key (required)
 - `model` - AI model (default: `gpt-4.1`)
 - `max-tokens` - Token limit (default: 512)
@@ -275,11 +298,13 @@ Always include verification steps in your suggestions:
 ## Git Integration
 
 ### Hook Installation
+
 - Symlink `git-ai-hook` binary to `.git/hooks/prepare-commit-msg`
 - Detect existing hooks and warn user
 - Support install/uninstall/reinstall commands
 
 ### Diff Processing
+
 - Handle multiple diff formats (standard, commit with hash, raw)
 - Support all operation types: add, modify, delete, rename, binary
 - Extract file paths, content, and metadata
@@ -288,12 +313,14 @@ Always include verification steps in your suggestions:
 ## OpenAI Integration
 
 ### Function Calling
+
 - Use structured outputs for file analysis
 - Define JSON schemas for commit message generation
 - Handle API errors gracefully with retries
 - Support multiple models: gpt-4.1, gpt-4o, gpt-4o-mini, gpt-4
 
 ### Assistant API
+
 - Maintain per-project threads for context
 - Host exclusive assistant instance locally
 - Accumulate learning across all projects
@@ -301,6 +328,7 @@ Always include verification steps in your suggestions:
 ## Commit Message Format
 
 ### Style Guidelines
+
 - Action-focused: "Add authentication to user service"
 - Component-focused: "auth: implement JWT validation"
 - Impact-focused: "New feature enabling secure login"
@@ -312,6 +340,7 @@ Always include verification steps in your suggestions:
 ## CLI Interface
 
 ### Command Structure
+
 ```bash
 git-ai config set <key> <value>  # Set configuration
 git-ai config get <key>          # Get configuration value
@@ -324,12 +353,14 @@ git-ai hook reinstall            # Reinstall hook
 ## Development Workflow
 
 ### Local Development
+
 - Use `just local-install` for quick dev installation
 - Run `cargo test` before committing
 - Check `./scripts/integration-tests` for comprehensive testing
 - Run `./scripts/hook-stress-test` for hook testing
 
 ### Building
+
 - Release builds use LTO and aggressive optimization
 - Include debug symbols even in release builds
 - Multi-target support: Linux (GNU/musl), macOS
@@ -337,12 +368,14 @@ git-ai hook reinstall            # Reinstall hook
 ## Documentation Standards
 
 ### Code Comments
+
 - Document complex algorithms and business logic
 - Use `///` for public API documentation
 - Include examples in doc comments for public functions
 - Keep comments up-to-date with code changes
 
 ### README Updates
+
 - Update examples when adding features
 - Document new configuration options in tables
 - Update architecture diagrams if structure changes
@@ -351,6 +384,7 @@ git-ai hook reinstall            # Reinstall hook
 ## Dependencies
 
 ### Core Dependencies
+
 - `anyhow` - Error handling with context
 - `tokio` - Async runtime
 - `serde`/`serde_json` - Serialization
@@ -360,6 +394,7 @@ git-ai hook reinstall            # Reinstall hook
 - `tiktoken-rs` - Token counting
 
 ### Minimal Features
+
 - Use `default-features = false` when possible
 - Only enable required features explicitly
 - Keep binary size reasonable
@@ -367,12 +402,14 @@ git-ai hook reinstall            # Reinstall hook
 ## Security Considerations
 
 ### API Keys
+
 - Never commit API keys to repository
 - Store in config file or environment variables
 - Use dotenv for development
 - Clear error messages without exposing secrets
 
 ### Input Validation
+
 - Validate all user inputs
 - Sanitize file paths
 - Check diff content for unusual patterns
@@ -398,6 +435,7 @@ git-ai hook reinstall            # Reinstall hook
 ## Common Patterns
 
 ### Structured Function Calling
+
 ```rust
 use serde::{Deserialize, Serialize};
 
@@ -413,6 +451,7 @@ struct FileAnalysis {
 ```
 
 ### Fallback Strategy
+
 ```rust
 // Try multi-step with API
 if let Ok(msg) = multi_step_with_api(diff).await {
@@ -429,6 +468,7 @@ single_step_api(diff).await
 ```
 
 ### Parallel File Processing
+
 ```rust
 use rayon::prelude::*;
 
@@ -450,4 +490,3 @@ Follow these rules when refactoring or adding new code.
 ---
 
 **Remember**: Git AI's goal is to generate meaningful, accurate commit messages that reflect the true intent and impact of changes. Every code change should contribute to this mission.
-
