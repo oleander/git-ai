@@ -60,7 +60,7 @@ end
 set TEST_DIR /tmp/git-ai-test-(date +%s)
 
 # Install git-ai
-cargo install --force --debug --path . || fail "Cargo installation failed"
+cargo install --debug --path . || fail "Cargo installation failed"
 
 # Setup test repository
 rm -rf $TEST_DIR
