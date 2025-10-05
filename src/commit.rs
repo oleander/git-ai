@@ -16,6 +16,9 @@ const INSTRUCTION_TEMPLATE: &str = include_str!("../resources/prompt.md");
 ///
 /// # Returns
 /// * `Result<String>` - The rendered template or an error
+///
+/// Note: This function is public only for testing purposes
+#[doc(hidden)]
 pub fn get_instruction_template() -> Result<String> {
   profile!("Generate instruction template");
   let max_length = config::APP.max_commit_length.unwrap_or(72).to_string();
@@ -37,6 +40,9 @@ pub fn get_instruction_template() -> Result<String> {
 ///
 /// # Returns
 /// * `Result<openai::Request>` - The prepared request
+///
+/// Note: This function is public only for testing purposes
+#[doc(hidden)]
 pub fn create_commit_request(diff: String, max_tokens: usize, model: Model) -> Result<openai::Request> {
   profile!("Prepare OpenAI request");
   let template = get_instruction_template()?;

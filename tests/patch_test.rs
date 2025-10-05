@@ -190,3 +190,125 @@ fn test_empty_diff() {
   let diff = TestRepository::to_diff(&git_repo, Some(tree.clone())).unwrap();
   assert!(TestPatchDiff::test_is_empty(&diff).unwrap());
 }
+
+#[test]
+fn test_diff_origin_characters() {
+  // Test that origin characters (+, -, space) are properly included in diff output
+  let repo = TestRepo::default();
+
+  // Create initial file with multiple lines
+  let file = repo
+    .create_file("test.txt", "line 1\nline 2\nline 3\n")
+    .unwrap();
+  file.stage().unwrap();
+  file.commit().unwrap();
+
+  // Modify the file: remove line 2, keep line 1 and 3, add line 4
+  let file = repo
+    .create_file("test.txt", "line 1\nline 3\nline 4\n")
+    .unwrap();
+  file.stage().unwrap();
+
+  // Get the diff
+  let repo_path = repo.repo_path.path().to_path_buf();
+  let git_repo = git2::Repository::open(&repo_path).unwrap();
+  let tree = git_repo.head().unwrap().peel_to_tree().unwrap();
+  let diff = TestRepository::to_diff(&git_repo, Some(tree)).unwrap();
+
+  // Collect diff data
+  use std::path::PathBuf;
+
+  use ai::hook::PatchDiff;
+  let diff_data = diff.collect_diff_data().unwrap();
+
+  // Get the patch for our test file - use relative path
+  let test_path = PathBuf::from("test.txt");
+  let patch = diff_data.get(&test_path).expect("Should contain test.txt");
+
+  // Verify that the patch contains origin characters
+  // Should have lines starting with '+' for additions
+  assert!(
+    patch.lines().any(|line| line.starts_with("+line 4")),
+    "Should contain '+line 4' for added line"
+  );
+
+  // Should have lines starting with '-' for deletions
+  assert!(
+    patch.lines().any(|line| line.starts_with("-line 2")),
+    "Should contain '-line 2' for removed line"
+  );
+
+  // Should have lines starting with ' ' (space) for context
+  assert!(
+    patch
+      .lines()
+      .any(|line| line.starts_with(" line 1") || line.starts_with(" line 3")),
+    "Should contain context lines starting with space"
+  );
+}
+
+#[test]
+fn test_diff_only_additions() {
+  // Test a diff with only additions (new file)
+  let repo = TestRepo::default();
+  let file = repo
+    .create_file("new_file.txt", "new line 1\nnew line 2\n")
+    .unwrap();
+  file.stage().unwrap();
+
+  let repo_path = repo.repo_path.path().to_path_buf();
+  let git_repo = git2::Repository::open(&repo_path).unwrap();
+  let diff = TestRepository::to_diff(&git_repo, None).unwrap();
+
+  use std::path::PathBuf;
+
+  use ai::hook::PatchDiff;
+  let diff_data = diff.collect_diff_data().unwrap();
+  let new_file_path = PathBuf::from("new_file.txt");
+  let patch = diff_data
+    .get(&new_file_path)
+    .expect("Should contain new_file.txt");
+
+  // All content lines should start with '+'
+  assert!(patch.lines().any(|line| line.starts_with("+new line 1")), "Should contain '+new line 1'");
+  assert!(patch.lines().any(|line| line.starts_with("+new line 2")), "Should contain '+new line 2'");
+}
+
+#[test]
+fn test_diff_only_deletions() {
+  // Test a diff with only deletions (deleted file)
+  let repo = TestRepo::default();
+  let file = repo
+    .create_file("to_delete.txt", "delete line 1\ndelete line 2\n")
+    .unwrap();
+  file.stage().unwrap();
+  file.commit().unwrap();
+
+  // Delete the file
+  file.delete().unwrap();
+  file.stage().unwrap();
+
+  let repo_path = repo.repo_path.path().to_path_buf();
+  let git_repo = git2::Repository::open(&repo_path).unwrap();
+  let tree = git_repo.head().unwrap().peel_to_tree().unwrap();
+  let diff = TestRepository::to_diff(&git_repo, Some(tree)).unwrap();
+
+  use std::path::PathBuf;
+
+  use ai::hook::PatchDiff;
+  let diff_data = diff.collect_diff_data().unwrap();
+  let delete_path = PathBuf::from("to_delete.txt");
+  let patch = diff_data
+    .get(&delete_path)
+    .expect("Should contain to_delete.txt");
+
+  // All content lines should start with '-'
+  assert!(
+    patch.lines().any(|line| line.starts_with("-delete line 1")),
+    "Should contain '-delete line 1'"
+  );
+  assert!(
+    patch.lines().any(|line| line.starts_with("-delete line 2")),
+    "Should contain '-delete line 2'"
+  );
+}

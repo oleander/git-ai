@@ -175,6 +175,39 @@ pub async fn generate_commit_message_multi_step(
   Ok(final_message)
 }
 
+/// Extracts the file path from git diff header parts.
+/// Handles various git prefixes (a/, b/, c/, i/) and /dev/null for deleted files.
+///
+/// # Arguments
+/// * `parts` - The whitespace-split parts from a "diff --git" line
+///
+/// # Returns
+/// * `Option<String>` - The extracted path without prefixes, or None if parsing fails
+fn extract_file_path_from_diff_parts(parts: &[&str]) -> Option<String> {
+  if parts.len() < 4 {
+    return None;
+  }
+
+  // Helper to strip git prefixes (a/, b/, c/, i/)
+  let strip_prefix = |s: &str| {
+    s.trim_start_matches("a/")
+      .trim_start_matches("b/")
+      .trim_start_matches("c/")
+      .trim_start_matches("i/")
+      .to_string()
+  };
+
+  let new_path = strip_prefix(parts[3]);
+  let old_path = strip_prefix(parts[2]);
+
+  // Prefer new path unless it's /dev/null (deleted file)
+  Some(if new_path == "/dev/null" || new_path == "dev/null" {
+    old_path
+  } else {
+    new_path
+  })
+}
+
 /// Parse git diff into individual files
 pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
   let mut files = Vec::new();
@@ -234,22 +267,11 @@ pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
 
       // Extract file path more carefully
       let parts: Vec<&str> = line.split_whitespace().collect();
-      if parts.len() >= 4 {
-        // Extract path from "b/" part (new file) or "a/" part (old file) and handle various prefixes
-        let a_path = parts[2].trim_start_matches("a/").trim_start_matches("c/");
-        let b_path = parts[3].trim_start_matches("b/").trim_start_matches("i/");
-
-        // Use b_path (new) if available and not /dev/null, otherwise use a_path (old)
-        let path = if b_path == "/dev/null" || b_path == "dev/null" {
-          a_path
-        } else {
-          b_path
-        };
-
+      if let Some(path) = extract_file_path_from_diff_parts(&parts) {
         log::debug!("Found new file in diff: {path}");
         current_file = Some(ParsedFile {
-          path:         path.to_string(),
-          operation:    "modified".to_string(), // Default, will be updated
+          path,
+          operation: "modified".to_string(), // Default, will be updated
           diff_content: String::new()
         });
       }
@@ -316,25 +338,15 @@ pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
         let full_section = format!("diff --git{section}");
 
         // Extract file path from the section more carefully
-        let mut path = "unknown";
         let mut found_path = false;
 
         // Safer approach: iterate through lines and find the path
+        let mut extracted_path = String::new();
         for section_line in full_section.lines().take(3) {
           if section_line.starts_with("diff --git") {
             let parts: Vec<&str> = section_line.split_whitespace().collect();
-            if parts.len() >= 4 {
-              // Extract path from "b/" part (new file) or "a/" part (old file)
-              let new_file_path = parts[3].trim_start_matches("b/").trim_start_matches("i/");
-              let old_file_path = parts[2].trim_start_matches("a/").trim_start_matches("c/");
-
-              // Prefer the new file path unless it's /dev/null
-              path = if new_file_path == "/dev/null" || new_file_path == "dev/null" {
-                old_file_path
-              } else {
-                new_file_path
-              };
-
+            if let Some(p) = extract_file_path_from_diff_parts(&parts) {
+              extracted_path = p;
               found_path = true;
               break;
             }
@@ -342,9 +354,9 @@ pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
         }
 
         if found_path {
-          log::debug!("Found file in section {i}: {path}");
+          log::debug!("Found file in section {i}: {extracted_path}");
           files.push(ParsedFile {
-            path:         path.to_string(),
+            path:         extracted_path,
             operation:    "modified".to_string(), // Default
             diff_content: full_section
           });

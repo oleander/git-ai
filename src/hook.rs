@@ -416,6 +416,7 @@ impl PatchDiff for Diff<'_> {
         _ => {
           // Other lines (headers, etc.) - skip them as they're not part of the actual diff content
           // The git diff headers are already included by the diff format
+          log::trace!("Skipping diff line with origin: {:?}", line.origin());
         }
       }
 
