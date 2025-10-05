@@ -55,6 +55,9 @@ jobs:
           override: true
           profile: minimal
 
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y fish
+
       - name: Run integration tests
         run: |
           ./scripts/integration-tests
