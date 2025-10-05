@@ -215,10 +215,11 @@ impl FromStr for Model {
         );
         Ok(Model::GPT41Mini)
       }
-      model => bail!(
-        "Invalid model name: '{}'. Supported models: gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4.5",
-        model
-      )
+      model =>
+        bail!(
+          "Invalid model name: '{}'. Supported models: gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4.5",
+          model
+        ),
     }
   }
 }
@@ -233,10 +234,7 @@ impl Display for Model {
 impl From<&str> for Model {
   fn from(s: &str) -> Self {
     s.parse().unwrap_or_else(|e| {
-      log::error!(
-        "Failed to parse model '{}': {}. Falling back to default model 'gpt-4.1'.",
-        s, e
-      );
+      log::error!("Failed to parse model '{}': {}. Falling back to default model 'gpt-4.1'.", s, e);
       Model::default()
     })
   }

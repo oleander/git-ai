@@ -1,5 +1,6 @@
-use ai::model::Model;
 use std::str::FromStr;
+
+use ai::model::Model;
 
 #[test]
 fn test_valid_model_names() {
