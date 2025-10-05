@@ -15,16 +15,14 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
 
       - name: Setup nightly toolchain
         uses: actions-rs/toolchain@v1
         with:
           components: rustfmt, clippy
           toolchain: nightly
-
-      - uses: actions/checkout@v5
 
       - name: Run clippy
         uses: actions-rs/cargo@v1
@@ -47,8 +45,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     continue-on-error: false
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
 
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
@@ -56,8 +54,6 @@ jobs:
           toolchain: ${{ matrix.rust }}
           override: true
           profile: minimal
-
-      - uses: actions/checkout@v5
 
       - name: Run integration tests
         run: |
