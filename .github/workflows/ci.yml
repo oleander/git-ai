@@ -38,6 +38,12 @@ jobs:
         with:
           command: fmt
           args: -- --check
+
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+
   test:
     needs: lint
     strategy:
@@ -70,9 +76,3 @@ jobs:
 
       - name: Run integration tests
         run: fish ./scripts/integration-tests
-
-      - name: Cargo build
-        run: cargo build
-
-      - name: Cargo test
-        run: cargo test
