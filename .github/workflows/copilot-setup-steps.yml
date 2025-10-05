@@ -20,7 +20,7 @@ env:
 
 jobs:
   copilot-setup-steps:
-    runs-on: ubuntu-latest-arm
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       actions: write
