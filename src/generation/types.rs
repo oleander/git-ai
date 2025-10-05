@@ -5,11 +5,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileChange {
   pub file_path:      String,
-  pub operation_type: String,
+  pub operation_type: OperationType,
   pub diff_content:   Option<String>,
   pub lines_added:    u32,
   pub lines_removed:  u32,
-  pub file_category:  String,
+  pub file_category:  FileCategory,
   pub summary:        String,
   pub impact_score:   f32
 }
