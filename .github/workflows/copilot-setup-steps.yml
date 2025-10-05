@@ -252,12 +252,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      - name: Setup Rust and install git-ai
+      - name: Restore Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          key: ${{ needs.setup-and-validate.outputs.cache-key }}
+
+      - name: Install git-ai
         run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           source ~/.cargo/env
-          rustup toolchain install nightly
-          rustup default nightly
           cargo install --path . --debug
 
       - name: Install fish shell for integration tests
