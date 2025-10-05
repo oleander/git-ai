@@ -12,16 +12,18 @@ use console::Emoji;
 const DEFAULT_TIMEOUT: i64 = 30;
 const DEFAULT_MAX_COMMIT_LENGTH: i64 = 72;
 const DEFAULT_MAX_TOKENS: i64 = 2024;
-const DEFAULT_MODEL: &str = "gpt-4o-mini";
+pub const DEFAULT_MODEL: &str = "gpt-4o-mini";
+pub const DEFAULT_TEMPERATURE: f64 = 0.7;
 const DEFAULT_API_KEY: &str = "<PLACE HOLDER FOR YOUR API KEY>";
 
-#[derive(Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct AppConfig {
   pub openai_api_key:    Option<String>,
   pub model:             Option<String>,
   pub max_tokens:        Option<usize>,
   pub max_commit_length: Option<usize>,
-  pub timeout:           Option<usize>
+  pub timeout:           Option<usize>,
+  pub temperature:       Option<f64>
 }
 
 #[derive(Debug)]
@@ -68,6 +70,7 @@ impl AppConfig {
       .set_default("max_commit_length", DEFAULT_MAX_COMMIT_LENGTH)?
       .set_default("max_tokens", DEFAULT_MAX_TOKENS)?
       .set_default("model", DEFAULT_MODEL)?
+      .set_default("temperature", DEFAULT_TEMPERATURE)?
       .set_default("openai_api_key", DEFAULT_API_KEY)?
       .build()?;
 
@@ -102,6 +105,12 @@ impl AppConfig {
   pub fn update_openai_api_key(&mut self, value: String) -> Result<()> {
     self.openai_api_key = Some(value);
     self.save_with_message("openai-api-key")
+  }
+
+  #[allow(dead_code)]
+  pub fn update_temperature(&mut self, value: f64) -> Result<()> {
+    self.temperature = Some(value);
+    self.save_with_message("temperature")
   }
 
   fn save_with_message(&self, option: &str) -> Result<()> {
