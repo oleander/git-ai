@@ -68,27 +68,23 @@ Git AI uses a sophisticated multi-step analysis process:
 ### Multi-Step Process
 
 1. **Parse** - Splits the git diff into individual files
-
    - Handles different diff formats (standard, commit with hash, raw output)
    - Extracts file paths, operation types, and diff content
    - Supports added, modified, deleted, renamed, and binary files
 
 2. **Analyze** - Examines each file in parallel for:
-
    - Lines added/removed (counts actual +/- lines)
    - File type categorization (source, test, config, docs, binary, build)
    - Change significance and summary generation
    - Uses OpenAI function calling for structured analysis
 
 3. **Score** - Calculates impact scores based on:
-
    - Operation type weights (add: 0.3, modify: 0.2, delete: 0.25, rename: 0.1, binary: 0.05)
    - File category weights (source: 0.4, test: 0.2, config: 0.25, build: 0.3, docs: 0.1, binary: 0.05)
    - Lines changed (normalized up to 0.3)
    - Total score capped at 1.0
 
 4. **Generate** - Creates multiple commit message candidates
-
    - Action-focused style (e.g., "Add authentication")
    - Component-focused style (e.g., "auth: implementation")
    - Impact-focused style (e.g., "New feature for authentication")
