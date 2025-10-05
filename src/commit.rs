@@ -183,13 +183,13 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
     Some(custom_settings) => {
       // Create a client with custom settings
       match openai::create_openai_config(custom_settings) {
-        Ok(config) => openai::call_with_config(request, config).await,
+        Ok(config) => openai::generate_with_config(request, config).await,
         Err(e) => Err(e)
       }
     }
     None => {
       // Use the default global config
-      openai::call(request).await
+      openai::generate_with_openai(request).await
     }
   }
 }

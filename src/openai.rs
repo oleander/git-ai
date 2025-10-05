@@ -197,8 +197,8 @@ fn truncate_to_fit(text: &str, max_tokens: usize, model: &Model) -> Result<Strin
   }
 }
 
-/// Calls the OpenAI API with the provided configuration
-pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<Response> {
+/// Generate with OpenAI using provided configuration
+pub async fn generate_with_config(request: Request, config: OpenAIConfig) -> Result<Response> {
   profile!("OpenAI API call with custom config");
 
   // Always try multi-step approach first (it's now the default)
@@ -377,13 +377,13 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
   }
 }
 
-/// Calls the OpenAI API with default configuration from settings
-pub async fn call(request: Request) -> Result<Response> {
+/// Generate with OpenAI using default configuration from settings
+pub async fn generate_with_openai(request: Request) -> Result<Response> {
   profile!("OpenAI API call");
 
   // Create OpenAI configuration using our settings
   let config = create_openai_config(&config::APP_CONFIG)?;
 
-  // Use the call_with_config function with the default config
-  call_with_config(request, config).await
+  // Use the generate_with_config function with the default config
+  generate_with_config(request, config).await
 }

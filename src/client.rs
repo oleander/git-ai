@@ -26,7 +26,7 @@ pub async fn call(request: Request) -> Result<Response> {
     model:      request.model
   };
 
-  let response = openai::call(openai_request).await?;
+  let response = openai::generate_with_openai(openai_request).await?;
   Ok(Response { response: response.response })
 }
 
