@@ -122,6 +122,115 @@ fn test_parse_diff_with_multiple_files() { /* ... */ }
 fn test_score_calculation_for_high_impact_source_file() { /* ... */ }
 ```
 
+### Real Test Examples from Codebase
+
+```rust
+// Function calling tests (tests/function_calling_test.rs)
+#[test]
+fn test_create_commit_function_tool_default() {
+    let tool = create_commit_function_tool(None).unwrap();
+    assert_eq!(tool.function.name, "commit");
+    // Verify JSON schema structure
+}
+
+#[test]
+fn test_parse_commit_function_response_invalid_json() {
+    let response = CommitFunctionCall {
+        name: "commit".to_string(),
+        arguments: "invalid json".to_string(),
+    };
+    let result = parse_commit_function_response(response);
+    assert!(result.is_err());
+}
+
+// Multi-step integration tests (src/multi_step_integration.rs)
+#[test]
+fn test_parse_diff_with_c_i_prefixes() {
+    let diff = r#"diff --git a/src/config.rs b/src/config.rs
+index abc123..def456 100644
+--- a/src/config.rs
++++ b/src/config.rs
+@@ -1,3 +1,4 @@
++use anyhow::Result;
+ use serde::Deserialize;
+"#;
+    let files = parse_diff(diff).unwrap();
+    assert_eq!(files.len(), 1);
+    assert_eq!(files[0].path, "src/config.rs");
+    assert_eq!(files[0].operation, "modified");
+}
+
+// Model token tests (tests/model_token_test.rs)
+#[test]
+fn test_token_counting_accuracy() {
+    let model = Model::Gpt4;
+    let text = "Hello world";
+    let tokens = model.count_tokens(text).unwrap();
+    assert!(tokens > 0);
+    assert!(tokens < 10); // Reasonable bounds
+}
+
+// Hook tests (src/hook.rs)
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_string_pool_get() {
+        let mut pool = StringPool::new();
+        let result = pool.get("test");
+        assert_eq!(result, "test");
+    }
+
+    #[test]
+    fn test_string_pool_limit() {
+        let mut pool = StringPool::new();
+        // Test memory limits
+        for i in 0..1000 {
+            pool.put(format!("test_{}", i));
+        }
+        assert!(pool.len() <= StringPool::MAX_SIZE);
+    }
+}
+```
+
+### Integration Test Patterns
+
+```rust
+// Use tests/common.rs for shared utilities
+use crate::common::*;
+
+// Test helper functions pattern
+fn setup_test_repo() -> TempDir {
+    let temp_dir = TempDir::new().unwrap();
+    // Initialize git repo, add files, etc.
+    temp_dir
+}
+
+fn create_test_diff(file_content: &str) -> String {
+    format!(r#"diff --git a/test.rs b/test.rs
+index abc123..def456 100644
+--- a/test.rs
++++ b/test.rs
+@@ -1,1 +1,1 @@
+-// Old content
++{}"#, file_content)
+}
+
+#[tokio::test]
+async fn test_end_to_end_commit_generation() {
+    let _temp_repo = setup_test_repo();
+    let diff = create_test_diff("// New content");
+    
+    let result = generate_commit_message_local(diff, Some(72));
+    assert!(result.is_ok());
+    
+    let message = result.unwrap();
+    assert!(message.len() <= 72);
+    assert!(!message.is_empty());
+}
+```
+
 ## Verification Workflow
 
 ### ALWAYS Verify Changes Before Committing
@@ -325,6 +434,106 @@ Always include verification steps in your suggestions:
 - Host exclusive assistant instance locally
 - Accumulate learning across all projects
 
+### AI Provider Integration
+
+#### OpenAI Integration (`src/openai.rs`)
+
+```rust
+use async_openai::Client;
+use async_openai::types::{
+    CreateChatCompletionRequest, 
+    ChatCompletionRequestMessage,
+    ChatCompletionTool
+};
+
+pub async fn call_with_config(
+    client: &Client<async_openai::config::OpenAIConfig>,
+    model: &Model,
+    messages: Vec<ChatCompletionRequestMessage>,
+    tools: Option<Vec<ChatCompletionTool>>,
+    max_tokens: Option<u16>
+) -> Result<String> {
+    let request = CreateChatCompletionRequest {
+        model: model.to_string(),
+        messages,
+        tools,
+        max_tokens: max_tokens.map(|t| t as u32),
+        temperature: Some(0.1), // Low for consistency
+        ..Default::default()
+    };
+
+    let response = client.chat().create(request).await?;
+    // Handle structured outputs and function calls
+    parse_openai_response(response)
+}
+```
+
+#### Ollama Integration (`src/ollama.rs`)
+
+```rust
+// Local model support for privacy and offline use
+pub struct OllamaClient {
+    base_url: String,
+    model: String,
+}
+
+impl OllamaClient {
+    pub async fn generate(&self, prompt: &str) -> Result<String> {
+        // HTTP client for Ollama REST API
+        let client = reqwest::Client::new();
+        let response = client
+            .post(&format!("{}/api/generate", self.base_url))
+            .json(&json!({
+                "model": self.model,
+                "prompt": prompt,
+                "stream": false
+            }))
+            .send()
+            .await?;
+        
+        let result: OllamaResponse = response.json().await?;
+        Ok(result.response)
+    }
+}
+```
+
+#### Model-Specific Optimizations
+
+```rust
+impl Model {
+    pub fn count_tokens(&self, text: &str) -> Result<usize> {
+        match self {
+            Model::Gpt4 | Model::Gpt4o | Model::Gpt4oMini | Model::Gpt41 => {
+                // Use tiktoken for OpenAI models
+                tiktoken_count_tokens(text, self.encoding())
+            }
+            Model::Ollama(_) => {
+                // Rough estimation for local models
+                estimate_tokens_by_chars(text)
+            }
+        }
+    }
+
+    pub fn max_context_length(&self) -> usize {
+        match self {
+            Model::Gpt4 => 8192,
+            Model::Gpt4o => 128000,
+            Model::Gpt4oMini => 128000,
+            Model::Gpt41 => 32768,
+            Model::Ollama(_) => 4096, // Conservative default
+        }
+    }
+
+    pub fn recommended_max_tokens(&self) -> u16 {
+        match self {
+            Model::Gpt4oMini => 256,  // Faster responses
+            Model::Gpt4o => 1024,     // Higher quality
+            _ => 512,                 // Balanced default
+        }
+    }
+}
+```
+
 ## Commit Message Format
 
 ### Style Guidelines
@@ -342,28 +551,67 @@ Always include verification steps in your suggestions:
 ### Command Structure
 
 ```bash
+# Configuration management
 git-ai config set <key> <value>  # Set configuration
 git-ai config get <key>          # Get configuration value
 git-ai config reset              # Reset to defaults
+
+# Hook management
 git-ai hook install              # Install git hook
 git-ai hook uninstall            # Remove git hook
 git-ai hook reinstall            # Reinstall hook
+
+# Available for debugging and testing
+git-ai --help                    # Show help information
 ```
+
+### Configuration Keys Reference
+
+| Key | Default | Description | Example |
+|-----|---------|-------------|---------|
+| `openai-api-key` | (required) | OpenAI API key | `sk-...` |
+| `model` | `gpt-4.1` | AI model to use | `gpt-4o`, `gpt-4o-mini`, `gpt-4` |
+| `max-tokens` | `512` | API request token limit | `256`, `1024` |
+| `max-commit-length` | `72` | Commit message character limit | `50`, `100` |
 
 ## Development Workflow
 
 ### Local Development
 
-- Use `just local-install` for quick dev installation
-- Run `cargo test` before committing
+- Use `just local-install` for quick dev installation with hook setup
+- Run `cargo test --all` before committing
 - Check `./scripts/integration-tests` for comprehensive testing
 - Run `./scripts/hook-stress-test` for hook testing
+- Use `./scripts/comprehensive-tests` for full test coverage
+
+### Justfile Commands
+
+The project includes essential development commands:
+
+```bash
+just local-install        # Install locally with debug symbols and setup hooks
+just integration-test      # Run integration tests in Docker
+just docker-build         # Build Docker image
+just local-github-actions # Run GitHub Actions locally with act
+```
+
+### Script Utilities
+
+```bash
+# Testing scripts (Fish shell)
+./scripts/integration-tests      # Core integration test suite
+./scripts/comprehensive-tests    # Extensive test coverage (11 test categories)
+./scripts/hook-stress-test      # Git hook functionality testing
+./scripts/current-version       # Get current version information
+```
 
 ### Building
 
-- Release builds use LTO and aggressive optimization
-- Include debug symbols even in release builds
-- Multi-target support: Linux (GNU/musl), macOS
+- **Development builds**: `cargo build` (fast compilation)
+- **Release builds**: `cargo build --release` (LTO and aggressive optimization)
+- **Debug symbols**: Include debug symbols even in release builds
+- **Multi-target support**: Linux (GNU/musl), macOS, Windows
+- **Local installation**: `cargo install --debug --path .` for development
 
 ## Documentation Standards
 
@@ -438,16 +686,58 @@ git-ai hook reinstall            # Reinstall hook
 
 ```rust
 use serde::{Deserialize, Serialize};
+use serde_json::json;
+use async_openai::types::{ChatCompletionTool, ChatCompletionToolType, FunctionObjectArgs};
 
-#[derive(Serialize, Deserialize)]
-struct FileAnalysis {
-    lines_added: u32,
-    lines_removed: u32,
-    category: FileCategory,
-    summary: String,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileAnalysisResult {
+    pub lines_added: u32,
+    pub lines_removed: u32,
+    pub file_category: String,
+    pub summary: String,
 }
 
-// Use with OpenAI function calling for structured outputs
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileChange {
+    #[serde(rename = "type")]
+    pub change_type: String,
+    pub summary: String,
+    pub lines_changed: u32,
+    pub impact_score: f32,
+    pub file_category: String,
+}
+
+// Create OpenAI function tools with JSON schemas
+pub fn create_analyze_function_tool() -> Result<ChatCompletionTool> {
+    let function = FunctionObjectArgs::default()
+        .name("analyze")
+        .description("Analyze a single file's changes from the git diff")
+        .parameters(json!({
+            "type": "object",
+            "properties": {
+                "file_path": {
+                    "type": "string",
+                    "description": "Relative path to the file"
+                },
+                "diff_content": {
+                    "type": "string", 
+                    "description": "The git diff content for this specific file only"
+                },
+                "operation_type": {
+                    "type": "string",
+                    "enum": ["added", "modified", "deleted", "renamed", "binary"],
+                    "description": "Type of operation performed on the file"
+                }
+            },
+            "required": ["file_path", "diff_content", "operation_type"]
+        }))
+        .build()?;
+
+    Ok(ChatCompletionTool { 
+        r#type: ChatCompletionToolType::Function, 
+        function 
+    })
+}
 ```
 
 ### Fallback Strategy
@@ -471,12 +761,237 @@ single_step_api(diff).await
 
 ```rust
 use rayon::prelude::*;
+use tokio::task::JoinSet;
 
+// CPU-bound parallel processing with rayon
 let analyses: Vec<FileAnalysis> = files
     .par_iter()
     .map(|file| analyze_file(file))
     .collect();
+
+// Async parallel processing with tokio
+let mut join_set = JoinSet::new();
+for file in files {
+    join_set.spawn(async move {
+        analyze_file_async(&file).await
+    });
+}
+
+let results = join_all(futures).await;
 ```
+
+## Debugging and Troubleshooting
+
+### Environment Setup for Debugging
+
+```bash
+# Enable debug logging for all components
+export RUST_LOG=debug
+
+# Enable trace logging for specific modules
+export RUST_LOG=ai::multi_step_analysis=trace,ai::openai=debug
+
+# Run with debug output
+cargo run --example multi_step_commit
+```
+
+### Debug Output Analysis
+
+Git AI provides comprehensive debug output when `RUST_LOG=debug` is set:
+
+```
+=== GIT AI HOOK DEBUG SESSION ===
+
+📋 INITIALIZATION
+  Args:        commit_msg_file='.git/COMMIT_EDITMSG', source=None, sha1=None
+  Build:       Debug build with performance profiling enabled
+
+⚙️  SETUP & PREPARATION  
+  │ Generate instruction template     1.56ms    ✓
+  │ Count tokens                      306.13ms  ✓
+  │ Calculate instruction tokens      307.77ms  ✓
+  └ Get context size                  959.00ns  ✓
+
+🤖 AI PROCESSING
+  Multi-Step Attempt:                           FAILED
+    └ Error: Invalid function_call             ✗ No function named 'required' specified
+
+  Single-Step Fallback:                        SUCCESS
+    │ Creating commit function tool             ✓ max_length=72
+    │ OpenAI API call                   2.78s   ✓
+    └ Response parsing                          ✓
+```
+
+### Common Issues and Solutions
+
+#### API-Related Issues
+
+```bash
+# Test API connectivity
+cargo run --example function_calling_demo
+
+# Check API key configuration
+git-ai config get openai-api-key
+
+# Test with different models
+git-ai config set model gpt-4o-mini  # Faster, cheaper
+git-ai config set model gpt-4o       # Better quality
+```
+
+#### Hook Issues
+
+```bash
+# Reinstall hook if not working
+git-ai hook reinstall
+
+# Check hook file directly
+ls -la .git/hooks/prepare-commit-msg
+cat .git/hooks/prepare-commit-msg
+
+# Test in isolation
+RUST_LOG=debug git commit --no-edit
+```
+
+#### Performance Issues
+
+```bash
+# Profile token usage
+RUST_LOG=debug git-ai 2>&1 | grep "tokens"
+
+# Monitor API call timing
+RUST_LOG=debug git-ai 2>&1 | grep "OpenAI API call"
+
+# Reduce token limit for large diffs
+git-ai config set max-tokens 256
+```
+
+### Testing Specific Scenarios
+
+```bash
+# Test empty diffs
+git commit --allow-empty --no-edit
+
+# Test large diffs
+dd if=/dev/zero of=large_file bs=1M count=1
+git add large_file && git commit --no-edit
+
+# Test binary files
+cp /bin/ls binary_file && git add binary_file && git commit --no-edit
+
+# Test Unicode and special characters
+echo "🚀 Unicode test 你好" > unicode.txt && git add . && git commit --no-edit
+```
+
+### Integration Test Categories
+
+The comprehensive test suite covers 11 categories:
+
+1. **Hook Installation and Configuration** - Basic setup and config management
+2. **Basic Git Operations** - Standard commit workflows
+3. **File Creation Permutations** - Empty files, multiple files, different content types
+4. **File Modification Permutations** - Start, middle, end modifications
+5. **Advanced Git Operations** - Amend, squash, template commits
+6. **Branch and Merge Operations** - Feature branches, merging
+7. **File Operations** - Deletions, mixed operations
+8. **Special Content** - Binary files, Unicode, special characters
+9. **File System Operations** - Directory moves, symlinks, permissions
+10. **Edge Cases** - Empty commits, case sensitivity, file/directory conversion
+11. **Bulk Operations** - Many files, large changes
+
+### Performance Monitoring
+
+```rust
+// Use profiling macros for performance tracking
+use crate::profile;
+
+pub fn expensive_operation() -> Result<String> {
+    profile!("Generate instruction template");
+    // ... implementation
+}
+```
+
+## API Usage Optimization
+
+### Token Management Strategies
+
+```rust
+// Smart truncation preserving file boundaries
+let truncated_diff = if estimated_tokens > max_tokens {
+    truncate_diff_intelligently(&diff, max_tokens)
+} else {
+    diff
+};
+
+// Prioritize high-impact files
+let sorted_files: Vec<_> = files
+    .iter()
+    .sorted_by(|a, b| b.impact_score.partial_cmp(&a.impact_score).unwrap())
+    .take(max_files_for_context)
+    .collect();
+```
+
+### Model Selection Guidelines
+
+| Model | Use Case | Speed | Quality | Cost |
+|-------|----------|--------|---------|------|
+| `gpt-4.1` | Default, balanced performance | Medium | High | Medium |
+| `gpt-4o` | Best quality, complex diffs | Slow | Highest | High |
+| `gpt-4o-mini` | Fast iteration, simple diffs | Fast | Good | Low |
+| `gpt-4` | Stable, proven performance | Medium | High | High |
+
+### Fallback Strategy Implementation
+
+```rust
+// Implement graceful degradation
+pub async fn generate_commit_message(diff: String) -> Result<String> {
+    // Try multi-step with API
+    if let Ok(msg) = generate_commit_message_multi_step(&client, diff.clone()).await {
+        return Ok(msg);
+    }
+
+    // Fallback to local analysis
+    if let Ok(msg) = generate_commit_message_local(diff.clone(), Some(72)) {
+        return Ok(msg);
+    }
+
+    // Last resort: single-step API
+    generate_commit_message_single_step(&client, diff).await
+}
+```
+
+## Release and Deployment
+
+### Version Management
+
+```bash
+# Check current version
+./scripts/current-version
+
+# Prepare release build
+cargo build --release
+
+# Multi-platform builds
+cargo build --target x86_64-unknown-linux-gnu
+cargo build --target x86_64-unknown-linux-musl
+cargo build --target x86_64-apple-darwin
+```
+
+### CI/CD Pipeline
+
+```bash
+# Test locally with act (GitHub Actions simulation)
+just local-github-actions
+
+# Run full release pipeline in Docker
+just release
+```
+
+### Distribution Channels
+
+- **Crates.io**: Primary distribution via `cargo install git-ai`
+- **Pre-compiled binaries**: Via `cargo-binstall` for faster installation
+- **Docker**: Containerized builds and testing
+- **GitHub Releases**: Tagged releases with pre-built binaries
 
 ## Workspace Rules
 
