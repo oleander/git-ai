@@ -5,7 +5,7 @@ use async_openai::Client;
 
 use crate::{config, debug_output, openai, profile};
 use crate::model::Model;
-use crate::config::App as Settings;
+use crate::config::AppConfig;
 use crate::multi_step_integration::{generate_commit_message_local, generate_commit_message_multi_step};
 
 /// The instruction template included at compile time
@@ -21,7 +21,7 @@ const INSTRUCTION_TEMPLATE: &str = include_str!("../resources/prompt.md");
 #[doc(hidden)]
 pub fn get_instruction_template() -> Result<String> {
   profile!("Generate instruction template");
-  let max_length = config::APP.max_commit_length.unwrap_or(72).to_string();
+  let max_length = config::APP_CONFIG.max_commit_length.unwrap_or(72).to_string();
   let template = mustache::compile_str(INSTRUCTION_TEMPLATE)
     .map_err(|e| anyhow!("Template compilation error: {}", e))?
     .render_to_string(&hashmap! {
@@ -70,7 +70,7 @@ pub fn create_commit_request(diff: String, max_tokens: usize, model: Model) -> R
 /// Returns an error if:
 /// - max_tokens is 0
 /// - OpenAI API call fails
-pub async fn generate(patch: String, remaining_tokens: usize, model: Model, settings: Option<&Settings>) -> Result<openai::Response> {
+pub async fn generate(patch: String, remaining_tokens: usize, model: Model, settings: Option<&AppConfig>) -> Result<openai::Response> {
   profile!("Generate commit message");
 
   if remaining_tokens == 0 {
@@ -80,7 +80,7 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
   // Try multi-step approach first
   let max_length = settings
     .and_then(|s| s.max_commit_length)
-    .or(config::APP.max_commit_length);
+    .or(config::APP_CONFIG.max_commit_length);
 
   // Check if we have a valid API key configuration
   let has_valid_api_key = if let Some(custom_settings) = settings {
@@ -91,7 +91,7 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
       .unwrap_or(false)
   } else {
     // Check environment variable or config
-    config::APP
+    config::APP_CONFIG
       .openai_api_key
       .as_ref()
       .map(|key| !key.is_empty() && key != "<PLACE HOLDER FOR YOUR API KEY>")
@@ -215,7 +215,7 @@ mod tests {
   #[tokio::test]
   async fn test_missing_api_key_error() {
     // Create settings with no API key
-    let settings = Settings {
+    let settings = AppConfig {
       openai_api_key:    None,
       model:             Some("gpt-4o-mini".to_string()),
       max_tokens:        Some(1024),
@@ -253,7 +253,7 @@ mod tests {
   #[tokio::test]
   async fn test_invalid_api_key_error() {
     // Create settings with invalid API key
-    let settings = Settings {
+    let settings = AppConfig {
       openai_api_key:    Some("<PLACE HOLDER FOR YOUR API KEY>".to_string()),
       model:             Some("gpt-4o-mini".to_string()),
       max_tokens:        Some(1024),
