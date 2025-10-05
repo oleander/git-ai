@@ -59,9 +59,7 @@ impl Model {
 
     // Always use the proper tokenizer for accurate counts
     // We cannot afford to underestimate tokens as it may cause API failures
-    let tokenizer = TOKENIZER.get_or_init(|| {
-      get_tokenizer(self.as_ref())
-    });
+    let tokenizer = TOKENIZER.get_or_init(|| get_tokenizer(self.as_ref()));
 
     // Use direct tokenization for accurate token count
     let tokens = tokenizer.encode_ordinary(text);
