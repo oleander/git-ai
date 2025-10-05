@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use async_openai::types::{ChatCompletionTool, ChatCompletionToolType, FunctionObjectArgs};
 use anyhow::Result;
+// TODO: Migrate to unified types from generation module
 
 /// File analysis result from the analyze function
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,7 +24,7 @@ pub struct FileDataForScoring {
   pub summary:        String
 }
 
-/// File data with calculated impact score
+/// File data with calculated impact score  
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileWithScore {
   pub file_path:      String,

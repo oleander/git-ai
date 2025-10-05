@@ -10,7 +10,7 @@ use futures::future::join_all;
 
 use crate::{commit, config, debug_output, function_calling, profile};
 use crate::model::Model;
-use crate::config::App as Settings;
+use crate::config::AppConfig;
 use crate::multi_step_integration::generate_commit_message_multi_step;
 
 const MAX_ATTEMPTS: usize = 3;
@@ -110,7 +110,7 @@ pub async fn generate_commit_message(diff: &str) -> Result<String> {
 }
 
 /// Creates an OpenAI configuration from application settings
-pub fn create_openai_config(settings: &Settings) -> Result<OpenAIConfig> {
+pub fn create_openai_config(settings: &AppConfig) -> Result<OpenAIConfig> {
   let api_key = settings
     .openai_api_key
     .as_ref()
@@ -205,7 +205,7 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
   let client = Client::with_config(config.clone());
   let model = request.model.to_string();
 
-  match generate_commit_message_multi_step(&client, &model, &request.prompt, config::APP.max_commit_length).await {
+  match generate_commit_message_multi_step(&client, &model, &request.prompt, config::APP_CONFIG.max_commit_length).await {
     Ok(message) => return Ok(Response { response: message }),
     Err(e) => {
       // Check if it's an API key error and propagate it
@@ -218,7 +218,7 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
 
   // Original single-step implementation as fallback
   // Create client with timeout if specified
-  let client = if let Some(timeout) = config::APP.timeout {
+  let client = if let Some(timeout) = config::APP_CONFIG.timeout {
     let http_client = reqwest::ClientBuilder::new()
       .timeout(Duration::from_secs(timeout as u64))
       .build()?;
@@ -236,7 +236,7 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
   let truncated_prompt = truncate_to_fit(&request.prompt, available_tokens, &request.model)?;
 
   // Create the commit function tool
-  let commit_tool = function_calling::create_commit_function_tool(config::APP.max_commit_length)?;
+  let commit_tool = function_calling::create_commit_function_tool(config::APP_CONFIG.max_commit_length)?;
 
   let chat_request = CreateChatCompletionRequestArgs::default()
     .max_tokens(request.max_tokens)
@@ -382,7 +382,7 @@ pub async fn call(request: Request) -> Result<Response> {
   profile!("OpenAI API call");
 
   // Create OpenAI configuration using our settings
-  let config = create_openai_config(&config::APP)?;
+  let config = create_openai_config(&config::APP_CONFIG)?;
 
   // Use the call_with_config function with the default config
   call_with_config(request, config).await

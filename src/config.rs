@@ -16,7 +16,7 @@ const DEFAULT_MODEL: &str = "gpt-4o-mini";
 const DEFAULT_API_KEY: &str = "<PLACE HOLDER FOR YOUR API KEY>";
 
 #[derive(Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
-pub struct App {
+pub struct AppConfig {
   pub openai_api_key:    Option<String>,
   pub model:             Option<String>,
   pub max_tokens:        Option<usize>,
@@ -32,7 +32,7 @@ pub struct ConfigPaths {
 
 lazy_static! {
   static ref PATHS: ConfigPaths = ConfigPaths::new();
-  pub static ref APP: App = App::new().expect("Failed to load config");
+  pub static ref APP_CONFIG: AppConfig = AppConfig::new().expect("Failed to load config");
 }
 
 impl ConfigPaths {
@@ -55,7 +55,7 @@ impl ConfigPaths {
   }
 }
 
-impl App {
+impl AppConfig {
   pub fn new() -> Result<Self> {
     dotenv::dotenv().ok();
     PATHS.ensure_exists()?;
