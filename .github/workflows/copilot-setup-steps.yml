@@ -40,6 +40,15 @@ jobs:
 
       - name: Setup Rust nightly toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: rustfmt, clippy
+
+      - name: Install fish shell (for integration tests)
+        run: sudo apt-get update && sudo apt-get install -y fish
+
+      - name: Verify formatting compliance
+        run: cargo fmt --check
 
       - run: cargo install --path . --debug
       - run: git ai hook install
