@@ -100,7 +100,9 @@ impl Args {
           .unwrap_or("gpt-4o-mini".to_string())
           .into();
         let used_tokens = commit::token_used(&model)?;
-        let max_tokens = config::APP_CONFIG.max_tokens.unwrap_or(model.context_size());
+        let max_tokens = config::APP_CONFIG
+          .max_tokens
+          .unwrap_or(model.context_size());
         let remaining_tokens = max_tokens.saturating_sub(used_tokens).max(512); // Ensure minimum 512 tokens
 
         let tree = match self.sha1.as_deref() {

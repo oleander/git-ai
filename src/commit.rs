@@ -21,7 +21,10 @@ const INSTRUCTION_TEMPLATE: &str = include_str!("../resources/prompt.md");
 #[doc(hidden)]
 pub fn get_instruction_template() -> Result<String> {
   profile!("Generate instruction template");
-  let max_length = config::APP_CONFIG.max_commit_length.unwrap_or(72).to_string();
+  let max_length = config::APP_CONFIG
+    .max_commit_length
+    .unwrap_or(72)
+    .to_string();
   let template = mustache::compile_str(INSTRUCTION_TEMPLATE)
     .map_err(|e| anyhow!("Template compilation error: {}", e))?
     .render_to_string(&hashmap! {

@@ -1,16 +1,17 @@
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileChange {
-  pub file_path: String,
+  pub file_path:      String,
   pub operation_type: String,
-  pub diff_content: Option<String>,
-  pub lines_added: u32,
-  pub lines_removed: u32,
-  pub file_category: String,
-  pub summary: String,
-  pub impact_score: f32,
+  pub diff_content:   Option<String>,
+  pub lines_added:    u32,
+  pub lines_removed:  u32,
+  pub file_category:  String,
+  pub summary:        String,
+  pub impact_score:   f32
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -19,7 +20,7 @@ pub enum OperationType {
   Modified,
   Deleted,
   Renamed,
-  Binary,
+  Binary
 }
 
 impl OperationType {
@@ -29,7 +30,7 @@ impl OperationType {
       OperationType::Modified => "modified",
       OperationType::Deleted => "deleted",
       OperationType::Renamed => "renamed",
-      OperationType::Binary => "binary",
+      OperationType::Binary => "binary"
     }
   }
 }
@@ -42,7 +43,7 @@ impl From<&str> for OperationType {
       "deleted" => OperationType::Deleted,
       "renamed" => OperationType::Renamed,
       "binary" => OperationType::Binary,
-      _ => OperationType::Modified, // default fallback
+      _ => OperationType::Modified // default fallback
     }
   }
 }
@@ -54,7 +55,7 @@ pub enum FileCategory {
   Config,
   Docs,
   Binary,
-  Build,
+  Build
 }
 
 impl FileCategory {
@@ -65,7 +66,7 @@ impl FileCategory {
       FileCategory::Config => "config",
       FileCategory::Docs => "docs",
       FileCategory::Binary => "binary",
-      FileCategory::Build => "build",
+      FileCategory::Build => "build"
     }
   }
 }
@@ -79,7 +80,7 @@ impl From<&str> for FileCategory {
       "docs" => FileCategory::Docs,
       "binary" => FileCategory::Binary,
       "build" => FileCategory::Build,
-      _ => FileCategory::Source, // default fallback
+      _ => FileCategory::Source // default fallback
     }
   }
 }
@@ -87,7 +88,7 @@ impl From<&str> for FileCategory {
 /// Unified response type for commit message generation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommitResponse {
-  pub message: String,
+  pub message:   String,
   pub reasoning: String,
-  pub files: HashMap<String, FileChange>,
+  pub files:     HashMap<String, FileChange>
 }

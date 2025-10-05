@@ -1,3 +1,3 @@
 pub mod types;
 
-pub use types::{FileChange, OperationType, FileCategory, CommitResponse};
+pub use types::{CommitResponse, FileCategory, FileChange, OperationType};
