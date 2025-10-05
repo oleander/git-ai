@@ -107,7 +107,10 @@ pub async fn generate_commit_message_multi_step(
       Err(e) => {
         // Check if it's an API key or authentication error - if so, propagate it immediately
         if crate::error::is_openai_auth_error(&e) {
-          return Err(anyhow::anyhow!("OpenAI API authentication failed: {}. Please check your API key configuration.", e));
+          return Err(anyhow::anyhow!(
+            "OpenAI API authentication failed: {}. Please check your API key configuration.",
+            e
+          ));
         }
         log::warn!("Failed to analyze file {}: {}", file.path, e);
         // Continue with other files even if one fails
