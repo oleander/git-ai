@@ -28,7 +28,7 @@ fn test_template_generation_with_default_max_length() {
 #[test]
 fn test_token_counting_empty_template() {
   // Token counting should work even with minimal content
-  let model = Model::GPT4oMini;
+  let model = Model::GPT41Mini;
   let result = model.count_tokens("");
   assert!(result.is_ok(), "Should handle empty string");
   assert_eq!(result.unwrap(), 0, "Empty string should have 0 tokens");
@@ -37,8 +37,8 @@ fn test_token_counting_empty_template() {
 #[test]
 fn test_token_counting_template() {
   // Test that we can count tokens in the actual template
-  let model = Model::GPT4oMini;
-  let result = calculate_token_usage(&model);
+  let model = Model::GPT41Mini;
+  let result = token_used(&model);
 
   assert!(result.is_ok(), "Token counting should succeed");
   let token_count = result.unwrap();
@@ -52,7 +52,7 @@ fn test_token_counting_template() {
 fn test_create_request_with_zero_tokens() {
   // Edge case: what happens with 0 max_tokens?
   let diff = "diff --git a/test.txt b/test.txt\n+Hello World".to_string();
-  let result = create_commit_request(diff, 0, Model::GPT4oMini);
+  let result = create_commit_request(diff, 0, Model::GPT41Mini);
 
   assert!(result.is_ok(), "Should create request even with 0 tokens");
   let request = result.unwrap();
@@ -63,7 +63,7 @@ fn test_create_request_with_zero_tokens() {
 fn test_create_request_with_empty_diff() {
   // Corner case: empty diff
   let diff = "".to_string();
-  let result = create_commit_request(diff.clone(), 1000, Model::GPT4oMini);
+  let result = create_commit_request(diff.clone(), 1000, Model::GPT41Mini);
 
   assert!(result.is_ok(), "Should handle empty diff");
   let request = result.unwrap();
@@ -75,7 +75,7 @@ fn test_create_request_with_empty_diff() {
 fn test_create_request_with_whitespace_only_diff() {
   // Corner case: whitespace-only diff
   let diff = "   \n\t\n   ".to_string();
-  let result = create_commit_request(diff.clone(), 1000, Model::GPT4oMini);
+  let result = create_commit_request(diff.clone(), 1000, Model::GPT41Mini);
 
   assert!(result.is_ok(), "Should handle whitespace-only diff");
   let request = result.unwrap();
@@ -86,7 +86,7 @@ fn test_create_request_with_whitespace_only_diff() {
 fn test_create_request_preserves_model() {
   // Test that different models are preserved correctly
   let diff = "diff --git a/test.txt b/test.txt\n+Test".to_string();
-  let models = vec![Model::GPT4oMini, Model::GPT4o, Model::GPT4, Model::GPT41];
+  let models = vec![Model::GPT41Mini, Model::GPT45, Model::GPT41, Model::GPT41Nano];
 
   for model in models {
     let result = create_commit_request(diff.clone(), 1000, model);
@@ -103,7 +103,7 @@ fn test_create_request_with_max_u16_tokens() {
   let diff = "diff --git a/test.txt b/test.txt\n+Test".to_string();
   let max_tokens = usize::from(u16::MAX);
 
-  let result = create_commit_request(diff, max_tokens, Model::GPT4oMini);
+  let result = create_commit_request(diff, max_tokens, Model::GPT41Mini);
   assert!(result.is_ok(), "Should handle max u16 tokens");
 
   let request = result.unwrap();
@@ -116,7 +116,7 @@ fn test_create_request_with_overflow_tokens() {
   let diff = "diff --git a/test.txt b/test.txt\n+Test".to_string();
   let max_tokens = usize::from(u16::MAX) + 1000;
 
-  let result = create_commit_request(diff, max_tokens, Model::GPT4oMini);
+  let result = create_commit_request(diff, max_tokens, Model::GPT41Mini);
   assert!(result.is_ok(), "Should handle token overflow");
 
   let request = result.unwrap();
@@ -139,7 +139,7 @@ index 1234567..abcdefg 100644
 "#
   .to_string();
 
-  let result = create_commit_request(diff.clone(), 1000, Model::GPT4oMini);
+  let result = create_commit_request(diff.clone(), 1000, Model::GPT41Mini);
   assert!(result.is_ok(), "Should handle simple diff");
 
   let request = result.unwrap();
@@ -164,7 +164,7 @@ index 0000000..1234567
 "#
   .to_string();
 
-  let result = create_commit_request(diff.clone(), 2000, Model::GPT4o);
+  let result = create_commit_request(diff.clone(), 2000, Model::GPT45);
   assert!(result.is_ok(), "Should handle file addition");
 
   let request = result.unwrap();
@@ -186,7 +186,7 @@ index 1234567..0000000
 "#
   .to_string();
 
-  let result = create_commit_request(diff.clone(), 1500, Model::GPT4oMini);
+  let result = create_commit_request(diff.clone(), 1500, Model::GPT41Mini);
   assert!(result.is_ok(), "Should handle file deletion");
 
   let request = result.unwrap();
@@ -208,7 +208,7 @@ index 1234567..abcdefg 100644
 "#
   .to_string();
 
-  let result = create_commit_request(diff.clone(), 1000, Model::GPT4oMini);
+  let result = create_commit_request(diff.clone(), 1000, Model::GPT41Mini);
   assert!(result.is_ok(), "Should handle file rename");
 
   let request = result.unwrap();
@@ -218,7 +218,7 @@ index 1234567..abcdefg 100644
 
 #[test]
 fn test_token_counting_with_diff_content() {
-  let model = Model::GPT4oMini;
+  let model = Model::GPT41Mini;
 
   let small_diff = "diff --git a/a.txt b/a.txt\n+Hello";
   let medium_diff = r#"diff --git a/test.js b/test.js
@@ -275,7 +275,7 @@ index 0000000..5555555
 "#
   .to_string();
 
-  let result = create_commit_request(diff.clone(), 3000, Model::GPT4o);
+  let result = create_commit_request(diff.clone(), 3000, Model::GPT45);
   assert!(result.is_ok(), "Should handle multiple file changes");
 
   let request = result.unwrap();
@@ -292,7 +292,7 @@ Binary files a/image.png and b/image.png differ
 "#
   .to_string();
 
-  let result = create_commit_request(diff.clone(), 1000, Model::GPT4oMini);
+  let result = create_commit_request(diff.clone(), 1000, Model::GPT41Mini);
   assert!(result.is_ok(), "Should handle binary file diff");
 
   let request = result.unwrap();
@@ -313,7 +313,7 @@ index 1234567..abcdefg 100644
 "#
   .to_string();
 
-  let result = create_commit_request(diff.clone(), 2000, Model::GPT4oMini);
+  let result = create_commit_request(diff.clone(), 2000, Model::GPT41Mini);
   assert!(result.is_ok(), "Should handle special characters");
 
   let request = result.unwrap();
@@ -335,14 +335,14 @@ fn test_create_request_with_large_diff() {
     }
   }
 
-  let result = create_commit_request(diff.clone(), 8000, Model::GPT4o);
+  let result = create_commit_request(diff.clone(), 8000, Model::GPT45);
   assert!(result.is_ok(), "Should handle large diff");
 
   let request = result.unwrap();
   assert!(request.prompt.len() > 10000, "Large diff should be preserved");
 
   // Count tokens to ensure we can handle large inputs
-  let model = Model::GPT4o;
+  let model = Model::GPT45;
   let token_count = model.count_tokens(&diff).unwrap();
   assert!(token_count > 1000, "Large diff should have substantial token count");
 }
@@ -356,7 +356,7 @@ fn test_create_request_with_very_long_lines() {
     long_line
   );
 
-  let result = create_commit_request(diff.clone(), 5000, Model::GPT4o);
+  let result = create_commit_request(diff.clone(), 5000, Model::GPT45);
   assert!(result.is_ok(), "Should handle very long lines");
 
   let request = result.unwrap();
@@ -400,7 +400,7 @@ Binary files a/image.png and b/image.png differ
 "#
   .to_string();
 
-  let result = create_commit_request(diff.clone(), 4000, Model::GPT4o);
+  let result = create_commit_request(diff.clone(), 4000, Model::GPT45);
   assert!(result.is_ok(), "Should handle mixed operations");
 
   let request = result.unwrap();
@@ -415,7 +415,7 @@ Binary files a/image.png and b/image.png differ
 
 #[test]
 fn test_token_counting_consistency_with_complex_diff() {
-  let model = Model::GPT4oMini;
+  let model = Model::GPT41Mini;
 
   let complex_diff = r#"diff --git a/src/main.rs b/src/main.rs
 index abc123..def456 100644
@@ -486,7 +486,7 @@ index 777..888 100644
 "#
   .to_string();
 
-  let result = create_commit_request(diff.clone(), 5000, Model::GPT4o);
+  let result = create_commit_request(diff.clone(), 5000, Model::GPT45);
   assert!(result.is_ok(), "Should handle multiple programming languages");
 
   let request = result.unwrap();
@@ -513,13 +513,13 @@ fn test_template_contains_required_sections() {
 #[test]
 fn test_request_structure_completeness() {
   let diff = "diff --git a/test.txt b/test.txt\n+test".to_string();
-  let request = create_commit_request(diff.clone(), 1000, Model::GPT4oMini).unwrap();
+  let request = create_commit_request(diff.clone(), 1000, Model::GPT41Mini).unwrap();
 
   // Verify request has all required components
   assert!(!request.system.is_empty(), "System prompt should not be empty");
   assert_eq!(request.prompt, diff, "User prompt should match input diff");
   assert_eq!(request.max_tokens, 1000, "Max tokens should be set correctly");
-  assert_eq!(request.model, Model::GPT4oMini, "Model should be set correctly");
+  assert_eq!(request.model, Model::GPT41Mini, "Model should be set correctly");
 
   // Verify system prompt has reasonable length
   assert!(request.system.len() > 500, "System prompt should be substantial");
@@ -546,9 +546,9 @@ index 123abc..456def 100644
   .to_string();
 
   // Test the full workflow
-  let model = Model::GPT4oMini;
-  let template = generate_instruction_template().unwrap();
-  let token_count = calculate_token_usage(&model).unwrap();
+  let model = Model::GPT41Mini;
+  let template = get_instruction_template().unwrap();
+  let token_count = token_used(&model).unwrap();
   let request = create_commit_request(simple_diff.clone(), 2000, model).unwrap();
 
   // Verify all components work together
@@ -562,7 +562,7 @@ index 123abc..456def 100644
 #[test]
 fn test_end_to_end_with_token_limits() {
   // Test that we can calculate tokens for both template and diff
-  let model = Model::GPT4o;
+  let model = Model::GPT45;
   let diff = r#"diff --git a/src/main.rs b/src/main.rs
 index abc..def 100644
 --- a/src/main.rs

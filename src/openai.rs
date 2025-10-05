@@ -37,7 +37,7 @@ pub async fn generate_commit_message(diff: &str) -> Result<String> {
   if let Ok(api_key) = std::env::var("OPENAI_API_KEY") {
     if !api_key.is_empty() {
       // Use the commit function directly without parsing
-      match commit::generate(diff.to_string(), 256, Model::GPT4oMini, None).await {
+      match commit::generate(diff.to_string(), 256, Model::GPT41Mini, None).await {
         Ok(response) => return Ok(response.response.trim().to_string()),
         Err(e) => {
           log::warn!("Direct generation failed, falling back to local: {e}");
