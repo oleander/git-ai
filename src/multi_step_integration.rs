@@ -245,7 +245,7 @@ pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
         } else {
           b_path
         };
-        
+
         log::debug!("Found new file in diff: {path}");
         current_file = Some(ParsedFile {
           path:         path.to_string(),
@@ -327,14 +327,14 @@ pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
               // Extract path from "b/" part (new file) or "a/" part (old file)
               let new_file_path = parts[3].trim_start_matches("b/").trim_start_matches("i/");
               let old_file_path = parts[2].trim_start_matches("a/").trim_start_matches("c/");
-              
+
               // Prefer the new file path unless it's /dev/null
               path = if new_file_path == "/dev/null" || new_file_path == "dev/null" {
                 old_file_path
               } else {
                 new_file_path
               };
-              
+
               found_path = true;
               break;
             }
@@ -709,7 +709,7 @@ index a67ebbe..da223be 100644
       .diff_content
       .contains("0472ffa1665c4c5573fb8f7698c9965122eda675"));
   }
-  
+
   #[test]
   fn test_parse_diff_with_c_i_prefixes() {
     // Test with c/ and i/ prefixes that appear in git hook diffs
@@ -741,7 +741,7 @@ index 0000000..a730e61
     assert!(files[0].diff_content.contains("# Test File"));
     assert!(files[1].diff_content.contains("console.log"));
   }
-  
+
   #[test]
   fn test_parse_diff_with_deleted_file() {
     // Test with a deleted file (where b path is /dev/null)
