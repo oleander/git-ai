@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -7,7 +6,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use rayon::prelude::*;
-use structopt::StructOpt;
 use git2::{Diff, DiffFormat, DiffOptions, Repository, Tree};
 use anyhow::{Context, Result};
 use thiserror::Error;
@@ -17,7 +15,7 @@ use crate::model::Model;
 use crate::profile;
 
 // Constants
-const MAX_POOL_SIZE: usize = 1000;
+
 const DEFAULT_STRING_CAPACITY: usize = 8192;
 const PARALLEL_CHUNK_SIZE: usize = 25;
 const ESTIMATED_FILES_COUNT: usize = 100;
@@ -42,46 +40,6 @@ pub enum HookError {
 
   #[error(transparent)]
   Anyhow(#[from] anyhow::Error)
-}
-
-// CLI Arguments
-#[derive(StructOpt, Debug)]
-#[structopt(name = "commit-msg-hook", about = "A tool for generating commit messages.")]
-pub struct Args {
-  pub commit_msg_file: PathBuf,
-
-  #[structopt(short = "t", long = "type")]
-  pub commit_type: Option<String>,
-
-  #[structopt(short = "s", long = "sha1")]
-  pub sha1: Option<String>
-}
-
-// Memory management
-#[derive(Debug)]
-struct StringPool {
-  strings:  Vec<String>,
-  capacity: usize
-}
-
-impl StringPool {
-  fn new(capacity: usize) -> Self {
-    Self { strings: Vec::with_capacity(capacity), capacity }
-  }
-
-  fn get(&mut self) -> String {
-    self
-      .strings
-      .pop()
-      .unwrap_or_else(|| String::with_capacity(self.capacity))
-  }
-
-  fn put(&mut self, mut string: String) {
-    string.clear();
-    if self.strings.len() < MAX_POOL_SIZE {
-      self.strings.push(string);
-    }
-  }
 }
 
 // File operations traits
@@ -363,10 +321,6 @@ impl PatchDiff for Diff<'_> {
 
     // Pre-allocate HashMap with estimated capacity
     let mut files = HashMap::with_capacity(ESTIMATED_FILES_COUNT);
-
-    // Use pre-sized buffers to avoid reallocations
-    const BUFFER_SIZE: usize = 64; // Hold context prefix strings
-    static CONTEXT_PREFIX: &str = "context: ";
 
     // Create thread-local cache for paths to avoid allocations
     thread_local! {
@@ -675,50 +629,4 @@ impl PatchRepository for Repository {
       .patience(true)
       .minimal(true);
   }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn test_string_pool_new() {
-    let pool = StringPool::new(100);
-    assert_eq!(pool.strings.len(), 0);
-    assert_eq!(pool.capacity, 100);
-  }
-
-  #[test]
-  fn test_string_pool_put_and_get() {
-    let mut pool = StringPool::new(10);
-    let mut s1 = String::with_capacity(10);
-    s1.push_str("test");
-    pool.put(s1);
-
-    assert_eq!(pool.strings.len(), 1);
-
-    let s2 = pool.get();
-    assert_eq!(s2.capacity(), 10);
-    assert_eq!(s2.len(), 0);
-    assert_eq!(pool.strings.len(), 0);
-  }
-
-  #[test]
-  fn test_string_pool_limit() {
-    let mut pool = StringPool::new(10);
-
-    for _ in 0..150 {
-      pool.put(String::with_capacity(10));
-    }
-
-    assert_eq!(pool.strings.len(), 150);
-  }
-}
-
-#[test]
-fn test_string_pool_get() {
-  let mut pool = StringPool::new(10);
-  let s1 = pool.get();
-  assert_eq!(s1.capacity(), 10);
-  assert_eq!(s1.len(), 0);
 }
