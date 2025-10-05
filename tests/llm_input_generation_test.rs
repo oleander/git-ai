@@ -1,4 +1,4 @@
-use ai::commit::{create_commit_request, generate_instruction_template, calculate_token_usage};
+use ai::commit::{calculate_token_usage, create_commit_request, generate_instruction_template};
 use ai::model::Model;
 
 /// Tests for the LLM input generation system
