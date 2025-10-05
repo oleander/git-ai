@@ -430,7 +430,7 @@ When reviewing code:
 - [ ] **Clippy**: Zero warnings (`-D warnings`)
 - [ ] **Format**: Follows rustfmt.toml exactly
 - [ ] **Docs**: All public items with examples
-- [ ] **Errors**: Context chains, no unwrap in libs (9 to remove)
+- [ ] **Errors**: Context chains, minimize unwrap usage in library code
 - [ ] **Tests**: Pass with coverage
 - [ ] **Names**: Clear, descriptive, appropriate length
 - [ ] **Performance**: No regressions
