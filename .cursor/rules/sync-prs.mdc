@@ -4,7 +4,7 @@ description: Sync all open pull requests with origin/main to keep them up-to-dat
 
 # Sync Open PRs with origin/main
 
-This rule provides a systematic approach to keeping all open pull requests synchronized with the main branch.
+This rule provides a systematic approach to keeping all open pull requests synchronized with the main branch using the Docker-based `just pr` command for isolated testing.
 
 ## Why Sync PRs?
 
@@ -12,74 +12,90 @@ This rule provides a systematic approach to keeping all open pull requests synch
 - Ensures PRs are tested against the latest codebase
 - Makes reviews easier by reducing the delta between PR and main
 - Identifies integration issues early
+- Uses isolated Docker environments to avoid polluting local git state
 
 ## Prerequisites
 
-1. Ensure local main is up-to-date:
+1. Docker installed and running
+2. GitHub CLI (`gh`) installed and authenticated:
    ```bash
-   git checkout main
-   git pull origin main
+   gh auth login
    ```
 
-2. Fetch all remote branches:
+3. Justfile command runner installed:
    ```bash
-   git fetch origin
+   # On macOS
+   brew install just
    ```
 
 ## Process to Sync All Open PRs
 
 ### Step 1: Get List of Open PRs
 
-Use GitHub API to list open PRs:
+Use GitHub CLI to list open PRs:
 ```bash
-# Get current origin/main SHA
-git rev-parse origin/main
-
-# List open PRs (requires gh CLI or use GitHub API tools)
-# This will show PR numbers, branches, and base commit
+gh pr list --json number,title,headRefName --limit 50
 ```
 
-### Step 2: Update Each PR Branch
+### Step 2: Update Each PR Using Docker
 
-For each open PR branch:
+For each open PR, use the `just pr` command to sync in an isolated environment:
 
 ```bash
-# Checkout the PR branch
-git checkout <pr-branch-name>
+# Sync a single PR with origin/main
+just sync-pr <PR_NUMBER>
 
-# Merge origin/main
-git merge origin/main --no-edit
-
-# If successful, push
-git push origin <pr-branch-name>
+# Or manually run the sync commands
+just pr <PR_NUMBER> "git fetch origin main && git merge origin/main --no-edit && cargo fmt --all && cargo check && git push origin HEAD"
 ```
+
+The `just pr` command:
+- Builds a Docker container with the PR checked out
+- Runs commands inside that isolated environment
+- Automatically handles GitHub authentication
+- Keeps your local git state clean
 
 ### Step 3: Handle Merge Conflicts
 
-When conflicts occur:
+When conflicts occur, you'll need to resolve them manually:
 
-1. **Identify conflicting files**:
+1. **Checkout the PR branch locally**:
    ```bash
+   gh pr checkout <PR_NUMBER>
+   ```
+
+2. **Identify conflicting files**:
+   ```bash
+   git fetch origin main
+   git merge origin/main --no-edit
    git status
    ```
 
-2. **Resolve conflicts manually**:
+3. **Resolve conflicts manually**:
    - Read both versions carefully
    - Understand the intent of each change
    - Combine changes intelligently (don't just pick one side)
    - Remove conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`)
 
-3. **Key principles for conflict resolution**:
+4. **Key principles for conflict resolution**:
    - Preserve new functionality from main
    - Keep PR-specific changes
    - Ensure constants/config changes are consistent
    - Test that the resolution compiles
 
-4. **Complete the merge**:
+5. **Complete the merge and test**:
    ```bash
    git add <resolved-files>
    git commit --no-edit
-   git push origin <pr-branch-name>
+   cargo fmt --all
+   cargo check
+   git push origin HEAD
+   ```
+
+6. **Verify using Docker**:
+   ```bash
+   # Test the resolved PR in isolated environment
+   just pr <PR_NUMBER> "cargo test"
    ```
 
 ## Common Conflict Scenarios
@@ -118,82 +134,156 @@ When both branches add imports:
 
 ```bash
 #!/bin/bash
-# sync-all-prs.sh - Sync all open PRs with origin/main
+# sync-all-prs - Sync all open PRs with origin/main using Docker
 
 set -e
 
-# Fetch latest
-git fetch origin
+echo "Fetching open PRs..."
 
-# Get main SHA
-MAIN_SHA=$(git rev-parse origin/main)
+# Get list of open PR numbers
+PR_NUMBERS=$(gh pr list --json number --jq '.[].number')
+
+if [ -z "$PR_NUMBERS" ]; then
+  echo "No open PRs found"
+  exit 0
+fi
+
+# Get main SHA for reference
+MAIN_SHA=$(git rev-parse origin/main 2>/dev/null || echo "unknown")
 echo "Syncing PRs to main: $MAIN_SHA"
+echo ""
 
-# List of PR branches (populate from GitHub API)
-PR_BRANCHES=(
-  "copilot/fix-branch-1"
-  "copilot/fix-branch-2"
-  # ... add more branches
-)
+# Track results
+SUCCESS=()
+CONFLICTS=()
 
-for branch in "${PR_BRANCHES[@]}"; do
-  echo "=== Syncing $branch ==="
+for pr_num in $PR_NUMBERS; do
+  echo "=== Syncing PR #$pr_num ==="
 
-  # Checkout and merge
-  git checkout "$branch" || git checkout -b "$branch" "origin/$branch"
+  # Get PR title for better output
+  PR_TITLE=$(gh pr view "$pr_num" --json title --jq '.title')
+  echo "Title: $PR_TITLE"
 
-  if git merge origin/main --no-edit; then
-    echo "✓ Merged successfully"
-    git push origin "$branch"
+  # Attempt sync using Docker-isolated environment
+  if just sync-pr "$pr_num"; then
+    echo "✓ PR #$pr_num merged successfully"
+    SUCCESS+=("$pr_num")
   else
-    echo "✗ Merge conflict - manual resolution needed"
-    echo "  Conflicting files:"
-    git status --short | grep "^UU"
-    echo "  Resolve conflicts then run:"
-    echo "    git add <files> && git commit --no-edit && git push origin $branch"
-    exit 1
+    echo "✗ PR #$pr_num has conflicts - manual resolution needed"
+    echo "  Resolve with:"
+    echo "    gh pr checkout $pr_num"
+    echo "    git merge origin/main --no-edit"
+    echo "    # ... resolve conflicts ..."
+    echo "    git push origin HEAD"
+    CONFLICTS+=("$pr_num")
   fi
+  echo ""
 done
 
-# Return to main
-git checkout main
-echo "All PRs synced!"
+# Summary
+echo "========================================"
+echo "Sync Summary"
+echo "========================================"
+echo "Successful: ${#SUCCESS[@]} PRs"
+for pr in "${SUCCESS[@]}"; do
+  echo "  ✓ #$pr"
+done
+
+if [ ${#CONFLICTS[@]} -gt 0 ]; then
+  echo ""
+  echo "Conflicts: ${#CONFLICTS[@]} PRs"
+  for pr in "${CONFLICTS[@]}"; do
+    echo "  ✗ #$pr"
+  done
+  exit 1
+fi
+
+echo ""
+echo "All PRs synced successfully!"
 ```
+
+This script uses the existing `just sync-pr` command from the Justfile, which runs the merge in an isolated Docker container.
 
 ## Best Practices
 
 1. **Sync regularly**: Update PRs weekly or after significant main branch changes
-2. **Test after sync**: Run tests to ensure the merge didn't break anything
+2. **Use Docker for testing**: The `just pr` command provides isolation and consistency
 3. **Review conflicts carefully**: Don't blindly accept one side
 4. **Document complex resolutions**: Add comments explaining non-obvious merge decisions
-5. **Clean up**: Return to main branch when done
-6. **Verify builds**: Run `cargo check` or `cargo build` after resolving conflicts
+5. **Test in isolation**: After resolving conflicts locally, verify with `just pr <NUM> "cargo test"`
+6. **Verify builds**: Always run `cargo check` and `cargo fmt` after resolving conflicts
+
+## Using the `just pr` Command
+
+The `just pr` command is a powerful tool for working with PRs in isolation:
+
+```bash
+# Run any command in the PR's Docker environment
+just pr <PR_NUMBER> "<command>"
+
+# Examples:
+just pr 42 "cargo build"
+just pr 42 "cargo test"
+just pr 42 "cargo clippy"
+just pr 42 "git log --oneline -5"
+
+# Sync a PR (combines fetch, merge, format, check, and push)
+just sync-pr 42
+```
+
+### Benefits of Docker-based PR Testing:
+- **Isolation**: No impact on your local git state
+- **Consistency**: Same environment for all PRs
+- **Authentication**: Automatically uses your GitHub token
+- **Clean slate**: Each command runs in a fresh container
 
 ## Troubleshooting
 
-### "Your local changes would be overwritten"
+### Docker build fails
 ```bash
-# Stash or commit your changes first
-git stash
-# or
-git commit -am "WIP: save current work"
+# Clean up Docker cache and rebuild
+docker system prune -f
+docker build -t git-ai .
+```
+
+### GitHub authentication issues
+```bash
+# Re-authenticate with GitHub CLI
+gh auth logout
+gh auth login
+
+# Verify token works
+gh auth status
 ```
 
 ### "Branch is up to date" but GitHub shows behind
 ```bash
-# Force fetch to update remote tracking
-git fetch origin --force
+# The PR container always fetches fresh from origin
+# Just run sync-pr again
+just sync-pr <PR_NUMBER>
 ```
 
 ### Accidentally pushed broken code
 ```bash
-# Fix the issue, then amend and force push (be careful!)
+# Checkout the PR locally, fix, and push
+gh pr checkout <PR_NUMBER>
+# ... make fixes ...
 git commit --amend --no-edit
-git push origin <branch> --force-with-lease
+git push origin HEAD --force-with-lease
+
+# Then verify with Docker
+just pr <PR_NUMBER> "cargo test"
+```
+
+### Script not executable
+```bash
+chmod +x scripts/sync-all-prs
 ```
 
 ## Related Files
 
+- [Justfile](mdc:Justfile) - Contains the `pr` and `sync-pr` commands
+- [Dockerfile](mdc:Dockerfile) - Docker configuration for PR testing
 - [src/config.rs](mdc:src/config.rs) - Often contains constants that conflict
 - [src/model.rs](mdc:src/model.rs) - Model definitions that may conflict
 - [Cargo.toml](mdc:Cargo.toml) - Dependency version conflicts
@@ -202,8 +292,33 @@ git push origin <branch> --force-with-lease
 
 After syncing each PR:
 - [ ] No merge conflict markers remain in code
-- [ ] Code compiles: `cargo check`
-- [ ] No new clippy warnings: `cargo clippy`
-- [ ] Tests pass: `cargo test`
+- [ ] Code compiles: `just pr <NUM> "cargo check"`
+- [ ] No new clippy warnings: `just pr <NUM> "cargo clippy"`
+- [ ] Tests pass: `just pr <NUM> "cargo test"`
+- [ ] Code is formatted: `just pr <NUM> "cargo fmt --all -- --check"`
 - [ ] PR branch is pushed to origin
 - [ ] GitHub shows PR is up-to-date with base branch
+
+## Quick Reference
+
+```bash
+# List open PRs
+gh pr list
+
+# Sync a single PR
+just sync-pr <PR_NUMBER>
+
+# Sync all PRs
+just sync-prs
+# or
+./scripts/sync-all-prs
+
+# Test a PR without syncing
+just pr <PR_NUMBER> "cargo test"
+
+# Manually resolve conflicts
+gh pr checkout <PR_NUMBER>
+git merge origin/main --no-edit
+# ... resolve conflicts ...
+git push origin HEAD
+```
