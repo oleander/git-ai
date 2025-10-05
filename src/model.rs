@@ -60,8 +60,7 @@ impl Model {
     // Always use the proper tokenizer for accurate counts
     // We cannot afford to underestimate tokens as it may cause API failures
     let tokenizer = TOKENIZER.get_or_init(|| {
-      let model_str = String::from(self);
-      get_tokenizer(&model_str)
+      get_tokenizer(self.as_ref())
     });
 
     // Use direct tokenization for accurate token count
@@ -75,8 +74,7 @@ impl Model {
   /// * `usize` - The maximum number of tokens the model can process
   pub fn context_size(&self) -> usize {
     profile!("Get context size");
-    let model_str = String::from(self);
-    get_context_size(&model_str)
+    get_context_size(self.as_ref())
   }
 
   /// Truncates the given text to fit within the specified token limit.
@@ -167,21 +165,28 @@ impl Model {
   }
 }
 
+impl AsRef<str> for Model {
+  fn as_ref(&self) -> &str {
+    match self {
+      Model::GPT41 => MODEL_GPT4_1,
+      Model::GPT41Mini => MODEL_GPT4_1_MINI,
+      Model::GPT41Nano => MODEL_GPT4_1_NANO,
+      Model::GPT45 => MODEL_GPT4_5
+    }
+  }
+}
+
+// Keep conversion to String for cases that need owned strings
 impl From<&Model> for String {
   fn from(model: &Model) -> Self {
-    match model {
-      Model::GPT41 => MODEL_GPT4_1.to_string(),
-      Model::GPT41Mini => MODEL_GPT4_1_MINI.to_string(),
-      Model::GPT41Nano => MODEL_GPT4_1_NANO.to_string(),
-      Model::GPT45 => MODEL_GPT4_5.to_string()
-    }
+    model.as_ref().to_string()
   }
 }
 
 // Keep the old impl for backwards compatibility where possible
 impl Model {
-  pub fn as_str(&self) -> String {
-    self.into()
+  pub fn as_str(&self) -> &str {
+    self.as_ref()
   }
 }
 
@@ -201,7 +206,7 @@ impl FromStr for Model {
 
 impl Display for Model {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", String::from(self))
+    write!(f, "{}", self.as_ref())
   }
 }
 
