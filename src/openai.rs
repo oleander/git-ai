@@ -214,7 +214,7 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
         return Err(e);
       }
       log::warn!("Parallel approach failed, trying multi-step: {e}");
-      
+
       // Fallback to old multi-step approach
       match generate_commit_message_multi_step(&client, &model, &request.prompt, config::APP_CONFIG.max_commit_length).await {
         Ok(message) => return Ok(Response { response: message }),

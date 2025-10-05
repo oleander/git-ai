@@ -608,16 +608,14 @@ pub async fn generate_commit_message_parallel(
 
   // Phase 1: Analyze each file in parallel using simplified approach
   log::debug!("Starting parallel analysis of {} files", parsed_files.len());
-  
+
   let analysis_futures: Vec<_> = parsed_files
     .iter()
     .map(|file| {
       let file_path = file.path.clone();
       let operation = file.operation.clone();
       let diff_content = file.diff_content.clone();
-      async move {
-        analyze_single_file_simple(client, model, &file_path, &operation, &diff_content).await
-      }
+      async move { analyze_single_file_simple(client, model, &file_path, &operation, &diff_content).await }
     })
     .collect();
 
@@ -650,24 +648,15 @@ pub async fn generate_commit_message_parallel(
 
   // Phase 2: Synthesize final commit message from all analyses
   log::debug!("Synthesizing final commit message from {} analyses", successful_analyses.len());
-  
-  let synthesis_result = synthesize_commit_message(
-    client,
-    model,
-    &successful_analyses,
-    max_length.unwrap_or(72),
-  ).await?;
+
+  let synthesis_result = synthesize_commit_message(client, model, &successful_analyses, max_length.unwrap_or(72)).await?;
 
   Ok(synthesis_result)
 }
 
 /// Analyzes a single file using simplified text completion (no function calling)
 async fn analyze_single_file_simple(
-  client: &Client<OpenAIConfig>,
-  model: &str,
-  file_path: &str,
-  operation: &str,
-  diff_content: &str,
+  client: &Client<OpenAIConfig>, model: &str, file_path: &str, operation: &str, diff_content: &str
 ) -> Result<String> {
   let system_prompt = "You are a git diff analyzer. Analyze the provided file change and provide a concise summary in 1-2 sentences describing what changed and why it matters.";
 
@@ -704,10 +693,7 @@ async fn analyze_single_file_simple(
 
 /// Synthesizes a final commit message from multiple file analyses
 async fn synthesize_commit_message(
-  client: &Client<OpenAIConfig>,
-  model: &str,
-  analyses: &[(String, String)],
-  max_length: usize,
+  client: &Client<OpenAIConfig>, model: &str, analyses: &[(String, String)], max_length: usize
 ) -> Result<String> {
   // Build context from all analyses
   let mut context = String::new();
@@ -1003,12 +989,12 @@ index abcd123..efgh456 100644
     assert_eq!(files.len(), 2);
     assert_eq!(files[0].path, "src/auth.rs");
     assert_eq!(files[1].path, "src/main.rs");
-    
+
     // Verify diff content is captured
     assert!(files[0].diff_content.contains("use crate::security"));
     assert!(files[1].diff_content.contains("auth::authenticate"));
   }
-  
+
   #[test]
   fn test_parse_diff_edge_cases() {
     // Test parsing with various git prefixes and edge cases
@@ -1025,13 +1011,13 @@ index 1234567..0000000
     assert_eq!(files.len(), 1);
     assert_eq!(files[0].path, "old_file.txt", "Should extract original path for deleted files");
     assert_eq!(files[0].operation, "deleted");
-    
+
     // Test with binary files
     let diff_binary = r#"diff --git a/image.png b/image.png
 new file mode 100644
 index 0000000..1234567
 Binary files /dev/null and b/image.png differ"#;
-    
+
     let files = parse_diff(diff_binary).unwrap();
     assert_eq!(files.len(), 1);
     assert_eq!(files[0].path, "image.png");

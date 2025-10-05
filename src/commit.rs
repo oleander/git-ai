@@ -126,7 +126,7 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
                   bail!("Invalid OpenAI API key. Please check your API key configuration.");
                 }
                 log::warn!("Parallel generation with custom settings failed, trying multi-step: {e}");
-                
+
                 // Fallback to old multi-step approach
                 match generate_commit_message_multi_step(&client, &model_str, &patch, max_length).await {
                   Ok(message) => return Ok(openai::Response { response: message }),
@@ -163,7 +163,7 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
               bail!("Invalid OpenAI API key. Please check your API key configuration.");
             }
             log::warn!("Parallel generation failed, trying multi-step: {e}");
-            
+
             // Fallback to old multi-step approach
             match generate_commit_message_multi_step(&client, &model_str, &patch, max_length).await {
               Ok(message) => return Ok(openai::Response { response: message }),
