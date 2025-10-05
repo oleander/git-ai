@@ -50,7 +50,20 @@ jobs:
       - name: Verify formatting compliance
         run: cargo fmt --check
 
-      - run: cargo install --path . --debug
-      - run: git ai hook install
-      - run: git ai config set openai-api-key ${{ secrets.OPENAI_API_KEY }}
-      - run: git ai config set model gpt-4.1
+      - name: Run clippy to catch issues early
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests to validate codebase
+        run: cargo test --quiet
+
+      - name: Install git-ai binary
+        run: cargo install --path . --debug
+
+      - name: Setup git-ai configuration
+        run: |
+          git ai hook install
+          git ai config set openai-api-key ${{ secrets.OPENAI_API_KEY }}
+          git ai config set model gpt-4.1
+
+      - name: Verify installation
+        run: git ai --version
