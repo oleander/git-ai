@@ -35,4 +35,4 @@ pr PR_NUMBER CMD:
     docker run -i --rm -e GITHUB_TOKEN=$(gh auth token) git-ai-pr-tester bash -c "{{CMD}}"
 
 sync-pr PR_NUM CMD = "date":
-    just pr {{PR_NUM}} "git fetch origin && git merge origin/main --no-edit && {{CMD}} && cargo fmt --check && cargo check && git push origin --force"
+    just pr {{PR_NUM}} "git fetch origin && git merge origin/main --no-edit && {{CMD}} && cargo fmt --check && cargo check && git push origin"
