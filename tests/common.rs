@@ -268,6 +268,8 @@ impl TestRepoFactory {
     let head = repo.repo.head()?;
     let commit = head.peel_to_commit()?;
     repo.repo.branch("feature", &commit, false)?;
+    drop(head);
+    drop(commit);
 
     // Modify on main
     let file = repo.create_file("conflict.txt", "Main branch content")?;
@@ -291,15 +293,20 @@ impl TestRepoFactory {
       .find_reference("refs/heads/main")
       .or_else(|_| repo.repo.find_reference("refs/heads/master"))?;
     let main_commit = main_ref.peel_to_commit()?;
+    let main_commit_id = main_commit.id();
+    drop(main_ref);
+    drop(main_commit);
 
     // Perform merge (this will create conflicts)
     let mut merge_opts = git2::MergeOptions::new();
     let mut checkout_opts = git2::build::CheckoutBuilder::new();
     checkout_opts.allow_conflicts(true);
 
+    let annotated_commit = repo.repo.find_annotated_commit(main_commit_id)?;
     repo
       .repo
-      .merge(&[&main_commit.into_object()], Some(&mut merge_opts), Some(&mut checkout_opts))?;
+      .merge(&[&annotated_commit], Some(&mut merge_opts), Some(&mut checkout_opts))?;
+    drop(annotated_commit);
 
     Ok(repo)
   }
