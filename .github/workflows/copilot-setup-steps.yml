@@ -39,8 +39,8 @@ jobs:
       - name: Setup Rust nightly toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - run: cargo fetch
       - run: cargo install --path . --debug
       - run: git ai hook install
       - run: git ai config set openai-api-key ${{ secrets.OPENAI_API_KEY }}
+      - run: git ai config set model gpt-4.1
 
