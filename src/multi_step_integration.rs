@@ -89,10 +89,16 @@ pub async fn generate_commit_message_multi_step(
         file_analyses.push((file, analysis));
       }
       Err(e) => {
-        // Check if it's an API key error - if so, propagate it immediately
+        // Check if it's an API key or authentication error - if so, propagate it immediately
         let error_str = e.to_string();
-        if error_str.contains("invalid_api_key") || error_str.contains("Incorrect API key") || error_str.contains("Invalid API key") {
-          return Err(e);
+        if error_str.contains("invalid_api_key") || 
+           error_str.contains("Incorrect API key") || 
+           error_str.contains("Invalid API key") ||
+           error_str.contains("authentication") ||
+           error_str.contains("unauthorized") ||
+           // Detect HTTP errors that typically indicate auth issues when calling OpenAI
+           (error_str.contains("http error") && error_str.contains("error sending request")) {
+          return Err(anyhow::anyhow!("OpenAI API authentication failed: {}. Please check your API key configuration.", e));
         }
         log::warn!("Failed to analyze file {}: {}", file.path, e);
         // Continue with other files even if one fails

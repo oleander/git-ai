@@ -209,7 +209,9 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
     Ok(message) => return Ok(Response { response: message }),
     Err(e) => {
       // Check if it's an API key error and propagate it
-      if e.to_string().contains("invalid_api_key") || e.to_string().contains("Incorrect API key") {
+      if e.to_string().contains("invalid_api_key") || 
+         e.to_string().contains("Incorrect API key") ||
+         e.to_string().contains("OpenAI API authentication failed") {
         return Err(e);
       }
       log::warn!("Multi-step approach failed, falling back to single-step: {e}");

@@ -121,7 +121,9 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
               Ok(message) => return Ok(openai::Response { response: message }),
               Err(e) => {
                 // Check if it's an API key error
-                if e.to_string().contains("invalid_api_key") || e.to_string().contains("Incorrect API key") {
+                if e.to_string().contains("invalid_api_key") || 
+                   e.to_string().contains("Incorrect API key") ||
+                   e.to_string().contains("OpenAI API authentication failed") {
                   bail!("Invalid OpenAI API key. Please check your API key configuration.");
                 }
                 log::warn!("Multi-step generation with custom settings failed: {e}");
@@ -149,7 +151,9 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
           Ok(message) => return Ok(openai::Response { response: message }),
           Err(e) => {
             // Check if it's an API key error
-            if e.to_string().contains("invalid_api_key") || e.to_string().contains("Incorrect API key") {
+            if e.to_string().contains("invalid_api_key") || 
+               e.to_string().contains("Incorrect API key") ||
+               e.to_string().contains("OpenAI API authentication failed") {
               bail!("Invalid OpenAI API key. Please check your API key configuration.");
             }
             log::warn!("Multi-step generation failed: {e}");
