@@ -30,30 +30,46 @@ This rule provides a systematic approach to keeping all open pull requests synch
 
 ## Process to Sync All Open PRs
 
-### Step 1: Get List of Open PRs
+### Quick Start
 
-Use GitHub CLI to list open PRs:
+The simplest way to sync all open PRs at once:
+
 ```bash
-gh pr list --json number,title,headRefName --limit 50
+# Sync all open PRs automatically
+just sync-all-prs
 ```
 
-### Step 2: Update Each PR Using Docker
+This command will:
+1. Sync each PR with origin/main
+2. Auto-format code with `cargo fmt --all`
+3. Amend the merge commit with formatting fixes
+4. Run `cargo fmt --check` and `cargo check`
+5. Force push the updated branch
 
-For each open PR, use the `just pr` command to sync in an isolated environment:
+### Manual Sync Options
+
+For more control, sync PRs individually:
 
 ```bash
-# Sync a single PR with origin/main
+# Sync a single PR with default behavior
 just sync-pr <PR_NUMBER>
 
-# Or manually run the sync commands
-just pr <PR_NUMBER> "git fetch origin main && git merge origin/main --no-edit && cargo fmt --all && cargo check && git push origin HEAD"
+# Sync with custom commands (e.g., run tests)
+just sync-pr <PR_NUMBER> "cargo fmt --all && cargo test && git add -A && git commit --amend --no-edit"
+
+# Or use the low-level pr command
+just pr <PR_NUMBER> "git fetch origin && git merge origin/main --no-edit && cargo fmt --all && cargo check && git push origin --force"
 ```
+
+### How It Works
 
 The `just pr` command:
 - Builds a Docker container with the PR checked out
 - Runs commands inside that isolated environment
-- Automatically handles GitHub authentication
-- Keeps your local git state clean
+- Automatically handles GitHub authentication via environment variables
+- Uses `git fetch origin` to ensure fresh remote state before merging
+- Uses `--force` push for amended commits (safe for PR branches)
+- Keeps your local git state completely clean
 
 ### Step 3: Handle Merge Conflicts
 
@@ -130,17 +146,31 @@ When both branches add imports:
 - Remove duplicates
 - Alphabetize within groups
 
-## Automation Script Template
+## Built-in Sync All Command
+
+The [Justfile](mdc:Justfile) now includes a `sync-all-prs` recipe that automatically syncs all open PRs:
+
+```bash
+just sync-all-prs
+```
+
+This is the recommended approach as it:
+- Is maintained alongside the codebase
+- Automatically formats code after merging
+- Handles authentication properly
+- Uses the same Docker isolation as individual PR syncs
+
+### Dynamic Script Alternative
+
+If you need a more dynamic approach that auto-discovers open PRs:
 
 ```bash
 #!/bin/bash
-# sync-all-prs - Sync all open PRs with origin/main using Docker
+# dynamic-sync-prs - Dynamically sync all open PRs
 
 set -e
 
 echo "Fetching open PRs..."
-
-# Get list of open PR numbers
 PR_NUMBERS=$(gh pr list --json number --jq '.[].number')
 
 if [ -z "$PR_NUMBERS" ]; then
@@ -148,61 +178,37 @@ if [ -z "$PR_NUMBERS" ]; then
   exit 0
 fi
 
-# Get main SHA for reference
 MAIN_SHA=$(git rev-parse origin/main 2>/dev/null || echo "unknown")
 echo "Syncing PRs to main: $MAIN_SHA"
 echo ""
 
-# Track results
 SUCCESS=()
 CONFLICTS=()
 
 for pr_num in $PR_NUMBERS; do
   echo "=== Syncing PR #$pr_num ==="
-
-  # Get PR title for better output
   PR_TITLE=$(gh pr view "$pr_num" --json title --jq '.title')
   echo "Title: $PR_TITLE"
 
-  # Attempt sync using Docker-isolated environment
-  if just sync-pr "$pr_num"; then
+  # Use the sync-pr command with auto-formatting
+  if just sync-pr "$pr_num" "cargo fmt --all && git add -A && git commit --amend --no-edit"; then
     echo "✓ PR #$pr_num merged successfully"
     SUCCESS+=("$pr_num")
   else
-    echo "✗ PR #$pr_num has conflicts - manual resolution needed"
-    echo "  Resolve with:"
-    echo "    gh pr checkout $pr_num"
-    echo "    git merge origin/main --no-edit"
-    echo "    # ... resolve conflicts ..."
-    echo "    git push origin HEAD"
+    echo "✗ PR #$pr_num has conflicts"
+    echo "  Resolve: gh pr checkout $pr_num && git merge origin/main"
     CONFLICTS+=("$pr_num")
   fi
   echo ""
 done
 
-# Summary
-echo "========================================"
-echo "Sync Summary"
 echo "========================================"
 echo "Successful: ${#SUCCESS[@]} PRs"
-for pr in "${SUCCESS[@]}"; do
-  echo "  ✓ #$pr"
-done
-
-if [ ${#CONFLICTS[@]} -gt 0 ]; then
-  echo ""
-  echo "Conflicts: ${#CONFLICTS[@]} PRs"
-  for pr in "${CONFLICTS[@]}"; do
-    echo "  ✗ #$pr"
-  done
-  exit 1
-fi
-
-echo ""
-echo "All PRs synced successfully!"
+[ ${#CONFLICTS[@]} -gt 0 ] && echo "Conflicts: ${#CONFLICTS[@]} PRs" && exit 1
+echo "All PRs synced!"
 ```
 
-This script uses the existing `just sync-pr` command from the Justfile, which runs the merge in an isolated Docker container.
+**Note**: The static `sync-all-prs` in the Justfile is simpler and faster (uses Docker caching), but requires manual updates when PRs change.
 
 ## Best Practices
 
@@ -226,16 +232,48 @@ just pr 42 "cargo build"
 just pr 42 "cargo test"
 just pr 42 "cargo clippy"
 just pr 42 "git log --oneline -5"
+just pr 42 "git status"
 
 # Sync a PR (combines fetch, merge, format, check, and push)
 just sync-pr 42
+
+# Sync a PR with custom commands (e.g., run tests before pushing)
+just sync-pr 42 "cargo fmt --all && cargo test && git add -A && git commit --amend --no-edit"
+
+# Sync all open PRs at once
+just sync-all-prs
 ```
+
+### Understanding the Command Flow
+
+1. **`just pr <NUM> "command"`** - Low-level Docker execution
+   - Builds Docker image with PR checked out
+   - Runs your command inside the container
+   - Good for testing and inspection
+
+2. **`just sync-pr <NUM>`** - High-level PR sync (default behavior)
+   - Fetches latest from origin
+   - Merges origin/main
+   - Runs default command (just "date" for testing)
+   - Verifies with `cargo fmt --check` and `cargo check`
+   - Force pushes to origin
+
+3. **`just sync-pr <NUM> "custom"`** - High-level PR sync (custom)
+   - Same as above but runs your custom command after merge
+   - Example: `"cargo fmt --all && git add -A && git commit --amend --no-edit"`
+   - Useful for fixing formatting issues automatically
+
+4. **`just sync-all-prs`** - Batch operation
+   - Runs `sync-pr` for all open PRs with formatting fixes
+   - Processes PRs sequentially
+   - Reports any failures
 
 ### Benefits of Docker-based PR Testing:
 - **Isolation**: No impact on your local git state
 - **Consistency**: Same environment for all PRs
-- **Authentication**: Automatically uses your GitHub token
+- **Authentication**: Automatically uses your GitHub token via environment variables
 - **Clean slate**: Each command runs in a fresh container
+- **Force push safety**: Safe to use `--force` since Docker environment is isolated
 
 ## Troubleshooting
 
@@ -256,12 +294,22 @@ gh auth login
 gh auth status
 ```
 
-### "Branch is up to date" but GitHub shows behind
+### Push rejected: "stale info" or "fetch first"
+This happens when the Docker container's remote state is outdated. The `sync-pr` command now handles this by running `git fetch origin` before merging, and uses `--force` push which is safe for PR branches.
+
+If you still see issues:
 ```bash
-# The PR container always fetches fresh from origin
-# Just run sync-pr again
+# The updated command already includes fetch
 just sync-pr <PR_NUMBER>
 ```
+
+### Formatting errors after merge
+The `sync-pr` and `sync-all-prs` commands automatically:
+1. Run `cargo fmt --all` after merging
+2. Amend the merge commit with formatting fixes
+3. Verify with `cargo fmt --check`
+
+No manual intervention needed for formatting issues!
 
 ### Accidentally pushed broken code
 ```bash
@@ -269,15 +317,22 @@ just sync-pr <PR_NUMBER>
 gh pr checkout <PR_NUMBER>
 # ... make fixes ...
 git commit --amend --no-edit
-git push origin HEAD --force-with-lease
+git push origin HEAD --force
 
 # Then verify with Docker
 just pr <PR_NUMBER> "cargo test"
 ```
 
-### Script not executable
+### Sync fails for specific PR
 ```bash
-chmod +x scripts/sync-all-prs
+# Try syncing just that PR with verbose output
+just pr <PR_NUMBER> "git fetch origin && git merge origin/main --no-edit && cargo check"
+
+# If conflicts, resolve manually
+gh pr checkout <PR_NUMBER>
+git merge origin/main
+# ... resolve conflicts ...
+git push origin HEAD --force
 ```
 
 ## Related Files
@@ -305,20 +360,54 @@ After syncing each PR:
 # List open PRs
 gh pr list
 
-# Sync a single PR
+# Sync all open PRs at once (recommended)
+just sync-all-prs
+
+# Sync a single PR with default behavior
 just sync-pr <PR_NUMBER>
 
-# Sync all PRs
-just sync-prs
-# or
-./scripts/sync-all-prs
+# Sync a single PR with custom commands
+just sync-pr <PR_NUMBER> "cargo fmt --all && cargo test && git add -A && git commit --amend --no-edit"
 
-# Test a PR without syncing
+# Run any command in a PR's Docker environment
 just pr <PR_NUMBER> "cargo test"
+just pr <PR_NUMBER> "cargo clippy"
+just pr <PR_NUMBER> "git log --oneline -5"
 
 # Manually resolve conflicts
 gh pr checkout <PR_NUMBER>
+git fetch origin
 git merge origin/main --no-edit
 # ... resolve conflicts ...
-git push origin HEAD
+cargo fmt --all
+git add -A
+git commit --no-edit
+git push origin HEAD --force
+```
+
+## Current Justfile Commands
+
+The [Justfile](mdc:Justfile) contains these PR-related commands:
+
+```justfile
+# Low-level: Run any command in a PR's Docker container
+pr PR_NUMBER CMD:
+    docker build --build-arg PR_NUMBER={{PR_NUMBER}} --build-arg GH_TOKEN=$(gh auth token) --target pr-tester -t git-ai-pr-tester .
+    docker run -i --rm -e GITHUB_TOKEN=$(gh auth token) git-ai-pr-tester bash -c "{{CMD}}"
+
+# Sync a single PR with origin/main
+sync-pr PR_NUM CMD = "date":
+    just pr {{PR_NUM}} "git fetch origin && git merge origin/main --no-edit && {{CMD}} && cargo fmt --check && cargo check && git push origin --force"
+
+# Sync all open PRs with origin/main
+sync-all-prs:
+    just sync-pr 74 "cargo fmt --all && git add -A && git commit --amend --no-edit"
+    just sync-pr 75 "cargo fmt --all && git add -A && git commit --amend --no-edit"
+    just sync-pr 76 "cargo fmt --all && git add -A && git commit --amend --no-edit"
+    # ... (continues for all open PRs)
+```
+
+**Note**: Update the `sync-all-prs` recipe when PRs are opened/closed by running:
+```bash
+gh pr list --json number --jq '.[].number'
 ```
