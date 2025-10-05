@@ -1,5 +1,10 @@
 //! Multi-step commit message generation.
 //!
+//! This module consolidates the functionality from the original multi-step modules:
+//! - `multi_step_analysis.rs` - File analysis, scoring, and candidate generation
+//! - `multi_step_integration.rs` - API integration, diff parsing, orchestration
+//! - `simple_multi_step.rs` - Simplified direct API approach
+//!
 //! Implements a sophisticated analysis pipeline:
 //! 1. Parse diff into individual files
 //! 2. Analyze each file (lines changed, category, impact)
