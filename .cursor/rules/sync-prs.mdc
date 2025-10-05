@@ -1,0 +1,209 @@
+---
+description: Sync all open pull requests with origin/main to keep them up-to-date
+---
+
+# Sync Open PRs with origin/main
+
+This rule provides a systematic approach to keeping all open pull requests synchronized with the main branch.
+
+## Why Sync PRs?
+
+- Prevents merge conflicts from accumulating
+- Ensures PRs are tested against the latest codebase
+- Makes reviews easier by reducing the delta between PR and main
+- Identifies integration issues early
+
+## Prerequisites
+
+1. Ensure local main is up-to-date:
+   ```bash
+   git checkout main
+   git pull origin main
+   ```
+
+2. Fetch all remote branches:
+   ```bash
+   git fetch origin
+   ```
+
+## Process to Sync All Open PRs
+
+### Step 1: Get List of Open PRs
+
+Use GitHub API to list open PRs:
+```bash
+# Get current origin/main SHA
+git rev-parse origin/main
+
+# List open PRs (requires gh CLI or use GitHub API tools)
+# This will show PR numbers, branches, and base commit
+```
+
+### Step 2: Update Each PR Branch
+
+For each open PR branch:
+
+```bash
+# Checkout the PR branch
+git checkout <pr-branch-name>
+
+# Merge origin/main
+git merge origin/main --no-edit
+
+# If successful, push
+git push origin <pr-branch-name>
+```
+
+### Step 3: Handle Merge Conflicts
+
+When conflicts occur:
+
+1. **Identify conflicting files**:
+   ```bash
+   git status
+   ```
+
+2. **Resolve conflicts manually**:
+   - Read both versions carefully
+   - Understand the intent of each change
+   - Combine changes intelligently (don't just pick one side)
+   - Remove conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`)
+
+3. **Key principles for conflict resolution**:
+   - Preserve new functionality from main
+   - Keep PR-specific changes
+   - Ensure constants/config changes are consistent
+   - Test that the resolution compiles
+
+4. **Complete the merge**:
+   ```bash
+   git add <resolved-files>
+   git commit --no-edit
+   git push origin <pr-branch-name>
+   ```
+
+## Common Conflict Scenarios
+
+### Configuration Constants
+
+When both main and PR modify constants (e.g., `DEFAULT_MODEL`):
+- Use the value from main for default behavior
+- Keep PR-specific additions (e.g., new constants like `DEFAULT_TEMPERATURE`)
+- Ensure visibility (pub vs non-pub) is consistent with usage
+
+Example resolution:
+```rust
+// Keep main's default value
+pub const DEFAULT_MODEL: &str = "gpt-4.1";
+// Keep PR's new constant
+pub const DEFAULT_TEMPERATURE: f64 = 0.7;
+```
+
+### Struct Field Changes
+
+When both branches modify a struct:
+- Include all fields from both versions
+- Ensure derives are compatible (e.g., `Eq` only if all fields implement it)
+- Update corresponding methods to handle all fields
+
+### Import Conflicts
+
+When both branches add imports:
+- Keep all necessary imports
+- Follow Rust import conventions: std → external → internal
+- Remove duplicates
+- Alphabetize within groups
+
+## Automation Script Template
+
+```bash
+#!/bin/bash
+# sync-all-prs.sh - Sync all open PRs with origin/main
+
+set -e
+
+# Fetch latest
+git fetch origin
+
+# Get main SHA
+MAIN_SHA=$(git rev-parse origin/main)
+echo "Syncing PRs to main: $MAIN_SHA"
+
+# List of PR branches (populate from GitHub API)
+PR_BRANCHES=(
+  "copilot/fix-branch-1"
+  "copilot/fix-branch-2"
+  # ... add more branches
+)
+
+for branch in "${PR_BRANCHES[@]}"; do
+  echo "=== Syncing $branch ==="
+
+  # Checkout and merge
+  git checkout "$branch" || git checkout -b "$branch" "origin/$branch"
+
+  if git merge origin/main --no-edit; then
+    echo "✓ Merged successfully"
+    git push origin "$branch"
+  else
+    echo "✗ Merge conflict - manual resolution needed"
+    echo "  Conflicting files:"
+    git status --short | grep "^UU"
+    echo "  Resolve conflicts then run:"
+    echo "    git add <files> && git commit --no-edit && git push origin $branch"
+    exit 1
+  fi
+done
+
+# Return to main
+git checkout main
+echo "All PRs synced!"
+```
+
+## Best Practices
+
+1. **Sync regularly**: Update PRs weekly or after significant main branch changes
+2. **Test after sync**: Run tests to ensure the merge didn't break anything
+3. **Review conflicts carefully**: Don't blindly accept one side
+4. **Document complex resolutions**: Add comments explaining non-obvious merge decisions
+5. **Clean up**: Return to main branch when done
+6. **Verify builds**: Run `cargo check` or `cargo build` after resolving conflicts
+
+## Troubleshooting
+
+### "Your local changes would be overwritten"
+```bash
+# Stash or commit your changes first
+git stash
+# or
+git commit -am "WIP: save current work"
+```
+
+### "Branch is up to date" but GitHub shows behind
+```bash
+# Force fetch to update remote tracking
+git fetch origin --force
+```
+
+### Accidentally pushed broken code
+```bash
+# Fix the issue, then amend and force push (be careful!)
+git commit --amend --no-edit
+git push origin <branch> --force-with-lease
+```
+
+## Related Files
+
+- [src/config.rs](mdc:src/config.rs) - Often contains constants that conflict
+- [src/model.rs](mdc:src/model.rs) - Model definitions that may conflict
+- [Cargo.toml](mdc:Cargo.toml) - Dependency version conflicts
+
+## Verification Checklist
+
+After syncing each PR:
+- [ ] No merge conflict markers remain in code
+- [ ] Code compiles: `cargo check`
+- [ ] No new clippy warnings: `cargo clippy`
+- [ ] Tests pass: `cargo test`
+- [ ] PR branch is pushed to origin
+- [ ] GitHub shows PR is up-to-date with base branch

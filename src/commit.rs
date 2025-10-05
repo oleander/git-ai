@@ -6,7 +6,7 @@ use async_openai::Client;
 use crate::{config, debug_output, openai, profile};
 use crate::model::Model;
 use crate::config::AppConfig;
-use crate::generation::multi_step::{generate_with_api, generate_local};
+use crate::generation::multi_step::{generate_local, generate_with_api};
 
 /// The instruction template included at compile time
 const INSTRUCTION_TEMPLATE: &str = include_str!("../resources/prompt.md");
