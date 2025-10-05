@@ -2,7 +2,8 @@ use std::env;
 
 use anyhow::Result;
 use async_openai::Client;
-use ai::multi_step_integration::{generate_commit_message_local, generate_commit_message_multi_step, parse_diff};
+use ai::multi_step_integration::{generate_commit_message_local, generate_commit_message_multi_step};
+use ai::diff::parser::parse_diff;
 
 #[tokio::main]
 async fn main() -> Result<()> {
