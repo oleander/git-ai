@@ -224,7 +224,7 @@ mod tests {
       max_tokens:        Some(1024),
       max_commit_length: Some(72),
       timeout:           Some(30),
-      temperature:       Some(0.7)
+      temperature:       Some(0.0)
     };
 
     // Temporarily clear the environment variable
@@ -263,7 +263,7 @@ mod tests {
       max_tokens:        Some(1024),
       max_commit_length: Some(72),
       timeout:           Some(30),
-      temperature:       Some(0.7)
+      temperature:       Some(0.0)
     };
 
     // Test that generate returns an error for invalid API key

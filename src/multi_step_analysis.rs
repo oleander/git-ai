@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use async_openai::types::{ChatCompletionTool, ChatCompletionToolType, FunctionObjectArgs};
 use anyhow::Result;
-// TODO: Migrate to unified types from generation module (tracked in issue #XX - create unified type migration issue)
+
 
 /// File analysis result from the analyze function
 #[derive(Debug, Clone, Serialize, Deserialize)]
