@@ -33,16 +33,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-
       - name: Setup Rust nightly toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly
           components: rustfmt, clippy
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
 
       - name: Install fish shell (for integration tests)
         run: sudo apt-get update && sudo apt-get install -y fish
