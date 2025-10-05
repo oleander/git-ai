@@ -10,6 +10,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
 jobs:
   lint:
@@ -57,12 +58,19 @@ jobs:
           override: true
           profile: minimal
 
-      - run: sudo apt install -y fish
+      - name: Install fish (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: sudo apt install fish
+
+      - name: Install fish (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: brew install fish
 
       - name: Run integration tests
-        run: |
-          ./scripts/integration-tests
-          cargo build --release
-          cargo test --release
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: fish ./scripts/integration-tests
+
+      - name: Cargo build
+        run: cargo build
+
+      - name: Cargo test
+        run: cargo test
