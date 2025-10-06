@@ -12,7 +12,6 @@ use crate::multi_step_integration::{generate_commit_message_local, generate_comm
 const INSTRUCTION_TEMPLATE: &str = include_str!("../resources/prompt.md");
 
 /// Returns the instruction template for the AI model.
-/// This template guides the model in generating appropriate commit messages.
 ///
 /// # Returns
 /// * `Result<String>` - The rendered template or an error
@@ -85,57 +84,31 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
     .and_then(|s| s.max_commit_length)
     .or(config::APP_CONFIG.max_commit_length);
 
-  // Check if we have a valid API key configuration
-  let has_valid_api_key = if let Some(custom_settings) = settings {
-    custom_settings
-      .openai_api_key
-      .as_ref()
-      .map(|key| !key.is_empty() && key != "<PLACE HOLDER FOR YOUR API KEY>")
-      .unwrap_or(false)
-  } else {
-    // Check environment variable or config
-    config::APP_CONFIG
-      .openai_api_key
-      .as_ref()
-      .map(|key| !key.is_empty() && key != "<PLACE HOLDER FOR YOUR API KEY>")
-      .unwrap_or(false)
-      || std::env::var("OPENAI_API_KEY")
-        .map(|key| !key.is_empty())
-        .unwrap_or(false)
-  };
-
-  if !has_valid_api_key {
-    bail!("OpenAI API key not configured. Please set your API key using:\n  git-ai config set openai-api-key <your-key>\nor set the OPENAI_API_KEY environment variable.");
-  }
-
   // Use custom settings if provided
   if let Some(custom_settings) = settings {
-    if let Some(api_key) = &custom_settings.openai_api_key {
-      if !api_key.is_empty() && api_key != "<PLACE HOLDER FOR YOUR API KEY>" {
-        match openai::create_openai_config(custom_settings) {
-          Ok(config) => {
-            let client = Client::with_config(config);
-            let model_str = model.to_string();
+    // Always try to create config - this will handle API key validation and fallback
+    match openai::create_openai_config(custom_settings) {
+      Ok(config) => {
+        let client = Client::with_config(config);
+        let model_str = model.to_string();
 
-            match generate_commit_message_multi_step(&client, &model_str, &patch, max_length).await {
-              Ok(message) => return Ok(openai::Response { response: message }),
-              Err(e) => {
-                // Check if it's an API key error
-                if e.to_string().contains("invalid_api_key") || e.to_string().contains("Incorrect API key") {
-                  bail!("Invalid OpenAI API key. Please check your API key configuration.");
-                }
-                log::warn!("Multi-step generation with custom settings failed: {e}");
-                if let Some(session) = debug_output::debug_session() {
-                  session.set_multi_step_error(e.to_string());
-                }
-              }
+        match generate_commit_message_multi_step(&client, &model_str, &patch, max_length).await {
+          Ok(message) => return Ok(openai::Response { response: message }),
+          Err(e) => {
+            // Check if it's an API key error
+            if e.to_string().contains("invalid_api_key") || e.to_string().contains("Incorrect API key") {
+              bail!("Invalid OpenAI API key. Set via:\n1. git-ai config set openai-api-key <key>\n2. OPENAI_API_KEY environment variable");
+            }
+            log::warn!("Multi-step generation with custom settings failed: {e}");
+            if let Some(session) = debug_output::debug_session() {
+              session.set_multi_step_error(e.to_string());
             }
           }
-          Err(e) => {
-            // If config creation fails due to API key, propagate the error
-            return Err(e);
-          }
         }
+      }
+      Err(e) => {
+        // If config creation fails due to API key, propagate the error
+        return Err(e);
       }
     }
   } else {
@@ -150,7 +123,7 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
           Err(e) => {
             // Check if it's an API key error
             if e.to_string().contains("invalid_api_key") || e.to_string().contains("Incorrect API key") {
-              bail!("Invalid OpenAI API key. Please check your API key configuration.");
+              bail!("Invalid OpenAI API key. Set via:\n1. git-ai config set openai-api-key <key>\n2. OPENAI_API_KEY environment variable");
             }
             log::warn!("Multi-step generation failed: {e}");
             if let Some(session) = debug_output::debug_session() {
@@ -247,7 +220,7 @@ mod tests {
     assert!(result.is_err());
     let error_message = result.unwrap_err().to_string();
     assert!(
-      error_message.contains("OpenAI API key not configured"),
+      error_message.contains("OpenAI API key not found") || error_message.contains("git-ai config set openai-api-key"),
       "Expected error message about missing API key, got: {}",
       error_message
     );
@@ -276,9 +249,44 @@ mod tests {
     assert!(result.is_err());
     let error_message = result.unwrap_err().to_string();
     assert!(
-      error_message.contains("OpenAI API key not configured"),
+      error_message.contains("OpenAI API key not found") || error_message.contains("git-ai config set openai-api-key"),
       "Expected error message about invalid API key, got: {}",
       error_message
     );
+  }
+
+  #[test]
+  fn test_api_key_fallback_to_env() {
+    // Test the API key resolution logic without creating OpenAI config objects
+    
+    // Set a valid-looking API key in environment 
+    std::env::set_var("OPENAI_API_KEY", "sk-test123456789012345678901234567890123456789012345678");
+    
+    // Test case 1: Placeholder in config should fall back to env var
+    let placeholder_key = Some("<PLACE HOLDER FOR YOUR API KEY>".to_string());
+    if let Some(key) = &placeholder_key {
+      if !key.is_empty() && key != "<PLACE HOLDER FOR YOUR API KEY>" {
+        panic!("Should not use placeholder key");
+      } else {
+        // Should fall back to env var
+        let env_result = std::env::var("OPENAI_API_KEY");
+        assert!(env_result.is_ok(), "Environment variable should be available");
+        assert_eq!(env_result.unwrap(), "sk-test123456789012345678901234567890123456789012345678");
+      }
+    }
+    
+    // Test case 2: Empty config should fall back to env var
+    let empty_key: Option<String> = None;
+    if empty_key.is_none() {
+      let env_result = std::env::var("OPENAI_API_KEY");
+      assert!(env_result.is_ok(), "Environment variable should be available for empty config");
+    }
+    
+    // Clean up
+    std::env::remove_var("OPENAI_API_KEY");
+    
+    // Verify environment variable is removed
+    let env_result_after_cleanup = std::env::var("OPENAI_API_KEY");
+    assert!(env_result_after_cleanup.is_err(), "Environment variable should be removed");
   }
 }

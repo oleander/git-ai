@@ -111,13 +111,29 @@ pub async fn generate_commit_message(diff: &str) -> Result<String> {
 
 /// Creates an OpenAI configuration from application settings
 pub fn create_openai_config(settings: &AppConfig) -> Result<OpenAIConfig> {
-  let api_key = settings
-    .openai_api_key
-    .as_ref()
-    .ok_or_else(|| anyhow!("OpenAI API key not configured"))?;
+  // Try config first, then environment variable
+  let api_key = if let Some(key) = &settings.openai_api_key {
+    if !key.is_empty() && key != "<PLACE HOLDER FOR YOUR API KEY>" {
+      key.clone()
+    } else {
+      // Try environment variable as fallback
+      std::env::var("OPENAI_API_KEY")
+        .map_err(|_| anyhow!(
+          "OpenAI API key not found. Set via:\n1. git-ai config set openai-api-key <key>\n2. OPENAI_API_KEY environment variable"
+        ))?
+    }
+  } else {
+    // No config key, try environment variable
+    std::env::var("OPENAI_API_KEY")
+      .map_err(|_| anyhow!(
+        "OpenAI API key not found. Set via:\n1. git-ai config set openai-api-key <key>\n2. OPENAI_API_KEY environment variable"
+      ))?
+  };
 
-  if api_key.is_empty() || api_key == "<PLACE HOLDER FOR YOUR API KEY>" {
-    return Err(anyhow!("Invalid OpenAI API key"));
+  if api_key.is_empty() {
+    return Err(anyhow!(
+      "OpenAI API key cannot be empty. Set via:\n1. git-ai config set openai-api-key <key>\n2. OPENAI_API_KEY environment variable"
+    ));
   }
 
   let config = OpenAIConfig::new().with_api_key(api_key);
@@ -342,7 +358,7 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
         // Check if it's an API key error - fail immediately without retrying
         if let OpenAIError::ApiError(ref api_err) = &last_error.as_ref().unwrap() {
           if api_err.code.as_deref() == Some("invalid_api_key") {
-            let error_msg = format!("Invalid OpenAI API key: {}", api_err.message);
+            let error_msg = format!("Invalid OpenAI API key: {}. Set via:\n1. git-ai config set openai-api-key <key>\n2. OPENAI_API_KEY environment variable", api_err.message);
             log::error!("{error_msg}");
             return Err(anyhow!(error_msg));
           }
