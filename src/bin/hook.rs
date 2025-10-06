@@ -99,7 +99,7 @@ impl Args {
           .clone()
           .unwrap_or("gpt-4o-mini".to_string())
           .into();
-        let used_tokens = commit::token_used(&model)?;
+        let used_tokens = commit::calculate_token_usage(&model)?;
         let max_tokens = config::APP_CONFIG
           .max_tokens
           .unwrap_or(model.context_size());

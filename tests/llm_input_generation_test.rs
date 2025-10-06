@@ -1,4 +1,4 @@
-use ai::commit::{create_commit_request, get_instruction_template, token_used};
+use ai::commit::{calculate_token_usage, create_commit_request, generate_instruction_template};
 use ai::model::Model;
 
 /// Tests for the LLM input generation system
@@ -12,7 +12,7 @@ use ai::model::Model;
 #[test]
 fn test_template_generation_with_default_max_length() {
   // Test that template generation works with default config
-  let result = get_instruction_template();
+  let result = generate_instruction_template();
   assert!(result.is_ok(), "Template generation should succeed");
 
   let template = result.unwrap();
@@ -38,7 +38,7 @@ fn test_token_counting_empty_template() {
 fn test_token_counting_template() {
   // Test that we can count tokens in the actual template
   let model = Model::GPT41Mini;
-  let result = token_used(&model);
+  let result = calculate_token_usage(&model);
 
   assert!(result.is_ok(), "Token counting should succeed");
   let token_count = result.unwrap();
@@ -498,7 +498,7 @@ index 777..888 100644
 
 #[test]
 fn test_template_contains_required_sections() {
-  let template = get_instruction_template().unwrap();
+  let template = generate_instruction_template().unwrap();
 
   // Verify template has all required sections for the LLM
   let required_sections = vec![
@@ -547,8 +547,8 @@ index 123abc..456def 100644
 
   // Test the full workflow
   let model = Model::GPT41Mini;
-  let template = get_instruction_template().unwrap();
-  let token_count = token_used(&model).unwrap();
+  let template = generate_instruction_template().unwrap();
+  let token_count = calculate_token_usage(&model).unwrap();
   let request = create_commit_request(simple_diff.clone(), 2000, model).unwrap();
 
   // Verify all components work together
@@ -581,7 +581,7 @@ index abc..def 100644
   .to_string();
 
   // Calculate total tokens needed
-  let template_tokens = token_used(&model).unwrap();
+  let template_tokens = calculate_token_usage(&model).unwrap();
   let diff_tokens = model.count_tokens(&diff).unwrap();
   let total_input_tokens = template_tokens + diff_tokens;
 

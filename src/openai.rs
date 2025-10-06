@@ -197,8 +197,24 @@ fn truncate_to_fit(text: &str, max_tokens: usize, model: &Model) -> Result<Strin
   }
 }
 
-/// Calls the OpenAI API with the provided configuration
-pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<Response> {
+/// Generate commit message with OpenAI using provided configuration
+///
+/// Uses multi-step approach by default with fallback to single-step generation.
+/// Includes token management, timeout handling, and retry logic.
+///
+/// # Arguments
+/// * `request` - OpenAI request containing system prompt, user prompt, model, and token limits
+/// * `config` - OpenAI configuration with API key and other settings
+///
+/// # Returns
+/// * `Result<Response>` - Generated commit message response
+///
+/// # Errors
+/// Returns error if:
+/// - API key is invalid or missing
+/// - All generation attempts fail (multi-step and single-step)
+/// - Network or API communication errors occur
+pub async fn generate_with_config(request: Request, config: OpenAIConfig) -> Result<Response> {
   profile!("OpenAI API call with custom config");
 
   // Always try multi-step approach first (it's now the default)
@@ -377,13 +393,28 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
   }
 }
 
-/// Calls the OpenAI API with default configuration from settings
-pub async fn call(request: Request) -> Result<Response> {
+/// Generate commit message with OpenAI using default configuration from settings
+///
+/// Convenience function that creates OpenAI configuration from global app settings
+/// and delegates to `generate_with_config`.
+///
+/// # Arguments
+/// * `request` - OpenAI request containing system prompt, user prompt, model, and token limits
+///
+/// # Returns
+/// * `Result<Response>` - Generated commit message response
+///
+/// # Errors
+/// Returns error if:
+/// - Global configuration is invalid or missing API key
+/// - All generation attempts fail (multi-step and single-step)
+/// - Network or API communication errors occur
+pub async fn generate_with_openai(request: Request) -> Result<Response> {
   profile!("OpenAI API call");
 
   // Create OpenAI configuration using our settings
   let config = create_openai_config(&config::APP_CONFIG)?;
 
-  // Use the call_with_config function with the default config
-  call_with_config(request, config).await
+  // Use the generate_with_config function with the default config
+  generate_with_config(request, config).await
 }

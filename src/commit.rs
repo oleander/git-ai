@@ -11,7 +11,7 @@ use crate::multi_step_integration::{generate_commit_message_local, generate_comm
 /// The instruction template included at compile time
 const INSTRUCTION_TEMPLATE: &str = include_str!("../resources/prompt.md");
 
-/// Returns the instruction template for the AI model.
+/// Generates the instruction template for the AI model.
 /// This template guides the model in generating appropriate commit messages.
 ///
 /// # Returns
@@ -19,7 +19,7 @@ const INSTRUCTION_TEMPLATE: &str = include_str!("../resources/prompt.md");
 ///
 /// Note: This function is public only for testing purposes
 #[doc(hidden)]
-pub fn get_instruction_template() -> Result<String> {
+pub fn generate_instruction_template() -> Result<String> {
   profile!("Generate instruction template");
   let max_length = config::APP_CONFIG
     .max_commit_length
@@ -48,7 +48,7 @@ pub fn get_instruction_template() -> Result<String> {
 #[doc(hidden)]
 pub fn create_commit_request(diff: String, max_tokens: usize, model: Model) -> Result<openai::Request> {
   profile!("Prepare OpenAI request");
-  let template = get_instruction_template()?;
+  let template = generate_instruction_template()?;
   Ok(openai::Request {
     system: template,
     prompt: diff,
@@ -183,19 +183,19 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
     Some(custom_settings) => {
       // Create a client with custom settings
       match openai::create_openai_config(custom_settings) {
-        Ok(config) => openai::call_with_config(request, config).await,
+        Ok(config) => openai::generate_with_config(request, config).await,
         Err(e) => Err(e)
       }
     }
     None => {
       // Use the default global config
-      openai::call(request).await
+      openai::generate_with_openai(request).await
     }
   }
 }
 
-pub fn token_used(model: &Model) -> Result<usize> {
-  get_instruction_token_count(model)
+pub fn calculate_token_usage(model: &Model) -> Result<usize> {
+  calculate_instruction_token_usage(model)
 }
 
 /// Calculates the number of tokens used by the instruction template.
@@ -205,9 +205,9 @@ pub fn token_used(model: &Model) -> Result<usize> {
 ///
 /// # Returns
 /// * `Result<usize>` - The number of tokens used or an error
-pub fn get_instruction_token_count(model: &Model) -> Result<usize> {
+pub fn calculate_instruction_token_usage(model: &Model) -> Result<usize> {
   profile!("Calculate instruction tokens");
-  let template = get_instruction_template()?;
+  let template = generate_instruction_template()?;
   model.count_tokens(&template)
 }
 
