@@ -297,7 +297,7 @@ impl DebugSession {
         eprintln!("      │ Results:");
         eprintln!("      │   ├ Lines Added:                {}", file.analysis.lines_added);
         eprintln!("      │   ├ Lines Removed:              {}", file.analysis.lines_removed);
-        eprintln!("      │   ├ File Category:              {}", file.analysis.file_category);
+        eprintln!("      │   ├ File Category:              {}", file.analysis.file_category.as_str());
         eprintln!("      │   └ Summary:                    {}", file.analysis.summary);
       }
 

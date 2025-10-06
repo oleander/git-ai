@@ -2,14 +2,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use async_openai::types::{ChatCompletionTool, ChatCompletionToolType, FunctionObjectArgs};
 use anyhow::Result;
-// TODO: Migrate to unified types from generation module
+
+use crate::generation::types::{FileCategory, OperationType};
 
 /// File analysis result from the analyze function
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileAnalysisResult {
   pub lines_added:   u32,
   pub lines_removed: u32,
-  pub file_category: String,
+  pub file_category: FileCategory,
   pub summary:       String
 }
 
@@ -17,10 +18,10 @@ pub struct FileAnalysisResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileDataForScoring {
   pub file_path:      String,
-  pub operation_type: String,
+  pub operation_type: OperationType,
   pub lines_added:    u32,
   pub lines_removed:  u32,
-  pub file_category:  String,
+  pub file_category:  FileCategory,
   pub summary:        String
 }
 
@@ -28,10 +29,10 @@ pub struct FileDataForScoring {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileWithScore {
   pub file_path:      String,
-  pub operation_type: String,
+  pub operation_type: OperationType,
   pub lines_added:    u32,
   pub lines_removed:  u32,
-  pub file_category:  String,
+  pub file_category:  FileCategory,
   pub summary:        String,
   pub impact_score:   f32
 }
@@ -214,7 +215,7 @@ pub fn analyze_file(file_path: &str, diff_content: &str, operation_type: &str) -
   // Generate summary based on diff content
   let summary = generate_file_summary(file_path, diff_content, operation_type);
 
-  log::debug!("File analysis complete: +{lines_added} -{lines_removed} lines, category: {file_category}");
+  log::debug!("File analysis complete: +{lines_added} -{lines_removed} lines, category: {}", file_category.as_str());
 
   FileAnalysisResult { lines_added, lines_removed, file_category, summary }
 }
@@ -280,7 +281,7 @@ pub fn generate_commit_messages(files_with_scores: Vec<FileWithScore>, max_lengt
 
 // Helper functions
 
-fn categorize_file(file_path: &str) -> String {
+fn categorize_file(file_path: &str) -> FileCategory {
   let path = file_path.to_lowercase();
 
   if path.ends_with(".test.js")
@@ -290,9 +291,9 @@ fn categorize_file(file_path: &str) -> String {
     || path.contains("/test/")
     || path.contains("/tests/")
   {
-    "test".to_string()
+    FileCategory::Test
   } else if path.ends_with(".md") || path.ends_with(".txt") || path.ends_with(".rst") || path.contains("/docs/") {
-    "docs".to_string()
+    FileCategory::Docs
   } else if path == "package.json"
     || path == "cargo.toml"
     || path == "go.mod"
@@ -300,7 +301,7 @@ fn categorize_file(file_path: &str) -> String {
     || path == "gemfile"
     || path.ends_with(".lock")
   {
-    "build".to_string()
+    FileCategory::Build
   } else if path.ends_with(".yml")
     || path.ends_with(".yaml")
     || path.ends_with(".json")
@@ -310,7 +311,7 @@ fn categorize_file(file_path: &str) -> String {
     || path.contains("config")
     || path.contains(".github/")
   {
-    "config".to_string()
+    FileCategory::Config
   } else if path.ends_with(".png")
     || path.ends_with(".jpg")
     || path.ends_with(".gif")
@@ -318,9 +319,9 @@ fn categorize_file(file_path: &str) -> String {
     || path.ends_with(".pdf")
     || path.ends_with(".zip")
   {
-    "binary".to_string()
+    FileCategory::Binary
   } else {
-    "source".to_string()
+    FileCategory::Source
   }
 }
 
@@ -328,8 +329,8 @@ fn generate_file_summary(file_path: &str, _diff_content: &str, operation_type: &
   // This is a simplified version - in practice, you'd analyze the diff content
   // more thoroughly to generate meaningful summaries
   match operation_type {
-    "added" => format!("New {} file added", categorize_file(file_path)),
-    "deleted" => format!("Removed {} file", categorize_file(file_path)),
+    "added" => format!("New {} file added", categorize_file(file_path).as_str()),
+    "deleted" => format!("Removed {} file", categorize_file(file_path).as_str()),
     "renamed" => "File renamed".to_string(),
     "binary" => "Binary file updated".to_string(),
     _ => "File modified".to_string()
@@ -350,14 +351,13 @@ fn calculate_single_impact_score(file_data: &FileDataForScoring) -> f32 {
   };
 
   // Score from file category
-  score += match file_data.file_category.as_str() {
-    "source" => 0.4,
-    "test" => 0.2,
-    "config" => 0.25,
-    "build" => 0.3,
-    "docs" => 0.1,
-    "binary" => 0.05,
-    _ => 0.1
+  score += match file_data.file_category {
+    FileCategory::Source => 0.4,
+    FileCategory::Test => 0.2,
+    FileCategory::Config => 0.25,
+    FileCategory::Build => 0.3,
+    FileCategory::Docs => 0.1,
+    FileCategory::Binary => 0.05,
   };
 
   // Score from lines changed (normalized)
@@ -408,12 +408,12 @@ fn generate_component_message(primary: &FileWithScore, _all_files: &[FileWithSco
 fn generate_impact_message(primary: &FileWithScore, all_files: &[FileWithScore], max_length: usize) -> String {
   let impact_type = if all_files
     .iter()
-    .any(|f| f.file_category == "source" && f.operation_type == "added")
+    .any(|f| f.file_category == FileCategory::Source && f.operation_type == OperationType::Added)
   {
     "feature"
-  } else if all_files.iter().any(|f| f.file_category == "test") {
+  } else if all_files.iter().any(|f| f.file_category == FileCategory::Test) {
     "test"
-  } else if all_files.iter().any(|f| f.file_category == "config") {
+  } else if all_files.iter().any(|f| f.file_category == FileCategory::Config) {
     "configuration"
   } else {
     "update"
@@ -469,14 +469,16 @@ fn generate_reasoning(files_with_scores: &[FileWithScore]) -> String {
   format!(
     "{} changes have highest impact ({:.2}) affecting {} functionality. \
         Total {} files changed with {} lines modified.",
-    primary
-      .file_category
-      .chars()
-      .next()
-      .unwrap_or('u')
-      .to_uppercase()
-      .collect::<String>()
-      + primary.file_category.get(1..).unwrap_or(""),
+    {
+      let category_str = primary.file_category.as_str();
+      category_str
+        .chars()
+        .next()
+        .unwrap_or('u')
+        .to_uppercase()
+        .collect::<String>()
+        + category_str.get(1..).unwrap_or("")
+    },
     primary.impact_score,
     extract_component_name(&primary.file_path),
     total_files,
@@ -490,22 +492,22 @@ mod tests {
 
   #[test]
   fn test_file_categorization() {
-    assert_eq!(categorize_file("src/main.rs"), "source");
-    assert_eq!(categorize_file("tests/integration_test.rs"), "test");
-    assert_eq!(categorize_file("package.json"), "build");
-    assert_eq!(categorize_file(".github/workflows/ci.yml"), "config");
-    assert_eq!(categorize_file("README.md"), "docs");
-    assert_eq!(categorize_file("logo.png"), "binary");
+    assert_eq!(categorize_file("src/main.rs"), FileCategory::Source);
+    assert_eq!(categorize_file("tests/integration_test.rs"), FileCategory::Test);
+    assert_eq!(categorize_file("package.json"), FileCategory::Build);
+    assert_eq!(categorize_file(".github/workflows/ci.yml"), FileCategory::Config);
+    assert_eq!(categorize_file("README.md"), FileCategory::Docs);
+    assert_eq!(categorize_file("logo.png"), FileCategory::Binary);
   }
 
   #[test]
   fn test_impact_score_calculation() {
     let file_data = FileDataForScoring {
       file_path:      "src/auth.rs".to_string(),
-      operation_type: "modified".to_string(),
+      operation_type: OperationType::Modified,
       lines_added:    50,
       lines_removed:  20,
-      file_category:  "source".to_string(),
+      file_category:  FileCategory::Source,
       summary:        "Updated authentication logic".to_string()
     };
 

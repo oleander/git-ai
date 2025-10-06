@@ -77,7 +77,7 @@ pub async fn generate_commit_message_multi_step(
           file_category: analysis["file_category"]
             .as_str()
             .unwrap_or("source")
-            .to_string(),
+            .into(),
           summary:       analysis["summary"].as_str().unwrap_or("").to_string()
         };
 
@@ -110,13 +110,13 @@ pub async fn generate_commit_message_multi_step(
     .map(|(file, analysis)| {
       FileDataForScoring {
         file_path:      file.path.clone(),
-        operation_type: file.operation.clone(),
+        operation_type: file.operation.as_str().into(),
         lines_added:    analysis["lines_added"].as_u64().unwrap_or(0) as u32,
         lines_removed:  analysis["lines_removed"].as_u64().unwrap_or(0) as u32,
         file_category:  analysis["file_category"]
           .as_str()
           .unwrap_or("source")
-          .to_string(),
+          .into(),
         summary:        analysis["summary"].as_str().unwrap_or("").to_string()
       }
     })
@@ -612,10 +612,7 @@ pub async fn generate_commit_message_parallel(
   let analysis_futures: Vec<_> = parsed_files
     .iter()
     .map(|file| {
-      let file_path = file.path.clone();
-      let operation = file.operation.clone();
-      let diff_content = file.diff_content.clone();
-      async move { analyze_single_file_simple(client, model, &file_path, &operation, &diff_content).await }
+      analyze_single_file_simple(client, model, &file.path, &file.operation, &file.diff_content)
     })
     .collect();
 
@@ -624,11 +621,11 @@ pub async fn generate_commit_message_parallel(
 
   // Collect successful analyses
   let mut successful_analyses = Vec::new();
-  for (i, result) in analysis_results.into_iter().enumerate() {
+  for (result, file) in analysis_results.into_iter().zip(parsed_files.iter()) {
     match result {
       Ok(summary) => {
-        log::debug!("Successfully analyzed file {}: {}", i, parsed_files[i].path);
-        successful_analyses.push((parsed_files[i].path.clone(), summary));
+        log::debug!("Successfully analyzed file: {}", file.path);
+        successful_analyses.push((file.path.clone(), summary));
       }
       Err(e) => {
         // Check if it's an API key error - if so, propagate immediately
@@ -636,7 +633,7 @@ pub async fn generate_commit_message_parallel(
         if error_str.contains("invalid_api_key") || error_str.contains("Incorrect API key") || error_str.contains("Invalid API key") {
           return Err(e);
         }
-        log::warn!("Failed to analyze file {}: {}", parsed_files[i].path, e);
+        log::warn!("Failed to analyze file {}: {}", file.path, e);
         // Continue with other files
       }
     }
@@ -765,7 +762,7 @@ pub fn generate_commit_message_local(diff_content: &str, max_length: Option<usiz
     let analysis = analyze_file(&file.path, &file.diff_content, &file.operation);
     files_data.push(FileDataForScoring {
       file_path:      file.path,
-      operation_type: file.operation,
+      operation_type: file.operation.as_str().into(),
       lines_added:    analysis.lines_added,
       lines_removed:  analysis.lines_removed,
       file_category:  analysis.file_category,

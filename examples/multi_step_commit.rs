@@ -253,7 +253,7 @@ Binary files a/logo.png and b/logo.png differ
     let analysis = analyze_file(&file.path, &file.diff_content, &file.operation);
     println!(
       "   {} -> +{} -{} lines, category: {}",
-      file.path, analysis.lines_added, analysis.lines_removed, analysis.file_category
+      file.path, analysis.lines_added, analysis.lines_removed, analysis.file_category.as_str()
     );
   }
 
@@ -266,7 +266,7 @@ Binary files a/logo.png and b/logo.png differ
       let analysis = analyze_file(&file.path, &file.diff_content, &file.operation);
       FileDataForScoring {
         file_path:      file.path.clone(),
-        operation_type: file.operation.clone(),
+        operation_type: file.operation.as_str().into(),
         lines_added:    analysis.lines_added,
         lines_removed:  analysis.lines_removed,
         file_category:  analysis.file_category,
