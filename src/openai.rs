@@ -197,7 +197,23 @@ fn truncate_to_fit(text: &str, max_tokens: usize, model: &Model) -> Result<Strin
   }
 }
 
-/// Generate with OpenAI using provided configuration
+/// Generate commit message with OpenAI using provided configuration
+///
+/// Uses multi-step approach by default with fallback to single-step generation.
+/// Includes token management, timeout handling, and retry logic.
+///
+/// # Arguments
+/// * `request` - OpenAI request containing system prompt, user prompt, model, and token limits
+/// * `config` - OpenAI configuration with API key and other settings
+///
+/// # Returns
+/// * `Result<Response>` - Generated commit message response
+///
+/// # Errors
+/// Returns error if:
+/// - API key is invalid or missing
+/// - All generation attempts fail (multi-step and single-step)
+/// - Network or API communication errors occur
 pub async fn generate_with_config(request: Request, config: OpenAIConfig) -> Result<Response> {
   profile!("OpenAI API call with custom config");
 
@@ -377,7 +393,22 @@ pub async fn generate_with_config(request: Request, config: OpenAIConfig) -> Res
   }
 }
 
-/// Generate with OpenAI using default configuration from settings
+/// Generate commit message with OpenAI using default configuration from settings
+///
+/// Convenience function that creates OpenAI configuration from global app settings
+/// and delegates to `generate_with_config`.
+///
+/// # Arguments
+/// * `request` - OpenAI request containing system prompt, user prompt, model, and token limits
+///
+/// # Returns
+/// * `Result<Response>` - Generated commit message response
+///
+/// # Errors
+/// Returns error if:
+/// - Global configuration is invalid or missing API key
+/// - All generation attempts fail (multi-step and single-step)
+/// - Network or API communication errors occur
 pub async fn generate_with_openai(request: Request) -> Result<Response> {
   profile!("OpenAI API call");
 

@@ -401,7 +401,21 @@ pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
   Ok(files)
 }
 
-/// Analyze file via OpenAI API
+/// Analyze file via OpenAI API using function calling to extract structured data
+///
+/// # Arguments
+/// * `client` - OpenAI client configured with API credentials
+/// * `model` - AI model name to use for analysis
+/// * `file` - Parsed file containing path, operation type, and diff content
+///
+/// # Returns
+/// * `Result<Value>` - JSON value containing file analysis (lines added/removed, category, summary)
+///
+/// # Errors
+/// Returns error if:
+/// - OpenAI API call fails
+/// - Model doesn't respond with expected function call format
+/// - JSON parsing of response fails
 async fn analyze_file_via_api(client: &Client<OpenAIConfig>, model: &str, file: &ParsedFile) -> Result<Value> {
   let tools = vec![create_analyze_function_tool()?];
 
@@ -440,7 +454,21 @@ async fn analyze_file_via_api(client: &Client<OpenAIConfig>, model: &str, file: 
   }
 }
 
-/// Calculate scores via OpenAI API
+/// Calculate impact scores via OpenAI API using analyzed file data
+///
+/// # Arguments
+/// * `client` - OpenAI client configured with API credentials
+/// * `model` - AI model name to use for scoring
+/// * `files_data` - Vector of analyzed file data with categories and summaries
+///
+/// # Returns
+/// * `Result<Vec<FileWithScore>>` - Files with calculated impact scores (0.0 to 1.0)
+///
+/// # Errors
+/// Returns error if:
+/// - OpenAI API call fails
+/// - Model doesn't respond with expected function call format
+/// - JSON parsing of response fails
 async fn calculate_scores_via_api(
   client: &Client<OpenAIConfig>, model: &str, files_data: Vec<FileDataForScoring>
 ) -> Result<Vec<FileWithScore>> {
@@ -487,7 +515,22 @@ async fn calculate_scores_via_api(
   }
 }
 
-/// Generate candidates via OpenAI API
+/// Generate commit message candidates via OpenAI API using scored files
+///
+/// # Arguments
+/// * `client` - OpenAI client configured with API credentials
+/// * `model` - AI model name to use for generation
+/// * `files_with_scores` - Vector of files with calculated impact scores
+/// * `max_length` - Maximum length for generated commit messages
+///
+/// # Returns
+/// * `Result<Value>` - JSON value containing multiple commit message candidates with reasoning
+///
+/// # Errors
+/// Returns error if:
+/// - OpenAI API call fails
+/// - Model doesn't respond with expected function call format
+/// - JSON parsing of response fails
 async fn generate_candidates_via_api(
   client: &Client<OpenAIConfig>, model: &str, files_with_scores: Vec<FileWithScore>, max_length: usize
 ) -> Result<Value> {
