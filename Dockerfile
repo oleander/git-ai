@@ -38,22 +38,17 @@ RUN apt-get update && apt-get install -y git fish wget \
 RUN rustup default nightly
 RUN rustup component add rust-std clippy rustc rustfmt --toolchain nightly
 
-# Copy .git directory into /source
-COPY .git /source/.git
-
-# Clone from local source into working directory
 WORKDIR /app
 
-RUN git clone --branch main /source /app --local
-RUN git remote set-url origin https://github.com/oleander/git-ai.git
-RUN git pull origin main
+ARG GH_TOKEN
+ENV GH_TOKEN=$GH_TOKEN
+RUN gh repo clone oleander/git-ai /app
+RUN git remote set-url origin https://x-access-token:$GH_TOKEN@github.com/oleander/git-ai.git
 RUN cargo fetch
 RUN cargo build
 RUN cargo clippy
 
 ARG PR_NUMBER
-ARG GH_TOKEN
-ENV GH_TOKEN=$GH_TOKEN
 RUN gh pr checkout $PR_NUMBER
 RUN cargo fetch
 RUN cargo build
