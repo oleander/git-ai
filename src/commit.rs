@@ -80,7 +80,11 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
     bail!("Maximum token count must be greater than zero")
   }
 
-  // Try multi-step approach first
+  // Try multi-step approach first (see multi_step_integration.rs for details)
+  //
+  // Error handling strategy:
+  // - Authentication errors are propagated immediately using is_openai_auth_error()
+  // - Other errors trigger fallback to local multi-step or single-step generation
   let max_length = settings
     .and_then(|s| s.max_commit_length)
     .or(config::APP_CONFIG.max_commit_length);
@@ -121,7 +125,7 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
               Ok(message) => return Ok(openai::Response { response: message }),
               Err(e) => {
                 // Check if it's an API key error
-                if e.to_string().contains("invalid_api_key") || e.to_string().contains("Incorrect API key") {
+                if crate::error::is_openai_auth_error(&e) {
                   bail!("Invalid OpenAI API key. Please check your API key configuration.");
                 }
                 log::warn!("Multi-step generation with custom settings failed: {e}");
@@ -149,7 +153,7 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
           Ok(message) => return Ok(openai::Response { response: message }),
           Err(e) => {
             // Check if it's an API key error
-            if e.to_string().contains("invalid_api_key") || e.to_string().contains("Incorrect API key") {
+            if crate::error::is_openai_auth_error(&e) {
               bail!("Invalid OpenAI API key. Please check your API key configuration.");
             }
             log::warn!("Multi-step generation failed: {e}");
