@@ -69,8 +69,27 @@ jobs:
         if: startsWith(matrix.os, 'macos')
         run: brew install fish
 
-      - name: Run integration tests
+      - name: Check for API Key availability
+        id: check-api-key
+        run: |
+          if [ -n "$OPENAI_API_KEY" ]; then
+            echo "api-key-available=true" >> $GITHUB_OUTPUT
+            echo "✅ OPENAI_API_KEY is available - running full integration tests"
+          else
+            echo "api-key-available=false" >> $GITHUB_OUTPUT
+            echo "⚠️ OPENAI_API_KEY not available - skipping integration tests that require API access"
+          fi
+
+      - name: Run integration tests (with API key)
+        if: steps.check-api-key.outputs.api-key-available == 'true'
         run: fish ./scripts/integration-tests
+
+      - name: Skip integration tests (no API key)
+        if: steps.check-api-key.outputs.api-key-available == 'false'
+        run: |
+          echo "Integration tests skipped due to missing OPENAI_API_KEY"
+          echo "This is expected for pull requests from forks for security reasons"
+          echo "Tests will run automatically when the PR is merged or run by maintainers"
 
       - name: Run cargo test
         uses: actions-rs/cargo@v1
