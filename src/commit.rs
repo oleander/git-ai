@@ -12,7 +12,6 @@ use crate::multi_step_integration::{generate_commit_message_local, generate_comm
 const INSTRUCTION_TEMPLATE: &str = include_str!("../resources/prompt.md");
 
 /// Returns the instruction template for the AI model.
-/// This template guides the model in generating appropriate commit messages.
 ///
 /// # Returns
 /// * `Result<String>` - The rendered template or an error
