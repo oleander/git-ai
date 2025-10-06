@@ -38,7 +38,7 @@ fn test_token_counting_empty_template() {
 fn test_token_counting_template() {
   // Test that we can count tokens in the actual template
   let model = Model::GPT41Mini;
-  let result = token_used(&model);
+  let result = calculate_token_usage(&model);
 
   assert!(result.is_ok(), "Token counting should succeed");
   let token_count = result.unwrap();
@@ -547,8 +547,8 @@ index 123abc..456def 100644
 
   // Test the full workflow
   let model = Model::GPT41Mini;
-  let template = get_instruction_template().unwrap();
-  let token_count = token_used(&model).unwrap();
+  let template = generate_instruction_template().unwrap();
+  let token_count = calculate_token_usage(&model).unwrap();
   let request = create_commit_request(simple_diff.clone(), 2000, model).unwrap();
 
   // Verify all components work together
