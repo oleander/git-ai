@@ -255,9 +255,9 @@ mod tests {
     );
   }
 
-  #[tokio::test]
-  async fn test_api_key_fallback_to_env() {
-    // Set a valid-looking API key in environment (won't actually work but should pass validation)
+  #[test]
+  fn test_api_key_fallback_to_env() {
+    // Set a valid-looking API key in environment 
     std::env::set_var("OPENAI_API_KEY", "sk-test123456789012345678901234567890123456789012345678");
     
     // Create settings with placeholder API key - should fall back to env var
@@ -269,27 +269,17 @@ mod tests {
       timeout:           Some(30)
     };
 
-    // This should not fail immediately due to API key - it should use the env var
-    // (It will likely fail later due to invalid API key, but not in the validation stage)
-    let result = generate(
-      "diff --git a/test.txt b/test.txt\n+Hello World".to_string(),
-      1024,
-      Model::GPT41Mini,
-      Some(&settings)
-    )
-    .await;
-
+    // Test that openai config creation succeeds - this is the core fallback logic
+    let config_result = openai::create_openai_config(&settings);
+    
     // Clean up
     std::env::remove_var("OPENAI_API_KEY");
 
-    // The error should NOT be about missing API key configuration
-    if let Err(e) = result {
-      let error_msg = e.to_string();
-      assert!(
-        !error_msg.contains("OpenAI API key not found"),
-        "Should not get 'key not found' error when env var is set, got: {}",
-        error_msg
-      );
-    }
+    // Should succeed because it falls back to environment variable
+    assert!(
+      config_result.is_ok(),
+      "create_openai_config should succeed when env var is set, got: {:?}",
+      config_result
+    );
   }
 }
