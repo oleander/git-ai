@@ -85,57 +85,31 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
     .and_then(|s| s.max_commit_length)
     .or(config::APP_CONFIG.max_commit_length);
 
-  // Check if we have a valid API key configuration
-  let has_valid_api_key = if let Some(custom_settings) = settings {
-    custom_settings
-      .openai_api_key
-      .as_ref()
-      .map(|key| !key.is_empty() && key != "<PLACE HOLDER FOR YOUR API KEY>")
-      .unwrap_or(false)
-  } else {
-    // Check environment variable or config
-    config::APP_CONFIG
-      .openai_api_key
-      .as_ref()
-      .map(|key| !key.is_empty() && key != "<PLACE HOLDER FOR YOUR API KEY>")
-      .unwrap_or(false)
-      || std::env::var("OPENAI_API_KEY")
-        .map(|key| !key.is_empty())
-        .unwrap_or(false)
-  };
-
-  if !has_valid_api_key {
-    bail!("OpenAI API key not configured. Please set your API key using:\n  git-ai config set openai-api-key <your-key>\nor set the OPENAI_API_KEY environment variable.");
-  }
-
   // Use custom settings if provided
   if let Some(custom_settings) = settings {
-    if let Some(api_key) = &custom_settings.openai_api_key {
-      if !api_key.is_empty() && api_key != "<PLACE HOLDER FOR YOUR API KEY>" {
-        match openai::create_openai_config(custom_settings) {
-          Ok(config) => {
-            let client = Client::with_config(config);
-            let model_str = model.to_string();
+    // Always try to create config - this will handle API key validation and fallback
+    match openai::create_openai_config(custom_settings) {
+      Ok(config) => {
+        let client = Client::with_config(config);
+        let model_str = model.to_string();
 
-            match generate_commit_message_multi_step(&client, &model_str, &patch, max_length).await {
-              Ok(message) => return Ok(openai::Response { response: message }),
-              Err(e) => {
-                // Check if it's an API key error
-                if e.to_string().contains("invalid_api_key") || e.to_string().contains("Incorrect API key") {
-                  bail!("Invalid OpenAI API key. Please check your API key configuration.");
-                }
-                log::warn!("Multi-step generation with custom settings failed: {e}");
-                if let Some(session) = debug_output::debug_session() {
-                  session.set_multi_step_error(e.to_string());
-                }
-              }
+        match generate_commit_message_multi_step(&client, &model_str, &patch, max_length).await {
+          Ok(message) => return Ok(openai::Response { response: message }),
+          Err(e) => {
+            // Check if it's an API key error
+            if e.to_string().contains("invalid_api_key") || e.to_string().contains("Incorrect API key") {
+              bail!("Invalid OpenAI API key. Set via:\n1. git-ai config set openai-api-key <key>\n2. OPENAI_API_KEY environment variable");
+            }
+            log::warn!("Multi-step generation with custom settings failed: {e}");
+            if let Some(session) = debug_output::debug_session() {
+              session.set_multi_step_error(e.to_string());
             }
           }
-          Err(e) => {
-            // If config creation fails due to API key, propagate the error
-            return Err(e);
-          }
         }
+      }
+      Err(e) => {
+        // If config creation fails due to API key, propagate the error
+        return Err(e);
       }
     }
   } else {
@@ -150,7 +124,7 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
           Err(e) => {
             // Check if it's an API key error
             if e.to_string().contains("invalid_api_key") || e.to_string().contains("Incorrect API key") {
-              bail!("Invalid OpenAI API key. Please check your API key configuration.");
+              bail!("Invalid OpenAI API key. Set via:\n1. git-ai config set openai-api-key <key>\n2. OPENAI_API_KEY environment variable");
             }
             log::warn!("Multi-step generation failed: {e}");
             if let Some(session) = debug_output::debug_session() {
@@ -247,7 +221,7 @@ mod tests {
     assert!(result.is_err());
     let error_message = result.unwrap_err().to_string();
     assert!(
-      error_message.contains("OpenAI API key not configured"),
+      error_message.contains("OpenAI API key not found") || error_message.contains("git-ai config set openai-api-key"),
       "Expected error message about missing API key, got: {}",
       error_message
     );
@@ -276,9 +250,47 @@ mod tests {
     assert!(result.is_err());
     let error_message = result.unwrap_err().to_string();
     assert!(
-      error_message.contains("OpenAI API key not configured"),
+      error_message.contains("OpenAI API key not found") || error_message.contains("git-ai config set openai-api-key"),
       "Expected error message about invalid API key, got: {}",
       error_message
     );
+  }
+
+  #[tokio::test]
+  async fn test_api_key_fallback_to_env() {
+    // Set a valid-looking API key in environment (won't actually work but should pass validation)
+    std::env::set_var("OPENAI_API_KEY", "sk-test123456789012345678901234567890123456789012345678");
+    
+    // Create settings with placeholder API key - should fall back to env var
+    let settings = AppConfig {
+      openai_api_key:    Some("<PLACE HOLDER FOR YOUR API KEY>".to_string()),
+      model:             Some("gpt-4o-mini".to_string()),
+      max_tokens:        Some(1024),
+      max_commit_length: Some(72),
+      timeout:           Some(30)
+    };
+
+    // This should not fail immediately due to API key - it should use the env var
+    // (It will likely fail later due to invalid API key, but not in the validation stage)
+    let result = generate(
+      "diff --git a/test.txt b/test.txt\n+Hello World".to_string(),
+      1024,
+      Model::GPT41Mini,
+      Some(&settings)
+    )
+    .await;
+
+    // Clean up
+    std::env::remove_var("OPENAI_API_KEY");
+
+    // The error should NOT be about missing API key configuration
+    if let Err(e) = result {
+      let error_msg = e.to_string();
+      assert!(
+        !error_msg.contains("OpenAI API key not found"),
+        "Should not get 'key not found' error when env var is set, got: {}",
+        error_msg
+      );
+    }
   }
 }
