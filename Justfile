@@ -34,6 +34,5 @@ pr PR_NUMBER CMD:
     docker build --build-arg PR_NUMBER={{PR_NUMBER}} --build-arg GH_TOKEN=$(gh auth token) --target pr-tester -t git-ai-pr-tester .
     docker run -i --rm -e GITHUB_TOKEN=$(gh auth token) git-ai-pr-tester bash -c "{{CMD}}"
 
-# Sync a specific PR with origin/main
-sync-pr PR_NUM:
-    just pr {{PR_NUM}} "git merge origin/main --no-edit && cargo fmt --check && cargo check && git push origin HEAD"
+sync-pr PR_NUM CMD = "date":
+    just pr {{PR_NUM}} "git fetch origin && git merge origin/main --no-edit && {{CMD}} && cargo fmt --check && cargo check && git push origin"
