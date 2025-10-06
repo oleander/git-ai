@@ -1,5 +1,6 @@
 pub mod commit;
 pub mod config;
+pub mod diff;
 pub mod hook;
 pub mod style;
 pub mod model;

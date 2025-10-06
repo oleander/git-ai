@@ -1,7 +1,5 @@
 use std::collections::HashMap;
-use std::io::{Read, Write};
 use std::path::PathBuf;
-use std::fs::File;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -13,6 +11,7 @@ use num_cpus;
 
 use crate::model::Model;
 use crate::profile;
+use crate::diff::traits::{DiffDeltaPath, Utf8String};
 
 // Constants
 
@@ -40,73 +39,6 @@ pub enum HookError {
 
   #[error(transparent)]
   Anyhow(#[from] anyhow::Error)
-}
-
-// File operations traits
-pub trait FilePath {
-  fn is_empty(&self) -> Result<bool> {
-    self.read().map(|s| s.is_empty())
-  }
-
-  fn write(&self, msg: String) -> Result<()>;
-  fn read(&self) -> Result<String>;
-}
-
-impl FilePath for PathBuf {
-  fn write(&self, msg: String) -> Result<()> {
-    File::create(self)?
-      .write_all(msg.as_bytes())
-      .map_err(Into::into)
-  }
-
-  fn read(&self) -> Result<String> {
-    let mut contents = String::new();
-    File::open(self)?.read_to_string(&mut contents)?;
-    Ok(contents)
-  }
-}
-
-// Git operations traits
-trait DiffDeltaPath {
-  fn path(&self) -> PathBuf;
-}
-
-impl DiffDeltaPath for git2::DiffDelta<'_> {
-  fn path(&self) -> PathBuf {
-    self
-      .new_file()
-      .path()
-      .or_else(|| self.old_file().path())
-      .map(PathBuf::from)
-      .unwrap_or_default()
-  }
-}
-
-// String conversion traits
-pub trait Utf8String {
-  fn to_utf8(&self) -> String;
-}
-
-impl Utf8String for Vec<u8> {
-  fn to_utf8(&self) -> String {
-    // Fast path for valid UTF-8 (most common case)
-    if let Ok(s) = std::str::from_utf8(self) {
-      return s.to_string();
-    }
-    // Fallback for invalid UTF-8
-    String::from_utf8_lossy(self).into_owned()
-  }
-}
-
-impl Utf8String for [u8] {
-  fn to_utf8(&self) -> String {
-    // Fast path for valid UTF-8 (most common case)
-    if let Ok(s) = std::str::from_utf8(self) {
-      return s.to_string();
-    }
-    // Fallback for invalid UTF-8
-    String::from_utf8_lossy(self).into_owned()
-  }
 }
 
 // Patch generation traits
