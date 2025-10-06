@@ -7,9 +7,13 @@ async fn test_invalid_api_key_propagates_error() {
   // Initialize logging to capture warnings
   let _ = env_logger::builder().is_test(true).try_init();
 
+  // Ensure no API key is available from environment to force early validation failure
+  let original_key = std::env::var("OPENAI_API_KEY").ok();
+  std::env::remove_var("OPENAI_API_KEY");
+
   // Create settings with an invalid API key that fails early validation (no network calls)
   let settings = AppConfig {
-    openai_api_key: Some("<PLACE HOLDER FOR YOUR API KEY>".to_string()),
+    openai_api_key: Some("".to_string()), // Empty string triggers early validation failure
     model: Some("gpt-4o-mini".to_string()),
     max_tokens: Some(1024),
     max_commit_length: Some(72),
@@ -20,6 +24,11 @@ async fn test_invalid_api_key_propagates_error() {
 
   // This should fail with an API key error, not log a warning and continue
   let result = commit::generate(example_diff, 1024, Model::GPT41Mini, Some(&settings)).await;
+
+  // Restore original environment variable if it existed
+  if let Some(key) = original_key {
+    std::env::set_var("OPENAI_API_KEY", key);
+  }
 
   // Verify the behavior - it should return an error, not continue with other files
   assert!(result.is_err(), "Expected API key error to be propagated as error, not warning");
