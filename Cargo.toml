@@ -36,6 +36,10 @@ path = "examples/multi_step_commit.rs"
 name = "parallel_tool_calls_demo"
 path = "examples/parallel_tool_calls_demo.rs"
 
+[[example]]
+name = "parallel_commit_demo"
+path = "examples/parallel_commit_demo.rs"
+
 [dependencies]
 # Core functionality
 anyhow = { version = "1.0.98", features = ["backtrace"] }

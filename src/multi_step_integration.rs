@@ -77,7 +77,7 @@ pub async fn generate_commit_message_multi_step(
           file_category: analysis["file_category"]
             .as_str()
             .unwrap_or("source")
-            .to_string(),
+            .into(),
           summary:       analysis["summary"].as_str().unwrap_or("").to_string()
         };
 
@@ -110,13 +110,13 @@ pub async fn generate_commit_message_multi_step(
     .map(|(file, analysis)| {
       FileDataForScoring {
         file_path:      file.path.clone(),
-        operation_type: file.operation.clone(),
+        operation_type: file.operation.as_str().into(),
         lines_added:    analysis["lines_added"].as_u64().unwrap_or(0) as u32,
         lines_removed:  analysis["lines_removed"].as_u64().unwrap_or(0) as u32,
         file_category:  analysis["file_category"]
           .as_str()
           .unwrap_or("source")
-          .to_string(),
+          .into(),
         summary:        analysis["summary"].as_str().unwrap_or("").to_string()
       }
     })
@@ -591,6 +591,157 @@ async fn select_best_candidate(
   }
 }
 
+/// Optimized parallel approach for commit message generation
+/// This replaces the sequential multi-step approach with true parallel processing
+pub async fn generate_commit_message_parallel(
+  client: &Client<OpenAIConfig>, model: &str, diff_content: &str, max_length: Option<usize>
+) -> Result<String> {
+  log::info!("Starting parallel commit message generation");
+
+  // Parse the diff to extract individual files
+  let parsed_files = parse_diff(diff_content)?;
+  log::info!("Parsed {} files from diff", parsed_files.len());
+
+  if parsed_files.is_empty() {
+    anyhow::bail!("No files found in diff");
+  }
+
+  // Phase 1: Analyze each file in parallel using simplified approach
+  log::debug!("Starting parallel analysis of {} files", parsed_files.len());
+
+  let analysis_futures: Vec<_> = parsed_files
+    .iter()
+    .map(|file| {
+      analyze_single_file_simple(client, model, &file.path, &file.operation, &file.diff_content)
+    })
+    .collect();
+
+  // Execute all file analyses concurrently
+  let analysis_results = join_all(analysis_futures).await;
+
+  // Collect successful analyses
+  let mut successful_analyses = Vec::new();
+  for (result, file) in analysis_results.into_iter().zip(parsed_files.iter()) {
+    match result {
+      Ok(summary) => {
+        log::debug!("Successfully analyzed file: {}", file.path);
+        successful_analyses.push((file.path.clone(), summary));
+      }
+      Err(e) => {
+        // Check if it's an API key error - if so, propagate immediately
+        let error_str = e.to_string();
+        if error_str.contains("invalid_api_key") || error_str.contains("Incorrect API key") || error_str.contains("Invalid API key") {
+          return Err(e);
+        }
+        log::warn!("Failed to analyze file {}: {}", file.path, e);
+        // Continue with other files
+      }
+    }
+  }
+
+  if successful_analyses.is_empty() {
+    anyhow::bail!("Failed to analyze any files in parallel");
+  }
+
+  // Phase 2: Synthesize final commit message from all analyses
+  log::debug!("Synthesizing final commit message from {} analyses", successful_analyses.len());
+
+  let synthesis_result = synthesize_commit_message(client, model, &successful_analyses, max_length.unwrap_or(72)).await?;
+
+  Ok(synthesis_result)
+}
+
+/// Analyzes a single file using simplified text completion (no function calling)
+async fn analyze_single_file_simple(
+  client: &Client<OpenAIConfig>, model: &str, file_path: &str, operation: &str, diff_content: &str
+) -> Result<String> {
+  let system_prompt = "You are a git diff analyzer. Analyze the provided file change and provide a concise summary in 1-2 sentences describing what changed and why it matters.";
+
+  let user_prompt = format!(
+    "File: {}\nOperation: {}\nDiff:\n{}\n\nProvide a concise summary (1-2 sentences) of what changed and why it matters:",
+    file_path, operation, diff_content
+  );
+
+  let request = CreateChatCompletionRequestArgs::default()
+    .model(model)
+    .messages(vec![
+      ChatCompletionRequestSystemMessageArgs::default()
+        .content(system_prompt)
+        .build()?
+        .into(),
+      ChatCompletionRequestUserMessageArgs::default()
+        .content(user_prompt)
+        .build()?
+        .into(),
+    ])
+    .max_tokens(150u32) // Keep responses concise
+    .build()?;
+
+  let response = client.chat().create(request).await?;
+
+  let content = response.choices[0]
+    .message
+    .content
+    .as_ref()
+    .ok_or_else(|| anyhow::anyhow!("No content in response"))?;
+
+  Ok(content.trim().to_string())
+}
+
+/// Synthesizes a final commit message from multiple file analyses
+async fn synthesize_commit_message(
+  client: &Client<OpenAIConfig>, model: &str, analyses: &[(String, String)], max_length: usize
+) -> Result<String> {
+  // Build context from all analyses
+  let mut context = String::new();
+  context.push_str("File changes summary:\n");
+  for (file_path, summary) in analyses {
+    context.push_str(&format!("• {}: {}\n", file_path, summary));
+  }
+
+  let system_prompt = format!(
+    "You are a git commit message expert. Based on the file change summaries provided, generate a concise, descriptive commit message that captures the essential nature of the changes. The message should be {} characters or less and follow conventional commit format when appropriate. Focus on WHAT changed and WHY, not just listing files.",
+    max_length
+  );
+
+  let user_prompt = format!(
+    "{}\n\nGenerate a commit message (max {} characters) that captures the essential nature of these changes:",
+    context, max_length
+  );
+
+  let request = CreateChatCompletionRequestArgs::default()
+    .model(model)
+    .messages(vec![
+      ChatCompletionRequestSystemMessageArgs::default()
+        .content(system_prompt)
+        .build()?
+        .into(),
+      ChatCompletionRequestUserMessageArgs::default()
+        .content(user_prompt)
+        .build()?
+        .into(),
+    ])
+    .max_tokens(100u32) // Commit messages should be short
+    .build()?;
+
+  let response = client.chat().create(request).await?;
+
+  let content = response.choices[0]
+    .message
+    .content
+    .as_ref()
+    .ok_or_else(|| anyhow::anyhow!("No content in response"))?;
+
+  let message = content.trim().to_string();
+
+  // Ensure message length doesn't exceed limit
+  if message.len() > max_length {
+    Ok(message.chars().take(max_length - 3).collect::<String>() + "...")
+  } else {
+    Ok(message)
+  }
+}
+
 /// Alternative: Use the multi-step analysis locally without OpenAI calls
 pub fn generate_commit_message_local(diff_content: &str, max_length: Option<usize>) -> Result<String> {
   use crate::multi_step_analysis::{analyze_file, calculate_impact_scores, generate_commit_messages};
@@ -611,7 +762,7 @@ pub fn generate_commit_message_local(diff_content: &str, max_length: Option<usiz
     let analysis = analyze_file(&file.path, &file.diff_content, &file.operation);
     files_data.push(FileDataForScoring {
       file_path:      file.path,
-      operation_type: file.operation,
+      operation_type: file.operation.as_str().into(),
       lines_added:    analysis.lines_added,
       lines_removed:  analysis.lines_removed,
       file_category:  analysis.file_category,
@@ -806,5 +957,67 @@ index 1234567..abcdefg 100644
     let message = generate_commit_message_local(diff, Some(72)).unwrap();
     assert!(!message.is_empty());
     assert!(message.len() <= 72);
+  }
+
+  #[tokio::test]
+  async fn test_parallel_generation_parsing() {
+    // Test that the parallel approach correctly handles multi-file diffs
+    let diff = r#"diff --git a/src/auth.rs b/src/auth.rs
+index 1234567..abcdefg 100644
+--- a/src/auth.rs
++++ b/src/auth.rs
+@@ -1,3 +1,4 @@
++use crate::security;
+ pub fn authenticate() {
+     // authentication logic
+ }
+diff --git a/src/main.rs b/src/main.rs
+index abcd123..efgh456 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -1,2 +1,3 @@
+ fn main() {
+     println!("Hello");
++    auth::authenticate();
+ }"#;
+
+    // Parse files to ensure parsing works correctly for parallel processing
+    let files = parse_diff(diff).unwrap();
+    assert_eq!(files.len(), 2);
+    assert_eq!(files[0].path, "src/auth.rs");
+    assert_eq!(files[1].path, "src/main.rs");
+
+    // Verify diff content is captured
+    assert!(files[0].diff_content.contains("use crate::security"));
+    assert!(files[1].diff_content.contains("auth::authenticate"));
+  }
+
+  #[test]
+  fn test_parse_diff_edge_cases() {
+    // Test parsing with various git prefixes and edge cases
+    let diff_with_dev_null = r#"diff --git a/old_file.txt b/dev/null
+deleted file mode 100644
+index 1234567..0000000
+--- a/old_file.txt
++++ /dev/null
+@@ -1,2 +0,0 @@
+-Old content
+-To be removed"#;
+
+    let files = parse_diff(diff_with_dev_null).unwrap();
+    assert_eq!(files.len(), 1);
+    assert_eq!(files[0].path, "old_file.txt", "Should extract original path for deleted files");
+    assert_eq!(files[0].operation, "deleted");
+
+    // Test with binary files
+    let diff_binary = r#"diff --git a/image.png b/image.png
+new file mode 100644
+index 0000000..1234567
+Binary files /dev/null and b/image.png differ"#;
+
+    let files = parse_diff(diff_binary).unwrap();
+    assert_eq!(files.len(), 1);
+    assert_eq!(files[0].path, "image.png");
+    assert_eq!(files[0].operation, "binary");
   }
 }

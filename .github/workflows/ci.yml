@@ -22,22 +22,15 @@ jobs:
           cache-on-failure: true
 
       - name: Setup nightly toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt, clippy
-          toolchain: nightly
 
       - name: Run clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -- -D warnings
+        run: cargo clippy -- -D warnings
 
       - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: -- --check
+        run: cargo fmt -- --check
 
   test:
     needs: lint
@@ -54,25 +47,29 @@ jobs:
         with:
           cache-on-failure: true
 
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.rust }}
-          override: true
-          profile: minimal
+      - name: Set up Rust (nightly)
+        if: matrix.rust == 'nightly'
+        uses: dtolnay/rust-toolchain@nightly
+        
+      - name: Set up Rust (stable)
+        if: matrix.rust == 'stable'
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install fish (Linux)
         if: startsWith(matrix.os, 'ubuntu')
-        run: sudo apt install fish
+        run: sudo apt update && sudo apt install -y fish
 
       - name: Install fish (macOS)
         if: startsWith(matrix.os, 'macos')
         run: brew install fish
 
       - name: Run integration tests
+        if: env.OPENAI_API_KEY != ''
         run: fish ./scripts/integration-tests
+        
+      - name: Skip integration tests (no API key)
+        if: env.OPENAI_API_KEY == ''
+        run: echo "Skipping integration tests - no OPENAI_API_KEY configured"
 
       - name: Run cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
+        run: cargo test
