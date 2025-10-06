@@ -11,7 +11,6 @@ use async_openai::types::{ChatCompletionRequestUserMessageArgs, CreateChatComple
 use colored::Colorize;
 
 use crate::profile;
-// use crate::config::format_prompt; // Temporarily comment out
 use crate::config::AppConfig;
 
 // Cached tokenizer for performance
@@ -22,8 +21,7 @@ const MODEL_GPT4_1: &str = "gpt-4.1";
 const MODEL_GPT4_1_MINI: &str = "gpt-4.1-mini";
 const MODEL_GPT4_1_NANO: &str = "gpt-4.1-nano";
 const MODEL_GPT4_5: &str = "gpt-4.5";
-// TODO: Get this from config.rs or a shared constants module
-const DEFAULT_MODEL_NAME: &str = "gpt-4.1";
+const DEFAULT_MODEL_NAME: &str = crate::config::DEFAULT_MODEL;
 
 /// Represents the available AI models for commit message generation.
 /// Each model has different capabilities and token limits.
@@ -246,17 +244,18 @@ impl From<String> for Model {
   }
 }
 
-fn get_tokenizer(_model_str: &str) -> CoreBPE {
-  // TODO: This should be based on the model string, but for now we'll just use cl100k_base
-  // which is used by gpt-3.5-turbo and gpt-4
-  tiktoken_rs::cl100k_base().expect("Failed to create tokenizer")
+fn get_tokenizer(model_str: &str) -> CoreBPE {
+  match model_str {
+    "gpt-4" | "gpt-4o" | "gpt-4o-mini" | "gpt-4.1" => tiktoken_rs::cl100k_base(),
+    _ => tiktoken_rs::cl100k_base() // fallback
+  }
+  .expect("Failed to create tokenizer")
 }
 
 pub async fn run(settings: AppConfig, content: String) -> Result<String> {
   let model_str = settings.model.as_deref().unwrap_or(DEFAULT_MODEL_NAME);
 
   let client = async_openai::Client::new();
-  // let prompt = format_prompt(&content, &settings.prompt(), settings.template())?; // Temporarily comment out
   let prompt = content; // Use raw content as prompt for now
   let model: Model = settings
     .model
@@ -274,15 +273,17 @@ pub async fn run(settings: AppConfig, content: String) -> Result<String> {
     );
   }
 
-  // TODO: Make temperature configurable
-  let temperature_value = 0.7;
+  let temperature_value = settings
+    .temperature
+    .unwrap_or(crate::config::DEFAULT_TEMPERATURE);
 
   log::info!(
     "Using model: {}, Tokens: {}, Max tokens: {}, Temperature: {}",
     model_str.yellow(),
     tokens.to_string().green(),
-    // TODO: Make max_tokens configurable
-    (model.context_size() - tokens).to_string().green(),
+    (settings.max_tokens.unwrap_or(model.context_size() - tokens))
+      .to_string()
+      .green(),
     temperature_value.to_string().blue() // Use temperature_value
   );
 
@@ -292,9 +293,8 @@ pub async fn run(settings: AppConfig, content: String) -> Result<String> {
       .content(prompt)
       .build()?
       .into()])
-    .temperature(temperature_value) // Use temperature_value
-    // TODO: Make max_tokens configurable
-    .max_tokens((model.context_size() - tokens) as u16)
+    .temperature(temperature_value as f32) // Use temperature_value
+    .max_tokens(settings.max_tokens.unwrap_or(model.context_size() - tokens) as u16)
     .build()?;
 
   profile!("OpenAI API call");
