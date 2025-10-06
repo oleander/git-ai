@@ -22,22 +22,15 @@ jobs:
           cache-on-failure: true
 
       - name: Setup nightly toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt, clippy
-          toolchain: nightly
 
       - name: Run clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -- -D warnings
+        run: cargo clippy -- -D warnings
 
       - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: -- --check
+        run: cargo fmt -- --check
 
   test:
     needs: lint
@@ -55,11 +48,9 @@ jobs:
           cache-on-failure: true
 
       - name: Set up Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
-          override: true
-          profile: minimal
 
       - name: Install fish (Linux)
         if: startsWith(matrix.os, 'ubuntu')
@@ -73,6 +64,4 @@ jobs:
         run: fish ./scripts/integration-tests
 
       - name: Run cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
+        run: cargo test
