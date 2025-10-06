@@ -7,9 +7,9 @@ async fn test_invalid_api_key_propagates_error() {
   // Initialize logging to capture warnings
   let _ = env_logger::builder().is_test(true).try_init();
 
-  // Create settings with an invalid API key that matches the problematic pattern from the issue
+  // Create settings with an invalid API key that fails early validation (no network calls)
   let settings = AppConfig {
-    openai_api_key: Some("dl://BA7invalid_key_here".to_string()),
+    openai_api_key: Some("<PLACE HOLDER FOR YOUR API KEY>".to_string()),
     model: Some("gpt-4o-mini".to_string()),
     max_tokens: Some(1024),
     max_commit_length: Some(72),
@@ -27,10 +27,10 @@ async fn test_invalid_api_key_propagates_error() {
   let error_message = result.unwrap_err().to_string();
   println!("Actual error message: '{}'", error_message);
 
-  // The error should indicate that the API key is invalid - testing the early validation logic
+  // The error should indicate that the API key is not configured (early validation without network calls)
   assert!(
-    error_message.contains("Invalid OpenAI API key") || error_message.contains("API key"),
-    "Expected error message to indicate API key issue, got: {}",
+    error_message.contains("OpenAI API key not configured") || error_message.contains("Invalid OpenAI API key"),
+    "Expected error message to indicate API key configuration issue, got: {}",
     error_message
   );
 }
