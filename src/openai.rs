@@ -113,22 +113,31 @@ pub async fn generate_commit_message(diff: &str) -> Result<String> {
 
 /// Creates an OpenAI configuration from application settings
 pub fn create_openai_config(settings: &AppConfig) -> Result<OpenAIConfig> {
-  let api_key = settings
-    .openai_api_key
-    .as_ref()
-    .ok_or_else(|| anyhow!("OpenAI API key not configured"))?;
+  // Treat whitespace-only base URLs as unset.
+  let base_url = settings
+    .openai_base_url
+    .as_deref()
+    .map(str::trim)
+    .filter(|s| !s.is_empty());
 
-  if api_key.is_empty() || api_key == "<PLACE HOLDER FOR YOUR API KEY>" {
-    return Err(anyhow!("Invalid OpenAI API key"));
-  }
+  let api_key = settings.openai_api_key.as_deref().unwrap_or("").trim();
+  let key_missing = api_key.is_empty() || api_key == "<PLACE HOLDER FOR YOUR API KEY>";
 
-  let mut config = OpenAIConfig::new().with_api_key(api_key);
-
-  // Allow pointing at a custom endpoint (e.g. a local ollama `/v1` server) when set.
-  if let Some(base_url) = settings.openai_base_url.as_ref() {
-    if !base_url.is_empty() {
-      config = config.with_api_base(base_url);
+  // A custom endpoint (e.g. a local ollama `/v1` server) usually needs no real key, so
+  // supply a placeholder when one isn't configured. The default OpenAI endpoint still
+  // requires a real key.
+  let effective_key = if key_missing {
+    match base_url {
+      Some(_) => "sk-no-key-required",
+      None => return Err(anyhow!("OpenAI API key not configured"))
     }
+  } else {
+    api_key
+  };
+
+  let mut config = OpenAIConfig::new().with_api_key(effective_key);
+  if let Some(base_url) = base_url {
+    config = config.with_api_base(base_url);
   }
 
   Ok(config)

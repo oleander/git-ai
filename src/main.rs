@@ -122,6 +122,11 @@ fn run_config_reset() -> Result<()> {
 }
 
 async fn run_config_model(value: String) -> Result<()> {
+  let value = value.trim().to_string();
+  if value.is_empty() {
+    anyhow::bail!("Model name cannot be empty");
+  }
+
   let mut app = AppConfig::new()?;
 
   // Verify the model exists at the configured endpoint before saving. Known and

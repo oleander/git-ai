@@ -27,9 +27,9 @@ const MODEL_GPT4_5: &str = "gpt-4.5";
 /// users can point git-ai at arbitrary models (e.g. local ollama endpoints).
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, Default)]
 pub enum Model {
-  /// Default model - GPT-4.1 latest version
+  /// GPT-4.1 - highest quality of the GPT-4.1 family
   GPT41,
-  /// Mini version of GPT-4.1 for faster processing
+  /// Mini version of GPT-4.1: faster/cheaper, the **default** for this per-commit tool
   #[default]
   GPT41Mini,
   /// Nano version of GPT-4.1 for very fast processing
