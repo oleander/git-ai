@@ -7,12 +7,8 @@ use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use tiktoken_rs::CoreBPE;
 use tiktoken_rs::model::get_context_size;
-use async_openai::types::chat::{ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs};
-use colored::Colorize;
 
 use crate::profile;
-// use crate::config::format_prompt; // Temporarily comment out
-use crate::config::AppConfig;
 
 // Cached tokenizer for performance
 static TOKENIZER: OnceLock<CoreBPE> = OnceLock::new();
@@ -22,8 +18,6 @@ const MODEL_GPT4_1: &str = "gpt-4.1";
 const MODEL_GPT4_1_MINI: &str = "gpt-4.1-mini";
 const MODEL_GPT4_1_NANO: &str = "gpt-4.1-nano";
 const MODEL_GPT4_5: &str = "gpt-4.5";
-// TODO: Get this from config.rs or a shared constants module
-const DEFAULT_MODEL_NAME: &str = "gpt-4.1";
 
 /// Represents the available AI models for commit message generation.
 /// Each model has different capabilities and token limits.
@@ -228,70 +222,6 @@ fn get_tokenizer(_model_str: &str) -> CoreBPE {
   // TODO: This should be based on the model string, but for now we'll just use cl100k_base
   // which is used by gpt-3.5-turbo and gpt-4
   tiktoken_rs::cl100k_base().expect("Failed to create tokenizer")
-}
-
-pub async fn run(settings: AppConfig, content: String) -> Result<String> {
-  let model_str = settings.model.as_deref().unwrap_or(DEFAULT_MODEL_NAME);
-
-  let client = async_openai::Client::new();
-  // Note: dead code path; kept compiling for the dependency upgrade.
-  // let prompt = format_prompt(&content, &settings.prompt(), settings.template())?; // Temporarily comment out
-  let prompt = content; // Use raw content as prompt for now
-  let model: Model = settings
-    .model
-    .as_deref()
-    .unwrap_or(DEFAULT_MODEL_NAME)
-    .into();
-  let tokens = model.count_tokens(&prompt)?;
-
-  if tokens > model.context_size() {
-    bail!(
-      "Input too large: {} tokens. Max {} tokens for {}",
-      tokens.to_string().red(),
-      model.context_size().to_string().green(),
-      model_str.yellow()
-    );
-  }
-
-  // TODO: Make temperature configurable
-  let temperature_value = 0.7_f32;
-
-  log::info!(
-    "Using model: {}, Tokens: {}, Max tokens: {}, Temperature: {}",
-    model_str.yellow(),
-    tokens.to_string().green(),
-    // TODO: Make max_tokens configurable
-    (model.context_size() - tokens).to_string().green(),
-    temperature_value.to_string().blue() // Use temperature_value
-  );
-
-  let request = CreateChatCompletionRequestArgs::default()
-    .model(model_str)
-    .messages([ChatCompletionRequestUserMessageArgs::default()
-      .content(prompt)
-      .build()?
-      .into()])
-    .temperature(temperature_value) // Use temperature_value
-    // TODO: Make max_tokens configurable
-    .max_completion_tokens((model.context_size() - tokens) as u32)
-    .build()?;
-
-  profile!("OpenAI API call");
-  let response = client.chat().create(request).await?;
-  let result = response
-    .choices
-    .first()
-    .ok_or_else(|| anyhow::anyhow!("OpenAI returned no choices"))?
-    .message
-    .content
-    .clone()
-    .unwrap_or_default();
-
-  if result.is_empty() {
-    bail!("No response from OpenAI");
-  }
-
-  Ok(result.trim().to_string())
 }
 
 #[cfg(test)]
