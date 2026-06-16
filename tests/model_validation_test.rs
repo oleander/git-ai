@@ -81,8 +81,8 @@ fn test_model_as_ref() {
     s.as_ref().to_string()
   }
 
-  assert_eq!(takes_str_ref(&Model::GPT41), "gpt-4.1");
-  assert_eq!(takes_str_ref(&Model::GPT41Mini), "gpt-4.1-mini");
+  assert_eq!(takes_str_ref(Model::GPT41), "gpt-4.1");
+  assert_eq!(takes_str_ref(Model::GPT41Mini), "gpt-4.1-mini");
 }
 
 #[test]

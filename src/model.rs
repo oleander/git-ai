@@ -7,7 +7,7 @@ use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use tiktoken_rs::CoreBPE;
 use tiktoken_rs::model::get_context_size;
-use async_openai::types::{ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs};
+use async_openai::types::chat::{ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs};
 use colored::Colorize;
 
 use crate::profile;
@@ -72,7 +72,9 @@ impl Model {
   /// * `usize` - The maximum number of tokens the model can process
   pub fn context_size(&self) -> usize {
     profile!("Get context size");
-    get_context_size(self.as_ref())
+    // tiktoken-rs 0.12 returns Option; fall back to 4096 (the historical default
+    // returned by tiktoken-rs 0.7 for unrecognized models) when the model is unknown.
+    get_context_size(self.as_ref()).unwrap_or(4096)
   }
 
   /// Truncates the given text to fit within the specified token limit.
@@ -256,6 +258,7 @@ pub async fn run(settings: AppConfig, content: String) -> Result<String> {
   let model_str = settings.model.as_deref().unwrap_or(DEFAULT_MODEL_NAME);
 
   let client = async_openai::Client::new();
+  // Note: dead code path; kept compiling for the dependency upgrade.
   // let prompt = format_prompt(&content, &settings.prompt(), settings.template())?; // Temporarily comment out
   let prompt = content; // Use raw content as prompt for now
   let model: Model = settings
@@ -294,7 +297,7 @@ pub async fn run(settings: AppConfig, content: String) -> Result<String> {
       .into()])
     .temperature(temperature_value) // Use temperature_value
     // TODO: Make max_tokens configurable
-    .max_tokens((model.context_size() - tokens) as u16)
+    .max_completion_tokens((model.context_size() - tokens) as u32)
     .build()?;
 
   profile!("OpenAI API call");

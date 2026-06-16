@@ -1,6 +1,8 @@
 use anyhow::Result;
 use async_openai::config::OpenAIConfig;
-use async_openai::types::{ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs};
+use async_openai::types::chat::{
+  ChatCompletionMessageToolCalls, ChatCompletionNamedToolChoice, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, ChatCompletionToolChoiceOption, ChatCompletionTools, CreateChatCompletionRequestArgs
+};
 use async_openai::Client;
 
 use crate::function_calling::{create_commit_function_tool, CommitFunctionArgs};
@@ -18,7 +20,7 @@ pub async fn generate_commit_message_simple(
   }
 
   // Use the commit function tool directly with the full diff
-  let tools = vec![create_commit_function_tool(max_length)?];
+  let tools = vec![ChatCompletionTools::Function(create_commit_function_tool(max_length)?)];
 
   let system_message = ChatCompletionRequestSystemMessageArgs::default()
     .content(
@@ -38,18 +40,25 @@ pub async fn generate_commit_message_simple(
     .model(model)
     .messages(vec![system_message, user_message])
     .tools(tools)
-    .tool_choice("commit")
+    .tool_choice(ChatCompletionToolChoiceOption::Function(ChatCompletionNamedToolChoice::from("commit")))
     .build()?;
 
   let response = client.chat().create(request).await?;
 
-  if let Some(tool_call) = response.choices[0]
+  let tool_call_arguments = response.choices[0]
     .message
     .tool_calls
     .as_ref()
     .and_then(|calls| calls.first())
-  {
-    let args: CommitFunctionArgs = serde_json::from_str(&tool_call.function.arguments)?;
+    .and_then(|call| {
+      match call {
+        ChatCompletionMessageToolCalls::Function(f) => Some(f.function.arguments.as_str()),
+        _ => None
+      }
+    });
+
+  if let Some(arguments) = tool_call_arguments {
+    let args: CommitFunctionArgs = serde_json::from_str(arguments)?;
 
     // Record in debug session
     if let Some(session) = debug_output::debug_session() {

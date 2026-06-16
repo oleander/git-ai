@@ -1,6 +1,8 @@
 use std::time::{Duration, Instant};
 
-use async_openai::types::{ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs};
+use async_openai::types::chat::{
+  ChatCompletionNamedToolChoice, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, ChatCompletionToolChoiceOption, ChatCompletionTools, CreateChatCompletionRequestArgs
+};
 use async_openai::config::OpenAIConfig;
 use async_openai::Client;
 use async_openai::error::OpenAIError;
@@ -239,7 +241,7 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
   let commit_tool = function_calling::create_commit_function_tool(config::APP_CONFIG.max_commit_length)?;
 
   let chat_request = CreateChatCompletionRequestArgs::default()
-    .max_tokens(request.max_tokens)
+    .max_completion_tokens(request.max_tokens as u32)
     .model(request.model.to_string())
     .messages([
       ChatCompletionRequestSystemMessageArgs::default()
@@ -251,8 +253,8 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
         .build()?
         .into()
     ])
-    .tools(vec![commit_tool])
-    .tool_choice("commit")
+    .tools(vec![ChatCompletionTools::Function(commit_tool)])
+    .tool_choice(ChatCompletionToolChoiceOption::Function(ChatCompletionNamedToolChoice::from("commit")))
     .build()?;
 
   let mut last_error = None;
@@ -286,11 +288,14 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
           // Process multiple tool calls in parallel
           let tool_futures: Vec<_> = tool_calls
             .iter()
-            .filter(|tool_call| tool_call.function.name == "commit")
-            .map(|tool_call| {
-              let args = tool_call.function.arguments.clone();
-              async move { function_calling::parse_commit_function_response(&args) }
+            .filter_map(|tool_call| {
+              match tool_call {
+                async_openai::types::chat::ChatCompletionMessageToolCalls::Function(call) if call.function.name == "commit" =>
+                  Some(call.function.arguments.clone()),
+                _ => None
+              }
             })
+            .map(|args| async move { function_calling::parse_commit_function_response(&args) })
             .collect();
 
           // Execute all tool calls in parallel
@@ -340,9 +345,9 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
         log::warn!("OpenAI API attempt {attempt} failed");
 
         // Check if it's an API key error - fail immediately without retrying
-        if let OpenAIError::ApiError(ref api_err) = &last_error.as_ref().unwrap() {
-          if api_err.code.as_deref() == Some("invalid_api_key") {
-            let error_msg = format!("Invalid OpenAI API key: {}", api_err.message);
+        if let Some(OpenAIError::ApiError(ref api_err)) = last_error.as_ref() {
+          if api_err.api_error.code.as_deref() == Some("invalid_api_key") {
+            let error_msg = format!("Invalid OpenAI API key: {}", api_err.api_error.message);
             log::error!("{error_msg}");
             return Err(anyhow!(error_msg));
           }
@@ -362,9 +367,9 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
     Some(OpenAIError::ApiError(api_err)) => {
       let error_msg = format!(
         "OpenAI API error: {} (type: {:?}, code: {:?})",
-        api_err.message,
-        api_err.r#type.as_deref().unwrap_or("unknown"),
-        api_err.code.as_deref().unwrap_or("unknown")
+        api_err.api_error.message,
+        api_err.api_error.r#type.as_deref().unwrap_or("unknown"),
+        api_err.api_error.code.as_deref().unwrap_or("unknown")
       );
       log::error!("{error_msg}");
       Err(anyhow!(error_msg))

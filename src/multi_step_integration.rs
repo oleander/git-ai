@@ -1,6 +1,8 @@
 use anyhow::Result;
 use async_openai::config::OpenAIConfig;
-use async_openai::types::{ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs};
+use async_openai::types::chat::{
+  ChatCompletionMessageToolCalls, ChatCompletionNamedToolChoice, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, ChatCompletionToolChoiceOption, ChatCompletionTools, CreateChatCompletionRequestArgs
+};
 use async_openai::Client;
 use serde_json::Value;
 use futures::future::join_all;
@@ -403,7 +405,7 @@ pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
 
 /// Call the analyze function via OpenAI
 async fn call_analyze_function(client: &Client<OpenAIConfig>, model: &str, file: &ParsedFile) -> Result<Value> {
-  let tools = vec![create_analyze_function_tool()?];
+  let tools = vec![ChatCompletionTools::Function(create_analyze_function_tool()?)];
 
   let system_message = ChatCompletionRequestSystemMessageArgs::default()
     .content("You are a git diff analyzer. Analyze the provided file changes and return structured data.")
@@ -422,29 +424,39 @@ async fn call_analyze_function(client: &Client<OpenAIConfig>, model: &str, file:
     .model(model)
     .messages(vec![system_message, user_message])
     .tools(tools)
-    .tool_choice("analyze")
+    .tool_choice(ChatCompletionToolChoiceOption::Function(ChatCompletionNamedToolChoice::from("analyze")))
     .build()?;
 
   let response = client.chat().create(request).await?;
 
-  if let Some(tool_call) = response.choices[0]
-    .message
-    .tool_calls
-    .as_ref()
-    .and_then(|calls| calls.first())
-  {
-    let args: Value = serde_json::from_str(&tool_call.function.arguments)?;
+  if let Some(arguments) = first_function_call_arguments(&response) {
+    let args: Value = serde_json::from_str(arguments)?;
     Ok(args)
   } else {
     anyhow::bail!("No tool call in response")
   }
 }
 
+/// Extracts the arguments of the first function tool call from a chat completion response.
+fn first_function_call_arguments(response: &async_openai::types::chat::CreateChatCompletionResponse) -> Option<&str> {
+  response.choices[0]
+    .message
+    .tool_calls
+    .as_ref()
+    .and_then(|calls| calls.first())
+    .and_then(|call| {
+      match call {
+        ChatCompletionMessageToolCalls::Function(f) => Some(f.function.arguments.as_str()),
+        _ => None
+      }
+    })
+}
+
 /// Call the score function via OpenAI
 async fn call_score_function(
   client: &Client<OpenAIConfig>, model: &str, files_data: Vec<FileDataForScoring>
 ) -> Result<Vec<FileWithScore>> {
-  let tools = vec![create_score_function_tool()?];
+  let tools = vec![ChatCompletionTools::Function(create_score_function_tool()?)];
 
   let system_message = ChatCompletionRequestSystemMessageArgs::default()
     .content("You are a git commit impact scorer. Calculate impact scores for the provided file changes.")
@@ -464,18 +476,13 @@ async fn call_score_function(
     .model(model)
     .messages(vec![system_message, user_message])
     .tools(tools)
-    .tool_choice("score")
+    .tool_choice(ChatCompletionToolChoiceOption::Function(ChatCompletionNamedToolChoice::from("score")))
     .build()?;
 
   let response = client.chat().create(request).await?;
 
-  if let Some(tool_call) = response.choices[0]
-    .message
-    .tool_calls
-    .as_ref()
-    .and_then(|calls| calls.first())
-  {
-    let args: Value = serde_json::from_str(&tool_call.function.arguments)?;
+  if let Some(arguments) = first_function_call_arguments(&response) {
+    let args: Value = serde_json::from_str(arguments)?;
     let files_with_scores: Vec<FileWithScore> = if args["files_with_scores"].is_null() {
       Vec::new() // Return empty vector if null
     } else {
@@ -491,7 +498,7 @@ async fn call_score_function(
 async fn call_generate_function(
   client: &Client<OpenAIConfig>, model: &str, files_with_scores: Vec<FileWithScore>, max_length: usize
 ) -> Result<Value> {
-  let tools = vec![create_generate_function_tool()?];
+  let tools = vec![ChatCompletionTools::Function(create_generate_function_tool()?)];
 
   let system_message = ChatCompletionRequestSystemMessageArgs::default()
     .content("You are a git commit message generator. Generate concise, descriptive commit messages.")
@@ -511,18 +518,13 @@ async fn call_generate_function(
     .model(model)
     .messages(vec![system_message, user_message])
     .tools(tools)
-    .tool_choice("generate")
+    .tool_choice(ChatCompletionToolChoiceOption::Function(ChatCompletionNamedToolChoice::from("generate")))
     .build()?;
 
   let response = client.chat().create(request).await?;
 
-  if let Some(tool_call) = response.choices[0]
-    .message
-    .tool_calls
-    .as_ref()
-    .and_then(|calls| calls.first())
-  {
-    let args: Value = serde_json::from_str(&tool_call.function.arguments)?;
+  if let Some(arguments) = first_function_call_arguments(&response) {
+    let args: Value = serde_json::from_str(arguments)?;
     Ok(args)
   } else {
     anyhow::bail!("No tool call in response")
@@ -534,7 +536,7 @@ async fn select_best_candidate(
   client: &Client<OpenAIConfig>, model: &str, candidates: &Value, scored_files: &[FileWithScore], original_diff: &str
 ) -> Result<String> {
   // Use the original commit function to get the final formatted response
-  let tools = vec![create_commit_function_tool(Some(72))?];
+  let tools = vec![ChatCompletionTools::Function(create_commit_function_tool(Some(72))?)];
 
   let system_message = ChatCompletionRequestSystemMessageArgs::default()
     .content(
@@ -564,19 +566,14 @@ async fn select_best_candidate(
     .model(model)
     .messages(vec![system_message, user_message])
     .tools(tools)
-    .tool_choice("commit")
+    .tool_choice(ChatCompletionToolChoiceOption::Function(ChatCompletionNamedToolChoice::from("commit")))
     .build()?;
 
   let response = client.chat().create(request).await?;
 
-  if let Some(tool_call) = response.choices[0]
-    .message
-    .tool_calls
-    .as_ref()
-    .and_then(|calls| calls.first())
-  {
+  if let Some(arguments) = first_function_call_arguments(&response) {
     // First, parse as Value to manually handle required fields
-    let raw_args: serde_json::Value = serde_json::from_str(&tool_call.function.arguments)?;
+    let raw_args: serde_json::Value = serde_json::from_str(arguments)?;
 
     // Extract the message which is what we really need
     if let Some(message) = raw_args.get("message").and_then(|m| m.as_str()) {
@@ -584,7 +581,7 @@ async fn select_best_candidate(
     }
 
     // Fallback to full parsing if the above approach fails
-    let args: CommitFunctionArgs = serde_json::from_str(&tool_call.function.arguments)?;
+    let args: CommitFunctionArgs = serde_json::from_str(arguments)?;
     Ok(args.message)
   } else {
     anyhow::bail!("No tool call in response")

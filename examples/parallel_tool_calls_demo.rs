@@ -1,5 +1,5 @@
 use anyhow::Result;
-use async_openai::types::{ChatCompletionTool, ChatCompletionToolType, FunctionObject};
+use async_openai::types::chat::{ChatCompletionTool, FunctionObject};
 use serde_json::json;
 
 #[tokio::main]
@@ -10,7 +10,6 @@ async fn main() -> Result<()> {
 
   // Create mock tools for demonstration
   let _tool1 = ChatCompletionTool {
-    r#type:   ChatCompletionToolType::Function,
     function: FunctionObject {
       name:        "get_weather".to_string(),
       description: Some("Get weather for a location".to_string()),
@@ -29,7 +28,6 @@ async fn main() -> Result<()> {
   };
 
   let _tool2 = ChatCompletionTool {
-    r#type:   ChatCompletionToolType::Function,
     function: FunctionObject {
       name:        "get_time".to_string(),
       description: Some("Get current time for a timezone".to_string()),
