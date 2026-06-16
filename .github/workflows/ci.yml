@@ -17,27 +17,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+
+      # rust-toolchain.toml pins the nightly version; install clippy+rustfmt for
+      # *that* toolchain (not floating nightly, whose components wouldn't match).
+      - name: Install pinned toolchain + components
+        run: |
+          rustup show
+          rustup component add clippy rustfmt
+
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
 
-      - name: Setup nightly toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          components: rustfmt, clippy
-          toolchain: nightly
-
       - name: Run clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings
 
       - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: -- --check
+        run: cargo fmt -- --check
+
+      - name: Security audit
+        run: |
+          cargo install cargo-audit --locked || true
+          cargo audit || true
 
   test:
     needs: lint
