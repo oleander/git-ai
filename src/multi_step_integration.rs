@@ -219,7 +219,7 @@ pub async fn generate_commit_message_multi_step(
 
   // Step 4: Select the best candidate and format final response
   let final_message_start_time = std::time::Instant::now();
-  let final_message = select_best_candidate(client, model, &candidates, &scored_files, diff_content).await?;
+  let final_message = select_best_candidate(client, model, &candidates, &scored_files, diff_content, max_length.unwrap_or(72)).await?;
   let final_message_duration = final_message_start_time.elapsed();
 
   // Record in debug session
@@ -589,10 +589,11 @@ async fn call_generate_function(
 
 /// Select the best candidate and format the final response
 async fn select_best_candidate(
-  client: &Client<OpenAIConfig>, model: &str, candidates: &Value, scored_files: &[FileWithScore], original_diff: &str
+  client: &Client<OpenAIConfig>, model: &str, candidates: &Value, scored_files: &[FileWithScore], original_diff: &str, max_length: usize
 ) -> Result<String> {
-  // Use the original commit function to get the final formatted response
-  let tools = vec![ChatCompletionTools::Function(create_commit_function_tool(Some(72))?)];
+  // Use the original commit function to get the final formatted response,
+  // honoring the configured commit-length limit (was previously hardcoded to 72).
+  let tools = vec![ChatCompletionTools::Function(create_commit_function_tool(Some(max_length))?)];
 
   let system_message = ChatCompletionRequestSystemMessageArgs::default()
     .content(COMMIT_SYSTEM_PROMPT)
