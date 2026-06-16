@@ -1,0 +1,36 @@
+name: Assign PR to Author on Creation
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  assign_pr_to_author:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Assign PR to Author
+        if: github.event.pull_request.user.login != 'github-actions[bot]' && github.event.pull_request.user.login != 'dependabot[bot]'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const prAuthor = context.payload.pull_request.user.login;
+            const prAssignees = context.payload.pull_request.assignees.map(a => a.login);
+
+            if (prAssignees.length > 0) {
+              console.log('PR is already assigned to someone. No action taken.');
+              return;
+            }
+
+            await github.rest.issues.addAssignees({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              assignees: [prAuthor],
+            });
+            console.log(`Assigned PR #${prNumber} to author @${prAuthor}`);

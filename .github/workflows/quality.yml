@@ -1,0 +1,30 @@
+name: Code Quality
+
+# Runs the qlty checks (actionlint, clippy, zizmor, trufflehog, ...) defined in
+# .qlty/qlty.toml. This is intentionally NOT a required status check -- it
+# surfaces quality/security findings without blocking merges.
+#
+# rustfmt is set to `mode = "monitor"` in qlty.toml so this job does NOT run the
+# stable-rustfmt formatter, which would conflict with the repo's nightly-only
+# `cargo +nightly fmt` source of truth.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  qlty:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      - name: Run qlty checks
+        uses: qltysh/qlty-action/check@06730ef41b86b073c3813c0fc07a0c734980ce5d # v1

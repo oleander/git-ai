@@ -1,0 +1,54 @@
+name: Assign PR to Reviewer and Unassign Author
+
+on:
+  pull_request:
+    types: [review_requested]
+
+permissions:
+  contents: read
+
+jobs:
+  assign_to_reviewer:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Assign PR to Requested Reviewer and Unassign Author
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const prAuthor = context.payload.pull_request.user.login;
+            const reviewer = context.payload.requested_reviewer;
+
+            // NOTE: datajust also handled `requested_team` via teams.listMembersInOrg.
+            // That path is org-only infrastructure and is omitted here: git-ai is a
+            // personal repo with no org teams, so only individual reviewers apply.
+            if (!reviewer) {
+              console.log('No individual reviewer found.');
+              return;
+            }
+
+            await github.rest.issues.addAssignees({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              assignees: [reviewer.login],
+            });
+            console.log(`Assigned PR #${prNumber} to ${reviewer.login}`);
+
+            try {
+              await github.rest.issues.removeAssignees({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                assignees: [prAuthor],
+              });
+              console.log(`Unassigned PR #${prNumber} from author ${prAuthor}`);
+            } catch (error) {
+              if (error.status === 404) {
+                console.log(`Author ${prAuthor} not assigned; skipping removal.`);
+              } else {
+                throw error;
+              }
+            }
