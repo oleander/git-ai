@@ -352,8 +352,14 @@ fn test_collect_diff_data_includes_headers() {
   // Must contain hunk header
   assert!(patch.contains("@@"), "collect_diff_data() must include hunk headers (@@), got:\n{patch}");
 
-  // Must also still contain content lines
-  assert!(patch.lines().any(|l| l.starts_with('+')), "Should still contain addition lines");
+  // Must contain a real added *content* line — not just the `+++` file header.
+  // (A bare `starts_with('+')` check would be satisfied by `+++ b/auth.rs`.)
+  assert!(
+    patch
+      .lines()
+      .any(|l| l.starts_with('+') && !l.starts_with("+++") && l.contains("validate()")),
+    "Should contain the added content line (+...validate()...), got:\n{patch}"
+  );
 }
 
 #[test]
