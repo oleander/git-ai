@@ -90,78 +90,54 @@ impl Model {
     self.walk_truncate(text, max_tokens, usize::MAX)
   }
 
-  /// Recursively truncates text to fit within token limits while maintaining coherence.
-  /// Uses a binary search-like approach to find the optimal truncation point.
+  /// Truncates text to fit within a token limit using a single tokenization pass.
+  ///
+  /// The previous implementation re-`join`ed words and re-tokenized the full candidate
+  /// string on every binary-search iteration (O(log n) full tokenizations + re-joins),
+  /// which was the dominant cost on large diffs. This version tokenizes the text exactly
+  /// once, keeps the first `max_tokens` tokens, and decodes them back to a string. Because
+  /// a single character can span multiple tokens, slicing the token vector can land on an
+  /// invalid UTF-8 boundary; in that case we drop trailing tokens until the decode succeeds.
+  /// Dropping tokens only ever reduces the count, so the result is guaranteed to re-encode
+  /// to `<= max_tokens` while always being valid UTF-8.
+  ///
+  /// The `_within` parameter is retained for signature compatibility but is no longer used:
+  /// the result is exact rather than an approximation within a tolerance.
   ///
   /// # Arguments
   /// * `text` - The text to truncate
   /// * `max_tokens` - The maximum number of tokens allowed
-  /// * `within` - The maximum allowed deviation from target token count
+  /// * `_within` - Unused; kept for backward-compatible call sites
   ///
   /// # Returns
   /// * `Result<String>` - The truncated text or an error
-  pub(crate) fn walk_truncate(&self, text: &str, max_tokens: usize, within: usize) -> Result<String> {
-    profile!("Walk truncate iteration");
-    log::debug!("max_tokens: {max_tokens}, within: {within}");
+  pub(crate) fn walk_truncate(&self, text: &str, max_tokens: usize, _within: usize) -> Result<String> {
+    profile!("Walk truncate");
+    log::debug!("max_tokens: {max_tokens}");
 
-    // Check if text already fits within token limit
-    let current_tokens = self.count_tokens(text)?;
-    if current_tokens <= max_tokens {
+    // Nothing to keep.
+    if max_tokens == 0 || text.is_empty() {
+      return Ok(String::new());
+    }
+
+    let tokenizer = TOKENIZER.get_or_init(|| get_tokenizer(self.as_ref()));
+
+    // Single tokenization pass.
+    let tokens = tokenizer.encode_ordinary(text);
+    if tokens.len() <= max_tokens {
       return Ok(text.to_string());
     }
 
-    // Binary search approach to find the right truncation point
-    let words: Vec<&str> = text.split_whitespace().collect();
-    let mut left = 0;
-    let mut right = words.len();
-    let mut best_fit = String::new();
-    let mut best_tokens = 0;
-
-    // Perform binary search to find optimal word count
-    while left < right {
-      let mid = (left + right).div_ceil(2);
-      let candidate = words[..mid].join(" ");
-      let tokens = self.count_tokens(&candidate)?;
-
-      if tokens <= max_tokens {
-        // This fits, try to find a longer text that still fits
-        best_fit = candidate;
-        best_tokens = tokens;
-        left = mid;
-      } else {
-        // Too many tokens, try shorter text
-        right = mid - 1;
-      }
-
-      // If we're close enough to the target, we can stop
-      if best_tokens > 0 && max_tokens.saturating_sub(best_tokens) <= within {
-        break;
+    // Keep the first `max_tokens` tokens, then back off until the slice decodes to
+    // valid UTF-8 (the slice boundary may fall inside a multi-byte character).
+    let mut end = max_tokens;
+    loop {
+      match tokenizer.decode(&tokens[..end]) {
+        Ok(decoded) => return Ok(decoded),
+        Err(_) if end > 0 => end -= 1,
+        Err(e) => return Err(e)
       }
     }
-
-    // If we couldn't find any fitting text, truncate more aggressively
-    if best_fit.is_empty() && !words.is_empty() {
-      // Try with just one word
-      best_fit = words[0].to_string();
-      let tokens = self.count_tokens(&best_fit)?;
-
-      // If even one word is too long, truncate at character level
-      if tokens > max_tokens {
-        // Estimate character limit based on token limit
-        // Conservative estimate: ~3 chars per token
-        let char_limit = max_tokens * 3;
-        best_fit = text.chars().take(char_limit).collect();
-
-        // Ensure we don't exceed token limit
-        while self.count_tokens(&best_fit)? > max_tokens && !best_fit.is_empty() {
-          // Remove last 10% of characters
-          let new_len = (best_fit.len() * 9) / 10;
-          best_fit = best_fit.chars().take(new_len).collect();
-        }
-      }
-    }
-
-    Ok(best_fit)
   }
 }
 
@@ -302,7 +278,10 @@ pub async fn run(settings: AppConfig, content: String) -> Result<String> {
 
   profile!("OpenAI API call");
   let response = client.chat().create(request).await?;
-  let result = response.choices[0]
+  let result = response
+    .choices
+    .first()
+    .ok_or_else(|| anyhow::anyhow!("OpenAI returned no choices"))?
     .message
     .content
     .clone()
@@ -313,4 +292,59 @@ pub async fn run(settings: AppConfig, content: String) -> Result<String> {
   }
 
   Ok(result.trim().to_string())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  /// C3: A large synthetic text must truncate to <= max_tokens, stay on a valid UTF-8
+  /// boundary, and re-encode to <= max_tokens.
+  #[test]
+  fn test_truncate_large_text_is_exact_and_utf8_safe() {
+    let model = Model::GPT41;
+    // Large input that comfortably exceeds the limit, with multi-byte UTF-8 characters
+    // (é, 世界, emoji) so we exercise the token-boundary back-off.
+    let text = "The quick brown fox café 世界 🚀 jumps over the lazy dog. ".repeat(500);
+    let max_tokens = 100;
+
+    let truncated = model.truncate(&text, max_tokens).unwrap();
+
+    // Valid UTF-8 by construction (it's a Rust String), and re-encodes to <= max_tokens.
+    let recount = model.count_tokens(&truncated).unwrap();
+    assert!(recount <= max_tokens, "re-encoded token count {recount} exceeds max {max_tokens}");
+
+    // It actually truncated (input was far larger than the limit).
+    assert!(truncated.len() < text.len(), "expected truncation to shorten the text");
+    assert!(!truncated.is_empty(), "truncation of large text should not be empty");
+  }
+
+  /// Text already within the limit is returned unchanged.
+  #[test]
+  fn test_truncate_passthrough_when_within_limit() {
+    let model = Model::GPT41;
+    let text = "small bit of text";
+    let truncated = model.truncate(text, 1000).unwrap();
+    assert_eq!(truncated, text);
+  }
+
+  /// max_tokens == 0 yields an empty string (and never panics).
+  #[test]
+  fn test_truncate_zero_tokens() {
+    let model = Model::GPT41;
+    let truncated = model.truncate("anything at all here", 0).unwrap();
+    assert_eq!(truncated, "");
+  }
+
+  /// Truncating multi-byte content to a tiny budget stays on a char boundary.
+  #[test]
+  fn test_truncate_multibyte_small_budget() {
+    let model = Model::GPT41;
+    let text = "日本語のテキストをトークン化してから切り詰めます".repeat(20);
+    let truncated = model.truncate(&text, 5).unwrap();
+    let recount = model.count_tokens(&truncated).unwrap();
+    assert!(recount <= 5, "re-encoded token count {recount} exceeds 5");
+    // Valid UTF-8 (String) — assert it is a prefix-ish valid slice by checking it round-trips.
+    assert!(truncated.is_char_boundary(truncated.len()));
+  }
 }

@@ -21,6 +21,32 @@ pub struct ParsedFile {
   pub diff_content: String
 }
 
+/// Reads a `u64` field from an analysis JSON object, logging at debug level when the
+/// field is absent so silently-defaulted values are visible. The default itself is
+/// unchanged from the prior `.as_u64().unwrap_or(default)` behavior.
+fn analysis_u64(analysis: &Value, field: &str, default: u64) -> u64 {
+  match analysis.get(field).and_then(Value::as_u64) {
+    Some(v) => v,
+    None => {
+      log::debug!("analysis response missing/invalid '{field}' (u64); defaulting to {default}");
+      default
+    }
+  }
+}
+
+/// Reads a string field from an analysis JSON object, logging at debug level when the
+/// field is absent. The default itself is unchanged from the prior
+/// `.as_str().unwrap_or(default)` behavior.
+fn analysis_str(analysis: &Value, field: &str, default: &str) -> String {
+  match analysis.get(field).and_then(Value::as_str) {
+    Some(v) => v.to_string(),
+    None => {
+      log::debug!("analysis response missing/invalid '{field}' (str); defaulting to '{default}'");
+      default.to_string()
+    }
+  }
+}
+
 /// Main entry point for multi-step commit message generation
 pub async fn generate_commit_message_multi_step(
   client: &Client<OpenAIConfig>, model: &str, diff_content: &str, max_length: Option<usize>
@@ -74,13 +100,10 @@ pub async fn generate_commit_message_multi_step(
 
         // Extract structured analysis data for debug
         let analysis_result = crate::multi_step_analysis::FileAnalysisResult {
-          lines_added:   analysis["lines_added"].as_u64().unwrap_or(0) as u32,
-          lines_removed: analysis["lines_removed"].as_u64().unwrap_or(0) as u32,
-          file_category: analysis["file_category"]
-            .as_str()
-            .unwrap_or("source")
-            .to_string(),
-          summary:       analysis["summary"].as_str().unwrap_or("").to_string()
+          lines_added:   analysis_u64(&analysis, "lines_added", 0) as u32,
+          lines_removed: analysis_u64(&analysis, "lines_removed", 0) as u32,
+          file_category: analysis_str(&analysis, "file_category", "source"),
+          summary:       analysis_str(&analysis, "summary", "")
         };
 
         // Record in debug session
@@ -113,13 +136,10 @@ pub async fn generate_commit_message_multi_step(
       FileDataForScoring {
         file_path:      file.path.clone(),
         operation_type: file.operation.clone(),
-        lines_added:    analysis["lines_added"].as_u64().unwrap_or(0) as u32,
-        lines_removed:  analysis["lines_removed"].as_u64().unwrap_or(0) as u32,
-        file_category:  analysis["file_category"]
-          .as_str()
-          .unwrap_or("source")
-          .to_string(),
-        summary:        analysis["summary"].as_str().unwrap_or("").to_string()
+        lines_added:    analysis_u64(analysis, "lines_added", 0) as u32,
+        lines_removed:  analysis_u64(analysis, "lines_removed", 0) as u32,
+        file_category:  analysis_str(analysis, "file_category", "source"),
+        summary:        analysis_str(analysis, "summary", "")
       }
     })
     .collect();
@@ -439,7 +459,9 @@ async fn call_analyze_function(client: &Client<OpenAIConfig>, model: &str, file:
 
 /// Extracts the arguments of the first function tool call from a chat completion response.
 fn first_function_call_arguments(response: &async_openai::types::chat::CreateChatCompletionResponse) -> Option<&str> {
-  response.choices[0]
+  response
+    .choices
+    .first()?
     .message
     .tool_calls
     .as_ref()
@@ -622,19 +644,39 @@ pub fn generate_commit_message_local(diff_content: &str, max_length: Option<usiz
   // Step 3: Generate candidates
   let generate_result = generate_commit_messages(score_result.files_with_scores, max_length.unwrap_or(72));
 
-  // Return the first candidate
-  Ok(
-    generate_result
-      .candidates
-      .first()
-      .cloned()
-      .unwrap_or_else(|| "Update files".to_string())
-  )
+  // Return the first candidate. Keep a safe fallback, but surface the failure so a
+  // silent "Update files" message is never mistaken for a real generated message.
+  match generate_result.candidates.first() {
+    Some(candidate) => Ok(candidate.clone()),
+    None => {
+      log::warn!("Local multi-step generation produced no candidates; falling back to 'Update files'");
+      Ok("Update files".to_string())
+    }
+  }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  /// C2: An OpenAI response with an empty `choices` array must not panic. The helper
+  /// returns `None` (so callers produce a clean error) instead of indexing `choices[0]`.
+  #[test]
+  fn test_first_function_call_arguments_empty_choices_no_panic() {
+    let json = serde_json::json!({
+      "id": "chatcmpl-test",
+      "choices": [],
+      "created": 0,
+      "model": "gpt-4.1",
+      "object": "chat.completion",
+      "usage": null
+    });
+    let response: async_openai::types::chat::CreateChatCompletionResponse =
+      serde_json::from_value(json).expect("should deserialize a response with empty choices");
+
+    // Must be None, not a panic.
+    assert!(first_function_call_arguments(&response).is_none());
+  }
 
   #[test]
   fn test_parse_diff() {
