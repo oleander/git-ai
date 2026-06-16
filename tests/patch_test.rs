@@ -312,3 +312,143 @@ fn test_diff_only_deletions() {
     "Should contain '-delete line 2'"
   );
 }
+
+#[test]
+fn test_collect_diff_data_includes_headers() {
+  // Regression test: collect_diff_data() must include file and hunk headers
+  // so that parse_diff() can split the output into per-file sections.
+  // Previously, headers were stripped, causing all commits to be treated
+  // as a single "unknown" file in the multi-step analysis pipeline.
+  let repo = TestRepo::default();
+
+  let file = repo.create_file("auth.rs", "fn login() {}\n").unwrap();
+  file.stage().unwrap();
+  file.commit().unwrap();
+
+  // Modify the file
+  let file = repo
+    .create_file("auth.rs", "fn login() { validate(); }\n")
+    .unwrap();
+  file.stage().unwrap();
+
+  let repo_path = repo.repo_path.path().to_path_buf();
+  let git_repo = git2::Repository::open(&repo_path).unwrap();
+  let tree = git_repo.head().unwrap().peel_to_tree().unwrap();
+  let diff = TestRepository::to_diff(&git_repo, Some(tree)).unwrap();
+
+  use std::path::PathBuf;
+
+  use ai::hook::PatchDiff;
+  let diff_data = diff.collect_diff_data().unwrap();
+  let path = PathBuf::from("auth.rs");
+  let patch = diff_data.get(&path).expect("Should contain auth.rs");
+
+  // Must contain diff header for parse_diff() to work
+  assert!(
+    patch.contains("diff --git"),
+    "collect_diff_data() must include file headers (diff --git), got:\n{patch}"
+  );
+
+  // Must contain hunk header
+  assert!(patch.contains("@@"), "collect_diff_data() must include hunk headers (@@), got:\n{patch}");
+
+  // Must contain a real added *content* line — not just the `+++` file header.
+  // (A bare `starts_with('+')` check would be satisfied by `+++ b/auth.rs`.)
+  assert!(
+    patch
+      .lines()
+      .any(|l| l.starts_with('+') && !l.starts_with("+++") && l.contains("validate()")),
+    "Should contain the added content line (+...validate()...), got:\n{patch}"
+  );
+}
+
+#[test]
+fn test_collect_diff_data_multi_file_headers() {
+  // Verify that each file in a multi-file diff gets its own headers,
+  // enabling parse_diff() to split them correctly.
+  let repo = TestRepo::default();
+
+  let f1 = repo.create_file("file_a.rs", "fn a() {}\n").unwrap();
+  f1.stage().unwrap();
+  let f2 = repo.create_file("file_b.rs", "fn b() {}\n").unwrap();
+  f2.stage().unwrap();
+  f1.commit().unwrap();
+
+  // Modify both files
+  let f1 = repo.create_file("file_a.rs", "fn a() { 1 }\n").unwrap();
+  f1.stage().unwrap();
+  let f2 = repo.create_file("file_b.rs", "fn b() { 2 }\n").unwrap();
+  f2.stage().unwrap();
+
+  let repo_path = repo.repo_path.path().to_path_buf();
+  let git_repo = git2::Repository::open(&repo_path).unwrap();
+  let tree = git_repo.head().unwrap().peel_to_tree().unwrap();
+  let diff = TestRepository::to_diff(&git_repo, Some(tree)).unwrap();
+
+  use std::path::PathBuf;
+
+  use ai::hook::PatchDiff;
+  let diff_data = diff.collect_diff_data().unwrap();
+
+  // Both files should have their own diff headers
+  let pa = PathBuf::from("file_a.rs");
+  let pb = PathBuf::from("file_b.rs");
+  let patch_a = diff_data.get(&pa).expect("Should contain file_a.rs");
+  let patch_b = diff_data.get(&pb).expect("Should contain file_b.rs");
+
+  assert!(patch_a.contains("diff --git"), "file_a.rs should have its own diff header");
+  assert!(patch_b.contains("diff --git"), "file_b.rs should have its own diff header");
+}
+
+#[test]
+fn test_to_patch_output_parseable_by_parse_diff() {
+  // End-to-end test: the output of to_patch() must be parseable by
+  // parse_diff() into correct per-file sections. This tests the full
+  // pipeline that was previously broken.
+  let repo = TestRepo::default();
+
+  let f1 = repo.create_file("main.rs", "fn main() {}\n").unwrap();
+  f1.stage().unwrap();
+  let f2 = repo.create_file("lib.rs", "pub fn hello() {}\n").unwrap();
+  f2.stage().unwrap();
+  f1.commit().unwrap();
+
+  // Modify both files
+  let f1 = repo
+    .create_file("main.rs", "fn main() { hello(); }\n")
+    .unwrap();
+  f1.stage().unwrap();
+  let f2 = repo
+    .create_file("lib.rs", "pub fn hello() { println!(\"hi\"); }\n")
+    .unwrap();
+  f2.stage().unwrap();
+
+  let repo_path = repo.repo_path.path().to_path_buf();
+  let git_repo = git2::Repository::open(&repo_path).unwrap();
+  let tree = git_repo.head().unwrap().peel_to_tree().unwrap();
+
+  // Generate patch via the same path the hook uses
+  use ai::hook::PatchRepository;
+  let patch = git_repo
+    .to_patch(Some(tree), 4096, ai::model::Model::default())
+    .unwrap();
+
+  // Now parse it the same way multi_step_integration does
+  use ai::multi_step_integration::parse_diff;
+  let parsed = parse_diff(&patch).unwrap();
+
+  // Must produce 2 files with correct paths — NOT a single "unknown" file
+  assert!(
+    parsed.len() == 2,
+    "parse_diff should find 2 files, got {} file(s): {:?}",
+    parsed.len(),
+    parsed.iter().map(|f| &f.path).collect::<Vec<_>>()
+  );
+
+  let paths: Vec<&str> = parsed.iter().map(|f| f.path.as_str()).collect();
+  assert!(paths.contains(&"main.rs"), "Should contain main.rs, got: {paths:?}");
+  assert!(paths.contains(&"lib.rs"), "Should contain lib.rs, got: {paths:?}");
+
+  // None should be "unknown" (the old broken fallback)
+  assert!(!paths.contains(&"unknown"), "Should NOT fall back to 'unknown' file, got: {paths:?}");
+}

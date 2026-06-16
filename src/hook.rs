@@ -367,9 +367,16 @@ impl PatchDiff for Diff<'_> {
           }
           entry.push_str(&content);
         }
+        'F' | 'H' => {
+          // File headers (diff --git, index, ---, +++) and hunk headers (@@ ... @@) carry the
+          // structure parse_diff() needs to split the patch into per-file sections. Dropping them
+          // (the v1.1.1 regression) collapsed every diff into a single "unknown" file.
+          let entry = files
+            .entry(path)
+            .or_insert_with(|| String::with_capacity(DEFAULT_STRING_CAPACITY));
+          entry.push_str(&content);
+        }
         _ => {
-          // Other lines (headers, etc.) - skip them as they're not part of the actual diff content
-          // The git diff headers are already included by the diff format
           log::trace!("Skipping diff line with origin: {:?}", line.origin());
         }
       }
