@@ -83,6 +83,10 @@ mode = "comment"
 
 [[plugin]]
 name = "rustfmt"
+# Monitor only: this project requires NIGHTLY rustfmt (rustfmt.toml uses nightly-only
+# options). qlty's rustfmt runs stable and would reformat differently, fighting
+# `cargo +nightly fmt`. Nightly `cargo fmt --check` in CI is the source of truth.
+mode = "monitor"
 
 [[plugin]]
 name = "trufflehog"
