@@ -89,13 +89,13 @@ jobs:
   release:
     runs-on: ubuntu-latest
     needs: artifact
-    # contents: write is required: this job amends/commits the version bump,
-    # creates+pushes git tags, and publishes a GitHub release.
+    # contents: write is required: this job pushes the release git tag and
+    # publishes a GitHub release. It never commits to main.
     permissions:
       contents: write
     steps:
       # persist-credentials is intentionally left enabled (default): the later
-      # "git push origin HEAD --tags" step relies on the checkout-provided token.
+      # "git push origin v<version>" tag-push step relies on the checkout-provided token.
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5 # zizmor: ignore[artipacked]
 
       - name: Setup Rust
@@ -113,48 +113,44 @@ jobs:
           GH_ACTOR: ${{ github.actor }}
         run: git config user.email "${GH_ACTOR}@users.noreply.github.com"
 
-      - name: Install cargo-bump
-        run: cargo install cargo-bump
-
-      - name: Bump version
-        run: cargo bump patch --git-tag
-
-      - name: Commit Version Bump
-        run: git commit -a --amend --no-edit
-
-      - name: New version
+      # Deliberate versioning: publish the version committed in Cargo.toml (no auto-bump),
+      # and only when that version has not been released yet. We push ONLY the tag (never a
+      # commit to main), so the branch protection ruleset does not apply and no bypass is needed.
+      - name: Determine version from Cargo.toml
         id: app
-        run: echo "version=$(git describe --tags --abbrev=0 HEAD)" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(grep -m1 '^version' Cargo.toml | sed -E 's/.*\"([^\"]+)\".*/\1/')" >> "$GITHUB_OUTPUT"
 
-      - name: Delete old tag
+      - name: Check whether this version is already released
+        id: check
         env:
           APP_VERSION: ${{ steps.app.outputs.version }}
-        run: git tag -d "$APP_VERSION"
-
-      - name: Create new tag
-        env:
-          APP_VERSION: ${{ steps.app.outputs.version }}
-        run: git tag "v$APP_VERSION"
+        run: |
+          if git ls-remote --tags origin "refs/tags/v${APP_VERSION}" | grep -q .; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "v${APP_VERSION} already released; skipping publish."
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Publish to crates.io
-        if: github.ref == 'refs/heads/main'
+        if: steps.check.outputs.release == 'true' && github.ref == 'refs/heads/main'
         # zizmor: ignore[use-trusted-publishing]
         # Intentionally uses CARGO_REGISTRY_TOKEN; migrating crates.io to OIDC
         # trusted publishing is out of scope for this change.
-        run: cargo publish --allow-dirty
+        run: cargo publish
 
-      - name: Test publish to crates.io (dry run)
+      - name: Verify packaging (dry run)
         if: github.ref != 'refs/heads/main'
         # zizmor: ignore[use-trusted-publishing]
-        run: cargo publish --dry-run --allow-dirty
+        run: cargo publish --dry-run
 
-      - name: Push to origin
-        if: github.ref == 'refs/heads/main'
-        run: git push origin HEAD --tags
-
-      - name: Test push to origin (dry run)
-        if: github.ref != 'refs/heads/main'
-        run: git push origin HEAD --tags --dry-run
+      - name: Tag and push the release tag
+        if: steps.check.outputs.release == 'true' && github.ref == 'refs/heads/main'
+        env:
+          APP_VERSION: ${{ steps.app.outputs.version }}
+        run: |
+          git tag "v${APP_VERSION}"
+          git push origin "v${APP_VERSION}"
 
       - name: Download all artifacts
         env:
@@ -168,7 +164,7 @@ jobs:
           done
 
       - name: Uploads compressed artifacts
-        if: github.ref == 'refs/heads/main'
+        if: steps.check.outputs.release == 'true' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: v${{ steps.app.outputs.version }}
