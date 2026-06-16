@@ -13,6 +13,40 @@ use crate::multi_step_analysis::{
 use crate::function_calling::{create_commit_function_tool, CommitFunctionArgs};
 use crate::debug_output;
 
+/// System prompt for the `analyze` step. Drives per-file analysis that feeds the
+/// `analyze` function-calling tool. Kept as a `pub const` so the prompt contract can be
+/// pinned by invariant tests without reaching into private request builders.
+pub const ANALYZE_SYSTEM_PROMPT: &str = "You are a senior software engineer analyzing one file's changes from a git diff. \
+Report only what the diff shows: count added and removed lines, classify the file's category, \
+and summarize the change in one short clause using imperative mood (\"add\", \"fix\", \"remove\"), \
+not past tense. Describe the functional impact of the change, not a mechanical line-by-line restatement. \
+Do not invent file names, symbols, or behavior that the diff does not contain. \
+Return your analysis only through the supplied function.";
+
+/// System prompt for the `score` step (impact scoring across all analyzed files).
+pub const SCORE_SYSTEM_PROMPT: &str = "You are scoring the relative impact of each changed file in a commit. \
+Weigh functional significance first: core source and behavior-changing config rank above tests, docs, \
+generated output, and binaries, and larger or higher-risk changes rank above trivial ones. \
+Assign each file a normalized impact score from 0.0 (negligible) to 1.0 (dominant change). \
+Return the scores only through the supplied function.";
+
+/// System prompt for the `generate` step (candidate commit subjects).
+pub const GENERATE_SYSTEM_PROMPT: &str = "You are an expert engineer writing git commit subject lines. \
+Produce concise candidate messages that summarize the most impactful change first. \
+Use the imperative mood (\"Add feature\", not \"Added feature\"), no trailing period, and stay within the \
+character limit given in the request. State what the change does and why it matters, not how it is implemented; \
+prioritize functional impact over mechanical file-by-file description. \
+Do not invent changes that are not supported by the provided files. \
+Return the candidates only through the supplied function.";
+
+/// System prompt for the final `commit` step (select and format the message).
+pub const COMMIT_SYSTEM_PROMPT: &str = "You are an expert engineer finalizing a git commit message from a multi-step analysis. \
+Select the single best candidate or refine one into a clear subject line. \
+Use the imperative mood (\"Fix crash\", not \"Fixed crash\"), keep the subject within the character limit, \
+use no trailing period, and lead with the change of highest impact. \
+Describe what changed and why, not how; do not invent changes absent from the diff. \
+Return the final message only through the supplied commit function.";
+
 /// Represents a parsed file from the git diff
 #[derive(Debug)]
 pub struct ParsedFile {
@@ -428,7 +462,7 @@ async fn call_analyze_function(client: &Client<OpenAIConfig>, model: &str, file:
   let tools = vec![ChatCompletionTools::Function(create_analyze_function_tool()?)];
 
   let system_message = ChatCompletionRequestSystemMessageArgs::default()
-    .content("You are a git diff analyzer. Analyze the provided file changes and return structured data.")
+    .content(ANALYZE_SYSTEM_PROMPT)
     .build()?
     .into();
 
@@ -481,7 +515,7 @@ async fn call_score_function(
   let tools = vec![ChatCompletionTools::Function(create_score_function_tool()?)];
 
   let system_message = ChatCompletionRequestSystemMessageArgs::default()
-    .content("You are a git commit impact scorer. Calculate impact scores for the provided file changes.")
+    .content(SCORE_SYSTEM_PROMPT)
     .build()?
     .into();
 
@@ -523,7 +557,7 @@ async fn call_generate_function(
   let tools = vec![ChatCompletionTools::Function(create_generate_function_tool()?)];
 
   let system_message = ChatCompletionRequestSystemMessageArgs::default()
-    .content("You are a git commit message generator. Generate concise, descriptive commit messages.")
+    .content(GENERATE_SYSTEM_PROMPT)
     .build()?
     .into();
 
@@ -561,10 +595,7 @@ async fn select_best_candidate(
   let tools = vec![ChatCompletionTools::Function(create_commit_function_tool(Some(72))?)];
 
   let system_message = ChatCompletionRequestSystemMessageArgs::default()
-    .content(
-      "You are a git commit message expert. Based on the multi-step analysis, \
-            select the best commit message and provide the final formatted response."
-    )
+    .content(COMMIT_SYSTEM_PROMPT)
     .build()?
     .into();
 
