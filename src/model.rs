@@ -275,7 +275,7 @@ pub async fn run(settings: AppConfig, content: String) -> Result<String> {
   }
 
   // TODO: Make temperature configurable
-  let temperature_value = 0.7;
+  let temperature_value = 0.7_f32;
 
   log::info!(
     "Using model: {}, Tokens: {}, Max tokens: {}, Temperature: {}",
