@@ -34,10 +34,13 @@ just local-install
 git-ai config set openai-api-key <your-key>
 
 # Set the model to use
-git-ai config set model gpt-4.1     # Default model (latest version)
-git-ai config set model gpt-4o      # Optimized GPT-4, better quality but slower
-git-ai config set model gpt-4o-mini # Mini version, faster processing
-git-ai config set model gpt-4       # Original GPT-4
+git-ai config set model gpt-4.1-mini # Default model (fast, low-cost, near-4.1 quality)
+git-ai config set model gpt-4.1      # Full GPT-4.1, higher quality but slower/costlier
+git-ai config set model gpt-4.1-nano # Nano version, fastest processing
+git-ai config set model gpt-4.5      # GPT-4.5, advanced capabilities
+
+# Any model string is accepted; unknown names are passed through verbatim and
+# verified against the configured endpoint before saving (see openai-base-url).
 
 # Set max tokens for API requests
 git-ai config set max-tokens <number>

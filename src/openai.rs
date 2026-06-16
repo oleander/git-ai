@@ -122,9 +122,87 @@ pub fn create_openai_config(settings: &AppConfig) -> Result<OpenAIConfig> {
     return Err(anyhow!("Invalid OpenAI API key"));
   }
 
-  let config = OpenAIConfig::new().with_api_key(api_key);
+  let mut config = OpenAIConfig::new().with_api_key(api_key);
+
+  // Allow pointing at a custom endpoint (e.g. a local ollama `/v1` server) when set.
+  if let Some(base_url) = settings.openai_base_url.as_ref() {
+    if !base_url.is_empty() {
+      config = config.with_api_base(base_url);
+    }
+  }
 
   Ok(config)
+}
+
+/// Outcome of checking whether a model exists at the configured endpoint.
+#[derive(Debug, PartialEq, Eq)]
+pub enum ModelVerification {
+  /// The model is usable (present in the listing, or a known/deprecated alias).
+  Acceptable,
+  /// The endpoint responded and the model is definitively absent.
+  Absent
+}
+
+/// Pure decision logic for model verification, decoupled from any network IO so it
+/// can be unit-tested with an injected list of available model ids.
+///
+/// * `candidate` - the model name the user is trying to set.
+/// * `available_ids` - model ids returned by the endpoint's `/models` listing.
+/// * `known_or_deprecated` - true if `candidate` maps to a built-in/deprecated model
+///   (those are always acceptable regardless of what the endpoint advertises).
+pub fn classify_model(candidate: &str, available_ids: &[String], known_or_deprecated: bool) -> ModelVerification {
+  if known_or_deprecated {
+    return ModelVerification::Acceptable;
+  }
+
+  let candidate = candidate.trim();
+  if available_ids.iter().any(|id| id == candidate) {
+    ModelVerification::Acceptable
+  } else {
+    ModelVerification::Absent
+  }
+}
+
+/// Verifies that `candidate` exists at the configured endpoint before it is persisted.
+///
+/// Semantics (see F2):
+/// * endpoint responds and model is present (or it's a known/deprecated alias) -> `Ok(())`.
+/// * endpoint responds and model is definitively absent -> `Err(..)` (caller must not save).
+/// * endpoint unreachable / unauthorized / no key configured (can't verify) -> `log::warn!`
+///   and `Ok(())` so offline users are not hard-blocked.
+pub async fn verify_model_exists(settings: &AppConfig, candidate: &str, known_or_deprecated: bool) -> Result<()> {
+  // Known/deprecated aliases are always valid and need no round-trip.
+  if known_or_deprecated {
+    return Ok(());
+  }
+
+  // Without a usable key/config we cannot verify; warn and allow.
+  let config = match create_openai_config(settings) {
+    Ok(config) => config,
+    Err(e) => {
+      log::warn!("Could not verify model '{candidate}' (no usable OpenAI config: {e}); allowing it.");
+      return Ok(());
+    }
+  };
+
+  let client = Client::with_config(config);
+  match client.models().list().await {
+    Ok(list) => {
+      let ids: Vec<String> = list.data.into_iter().map(|m| m.id).collect();
+      match classify_model(candidate, &ids, known_or_deprecated) {
+        ModelVerification::Acceptable => Ok(()),
+        ModelVerification::Absent =>
+          Err(anyhow!(
+            "Model '{candidate}' is not available at the configured endpoint. \
+           Run `git ai config set model <name>` with a model the endpoint offers."
+          )),
+      }
+    }
+    Err(e) => {
+      log::warn!("Could not verify model '{candidate}' (endpoint unreachable/unauthorized: {e}); allowing it.");
+      Ok(())
+    }
+  }
 }
 
 /// Truncates text to fit within token limits
@@ -391,4 +469,87 @@ pub async fn call(request: Request) -> Result<Response> {
 
   // Use the call_with_config function with the default config
   call_with_config(request, config).await
+}
+
+#[cfg(test)]
+mod tests {
+  use async_openai::config::{Config, OpenAIConfig};
+
+  use super::*;
+
+  fn settings_with(api_key: Option<&str>, base_url: Option<&str>) -> AppConfig {
+    AppConfig {
+      openai_api_key:    api_key.map(|s| s.to_string()),
+      openai_base_url:   base_url.map(|s| s.to_string()),
+      model:             Some("gpt-4.1-mini".to_string()),
+      max_tokens:        Some(1024),
+      max_commit_length: Some(72),
+      timeout:           Some(30)
+    }
+  }
+
+  /// F1: when no base URL is set, the config keeps async-openai's default api_base.
+  #[test]
+  fn test_create_openai_config_omits_base_when_absent() {
+    let settings = settings_with(Some("sk-test-key"), None);
+    let config = create_openai_config(&settings).unwrap();
+    let default_base = OpenAIConfig::new().api_base().to_string();
+    assert_eq!(config.api_base(), default_base);
+  }
+
+  /// F1: when a base URL is set, the config applies it via with_api_base.
+  #[test]
+  fn test_create_openai_config_applies_base_when_present() {
+    let settings = settings_with(Some("sk-test-key"), Some("http://localhost:11434/v1"));
+    let config = create_openai_config(&settings).unwrap();
+    assert_eq!(config.api_base(), "http://localhost:11434/v1");
+  }
+
+  /// F1: an empty base URL string is treated as unset.
+  #[test]
+  fn test_create_openai_config_ignores_empty_base() {
+    let settings = settings_with(Some("sk-test-key"), Some(""));
+    let config = create_openai_config(&settings).unwrap();
+    let default_base = OpenAIConfig::new().api_base().to_string();
+    assert_eq!(config.api_base(), default_base);
+  }
+
+  /// F2: known/deprecated names are acceptable regardless of the endpoint listing.
+  #[test]
+  fn test_classify_model_known_is_acceptable() {
+    assert_eq!(classify_model("gpt-4.1", &[], true), ModelVerification::Acceptable);
+  }
+
+  /// F2: an unknown model present in the endpoint listing is acceptable.
+  #[test]
+  fn test_classify_model_present_is_acceptable() {
+    let ids = vec!["llama3.1:8b".to_string(), "mistral".to_string()];
+    assert_eq!(classify_model("llama3.1:8b", &ids, false), ModelVerification::Acceptable);
+  }
+
+  /// F2: an unknown model definitively absent from the listing is Absent.
+  #[test]
+  fn test_classify_model_absent() {
+    let ids = vec!["llama3.1:8b".to_string()];
+    assert_eq!(classify_model("nonexistent-model", &ids, false), ModelVerification::Absent);
+  }
+
+  /// F2: when there is no usable config (no/placeholder key) we cannot verify, so allow.
+  #[tokio::test]
+  async fn test_verify_model_exists_allows_when_no_config() {
+    let settings = settings_with(None, None);
+    // Unknown model, but no key means we can't verify -> warn + allow (Ok).
+    assert!(verify_model_exists(&settings, "some-model", false)
+      .await
+      .is_ok());
+  }
+
+  /// F2: known/deprecated names short-circuit without any network round-trip.
+  #[tokio::test]
+  async fn test_verify_model_exists_known_short_circuits() {
+    let settings = settings_with(None, None);
+    assert!(verify_model_exists(&settings, "gpt-4.1", true)
+      .await
+      .is_ok());
+  }
 }

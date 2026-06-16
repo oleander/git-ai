@@ -21,17 +21,23 @@ const MODEL_GPT4_5: &str = "gpt-4.5";
 
 /// Represents the available AI models for commit message generation.
 /// Each model has different capabilities and token limits.
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Serialize, Deserialize, Default)]
+///
+/// Known variants exist so we can specialize tokenizer/context-size handling for
+/// them, but any other model string is carried through verbatim via `Other` so
+/// users can point git-ai at arbitrary models (e.g. local ollama endpoints).
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, Default)]
 pub enum Model {
   /// Default model - GPT-4.1 latest version
-  #[default]
   GPT41,
   /// Mini version of GPT-4.1 for faster processing
+  #[default]
   GPT41Mini,
   /// Nano version of GPT-4.1 for very fast processing
   GPT41Nano,
   /// GPT-4.5 model for advanced capabilities
-  GPT45
+  GPT45,
+  /// Any other model string, carried through verbatim (e.g. local/ollama models).
+  Other(String)
 }
 
 impl Model {
@@ -141,7 +147,8 @@ impl AsRef<str> for Model {
       Model::GPT41 => MODEL_GPT4_1,
       Model::GPT41Mini => MODEL_GPT4_1_MINI,
       Model::GPT41Nano => MODEL_GPT4_1_NANO,
-      Model::GPT45 => MODEL_GPT4_5
+      Model::GPT45 => MODEL_GPT4_5,
+      Model::Other(name) => name.as_str()
     }
   }
 }
@@ -164,8 +171,10 @@ impl FromStr for Model {
   type Err = anyhow::Error;
 
   fn from_str(s: &str) -> Result<Self> {
-    let normalized = s.trim().to_lowercase();
+    let trimmed = s.trim();
+    let normalized = trimmed.to_lowercase();
     match normalized.as_str() {
+      "" => bail!("Model name cannot be empty"),
       "gpt-4.1" => Ok(Model::GPT41),
       "gpt-4.1-mini" => Ok(Model::GPT41Mini),
       "gpt-4.1-nano" => Ok(Model::GPT41Nano),
@@ -187,11 +196,9 @@ impl FromStr for Model {
         );
         Ok(Model::GPT41Mini)
       }
-      model =>
-        bail!(
-          "Invalid model name: '{}'. Supported models: gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4.5",
-          model
-        ),
+      // Any other model string is accepted and carried through verbatim (original
+      // case preserved, since local/ollama model names can be case-sensitive).
+      _ => Ok(Model::Other(trimmed.to_string()))
     }
   }
 }
@@ -216,6 +223,15 @@ impl From<String> for Model {
   fn from(s: String) -> Self {
     s.as_str().into()
   }
+}
+
+/// Returns true if `name` is a built-in/known model or a recognized deprecated
+/// alias. Such names are always considered valid and need no endpoint verification.
+pub fn is_known_or_deprecated(name: &str) -> bool {
+  matches!(
+    name.trim().to_lowercase().as_str(),
+    "gpt-4.1" | "gpt-4.1-mini" | "gpt-4.1-nano" | "gpt-4.5" | "gpt-4" | "gpt-4o" | "gpt-4o-mini" | "gpt-3.5-turbo"
+  )
 }
 
 fn get_tokenizer(_model_str: &str) -> CoreBPE {

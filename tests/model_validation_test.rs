@@ -38,22 +38,31 @@ fn test_deprecated_model_backward_compat() {
 }
 
 #[test]
-fn test_invalid_model_name() {
-  // Test that invalid model names return an error
-  let result = Model::from_str("does-not-exist");
-  assert!(result.is_err());
-  assert!(result
-    .unwrap_err()
-    .to_string()
-    .contains("Invalid model name"));
+fn test_arbitrary_model_name_accepted() {
+  // Unknown model strings are now accepted and carried through verbatim via Other.
+  let model = Model::from_str("llama3.1:8b").unwrap();
+  assert_eq!(model, Model::Other("llama3.1:8b".to_string()));
+  // The real string is preserved (original case, no normalization).
+  assert_eq!(model.as_str(), "llama3.1:8b");
+  assert_eq!(model.to_string(), "llama3.1:8b");
+
+  // Case is preserved for arbitrary names (local/ollama names can be case-sensitive).
+  let mixed = Model::from_str("MyCustom-Model").unwrap();
+  assert_eq!(mixed, Model::Other("MyCustom-Model".to_string()));
 }
 
 #[test]
-fn test_invalid_model_fallback() {
-  // Test that From<&str> falls back to default for invalid models
-  let model = Model::from("invalid-model");
-  assert_eq!(model, Model::default());
-  assert_eq!(model, Model::GPT41);
+fn test_empty_model_name_rejected() {
+  // Empty / whitespace-only names are the only rejected input.
+  assert!(Model::from_str("").is_err());
+  assert!(Model::from_str("   ").is_err());
+}
+
+#[test]
+fn test_unknown_model_fallback_carries_through() {
+  // From<&str> no longer falls back to default for unknown models; it carries them.
+  let model = Model::from("custom-model");
+  assert_eq!(model, Model::Other("custom-model".to_string()));
 }
 
 #[test]
@@ -97,6 +106,19 @@ fn test_model_from_string() {
 
 #[test]
 fn test_default_model() {
-  // Test that the default model is GPT41
-  assert_eq!(Model::default(), Model::GPT41);
+  // Test that the default model is GPT41Mini (F3).
+  assert_eq!(Model::default(), Model::GPT41Mini);
+}
+
+#[test]
+fn test_unknown_model_tokenizer_and_context_fallback() {
+  // Unknown models fall back to the cl100k_base tokenizer and a sane default context size.
+  let model = Model::from_str("some-unknown-model-xyz").unwrap();
+  // Tokenizer fallback works (non-zero count for non-empty text, no panic).
+  let count = model
+    .count_tokens("hello world, this is a token count test")
+    .unwrap();
+  assert!(count > 0, "unknown model should still count tokens via cl100k_base fallback");
+  // Context size falls back to 4096 for unrecognized models.
+  assert_eq!(model.context_size(), 4096);
 }

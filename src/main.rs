@@ -1,12 +1,9 @@
-mod config;
-mod filesystem;
-
 use structopt::StructOpt;
 use anyhow::Result;
 use dotenv::dotenv;
-
-use crate::config::AppConfig;
-use crate::filesystem::Filesystem;
+use ai::config::AppConfig;
+use ai::filesystem::Filesystem;
+use ai::{model, openai};
 
 #[derive(StructOpt)]
 #[structopt(name = "git-ai", about = "A git extension that uses OpenAI to generate commit messages")]
@@ -56,6 +53,12 @@ enum SetSubcommand {
   #[structopt(about = "Sets the OpenAI API key")]
   OpenaiApiKey {
     #[structopt(help = "The OpenAI API key", name = "VALUE")]
+    value: String
+  },
+
+  #[structopt(about = "Sets a custom OpenAI-compatible base URL (e.g. a local ollama endpoint)")]
+  OpenaiBaseUrl {
+    #[structopt(help = "The base URL, e.g. http://localhost:11434/v1", name = "VALUE")]
     value: String
   }
 }
@@ -118,8 +121,16 @@ fn run_config_reset() -> Result<()> {
   Ok(())
 }
 
-fn run_config_model(value: String) -> Result<()> {
+async fn run_config_model(value: String) -> Result<()> {
   let mut app = AppConfig::new()?;
+
+  // Verify the model exists at the configured endpoint before saving. Known and
+  // deprecated aliases skip the round-trip; unreachable/unauthorized endpoints
+  // warn-and-allow so offline users are not blocked. A definitively-absent model
+  // returns an error here and is NOT persisted.
+  let known_or_deprecated = model::is_known_or_deprecated(&value);
+  openai::verify_model_exists(&app, &value, known_or_deprecated).await?;
+
   app.update_model(value.clone())?;
   println!("✅ Model set to: {value}");
   Ok(())
@@ -143,6 +154,13 @@ fn run_config_openai_api_key(value: String) -> Result<()> {
   let mut app = AppConfig::new()?;
   app.update_openai_api_key(value)?;
   println!("✅ OpenAI API key updated");
+  Ok(())
+}
+
+fn run_config_openai_base_url(value: String) -> Result<()> {
+  let mut app = AppConfig::new()?;
+  app.update_openai_base_url(value.clone())?;
+  println!("✅ OpenAI base URL set to: {value}");
   Ok(())
 }
 
@@ -185,7 +203,7 @@ async fn main() -> Result<()> {
         ConfigSubcommand::Set(set) =>
           match set {
             SetSubcommand::Model(model) => {
-              run_config_model(model.value)?;
+              run_config_model(model.value).await?;
             }
             SetSubcommand::MaxTokens { max_tokens } => {
               run_config_max_tokens(max_tokens)?;
@@ -195,6 +213,9 @@ async fn main() -> Result<()> {
             }
             SetSubcommand::OpenaiApiKey { value } => {
               run_config_openai_api_key(value)?;
+            }
+            SetSubcommand::OpenaiBaseUrl { value } => {
+              run_config_openai_base_url(value)?;
             }
           },
       },

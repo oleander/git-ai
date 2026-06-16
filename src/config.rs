@@ -12,12 +12,16 @@ use console::Emoji;
 const DEFAULT_TIMEOUT: i64 = 30;
 const DEFAULT_MAX_COMMIT_LENGTH: i64 = 72;
 const DEFAULT_MAX_TOKENS: i64 = 2024;
-const DEFAULT_MODEL: &str = "gpt-4.1"; // Matches Model::default()
+const DEFAULT_MODEL: &str = "gpt-4.1-mini"; // Matches Model::default()
 const DEFAULT_API_KEY: &str = "<PLACE HOLDER FOR YOUR API KEY>";
 
 #[derive(Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct AppConfig {
   pub openai_api_key:    Option<String>,
+  // serde_ini cannot serialize `None`; skip the field entirely when unset so a
+  // config without a base URL still round-trips (and `save()` does not error).
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub openai_base_url:   Option<String>,
   pub model:             Option<String>,
   pub max_tokens:        Option<usize>,
   pub max_commit_length: Option<usize>,
@@ -104,8 +108,53 @@ impl AppConfig {
     self.save_with_message("openai-api-key")
   }
 
+  pub fn update_openai_base_url(&mut self, value: String) -> Result<()> {
+    self.openai_base_url = Some(value);
+    self.save_with_message("openai-base-url")
+  }
+
   fn save_with_message(&self, option: &str) -> Result<()> {
     println!("{} Configuration option {} updated!", Emoji("✨", ":-)"), option);
     self.save()
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  /// F1: AppConfig round-trips `openai_base_url` through the INI serializer.
+  #[test]
+  fn test_openai_base_url_ini_round_trip() {
+    let config = AppConfig {
+      openai_api_key:    Some("sk-test".to_string()),
+      openai_base_url:   Some("http://localhost:11434/v1".to_string()),
+      model:             Some("gpt-4.1-mini".to_string()),
+      max_tokens:        Some(1024),
+      max_commit_length: Some(72),
+      timeout:           Some(30)
+    };
+
+    let ini = serde_ini::to_string(&config).expect("serialize");
+    let parsed: AppConfig = serde_ini::from_str(&ini).expect("deserialize");
+    assert_eq!(parsed.openai_base_url, Some("http://localhost:11434/v1".to_string()));
+    assert_eq!(parsed, config);
+  }
+
+  /// F1: when `openai_base_url` is absent it round-trips as None.
+  #[test]
+  fn test_openai_base_url_absent_round_trip() {
+    let config = AppConfig {
+      openai_api_key:    Some("sk-test".to_string()),
+      openai_base_url:   None,
+      model:             Some("gpt-4.1-mini".to_string()),
+      max_tokens:        Some(1024),
+      max_commit_length: Some(72),
+      timeout:           Some(30)
+    };
+
+    let ini = serde_ini::to_string(&config).expect("serialize");
+    let parsed: AppConfig = serde_ini::from_str(&ini).expect("deserialize");
+    assert_eq!(parsed.openai_base_url, None);
   }
 }
