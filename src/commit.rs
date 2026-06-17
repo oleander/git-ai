@@ -139,23 +139,33 @@ pub async fn generate(patch: String, remaining_tokens: usize, model: Model, sett
       }
     }
   } else {
-    // Try with default settings
-    if let Ok(api_key) = std::env::var("OPENAI_API_KEY") {
-      if !api_key.is_empty() {
-        let client = Client::new();
-        let model_str = model.to_string();
+    // Default path (no per-request settings): build the client from the stored
+    // configuration so a key set via `git-ai config set openai-api-key` (or a custom
+    // `openai-base-url`) is actually used. Previously this branch only consulted the
+    // `OPENAI_API_KEY` environment variable, so a config-file key was silently ignored
+    // and every commit fell through to the local programmatic generator ("Update <file>").
+    // Fall back to the environment variable when the config holds no usable key.
+    let client = match openai::create_openai_config(&config::APP_CONFIG) {
+      Ok(config) => Some(Client::with_config(config)),
+      Err(_) => match std::env::var("OPENAI_API_KEY") {
+        Ok(key) if !key.is_empty() => Some(Client::new()),
+        _ => None
+      }
+    };
 
-        match generate_commit_message_multi_step(&client, &model_str, &patch, max_length).await {
-          Ok(message) => return Ok(openai::Response { response: message }),
-          Err(e) => {
-            // Check if it's an API key error
-            if e.to_string().contains("invalid_api_key") || e.to_string().contains("Incorrect API key") {
-              bail!("Invalid OpenAI API key. Please check your API key configuration.");
-            }
-            log::warn!("Multi-step generation failed: {e}");
-            if let Some(session) = debug_output::debug_session() {
-              session.set_multi_step_error(e.to_string());
-            }
+    if let Some(client) = client {
+      let model_str = model.to_string();
+
+      match generate_commit_message_multi_step(&client, &model_str, &patch, max_length).await {
+        Ok(message) => return Ok(openai::Response { response: message }),
+        Err(e) => {
+          // Check if it's an API key error
+          if e.to_string().contains("invalid_api_key") || e.to_string().contains("Incorrect API key") {
+            bail!("Invalid OpenAI API key. Please check your API key configuration.");
+          }
+          log::warn!("Multi-step generation failed: {e}");
+          if let Some(session) = debug_output::debug_session() {
+            session.set_multi_step_error(e.to_string());
           }
         }
       }

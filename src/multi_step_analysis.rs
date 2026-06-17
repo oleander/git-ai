@@ -368,6 +368,21 @@ fn calculate_single_impact_score(file_data: &FileDataForScoring) -> f32 {
   score.min(1.0) // Cap at 1.0
 }
 
+/// Truncate a commit subject to at most `max_length` characters without splitting a
+/// word. Cutting mid-word (the previous `chars().take(max_length)` behavior) produced
+/// subjects like "Update controlle"; this trims back to the last word boundary instead,
+/// only falling back to a hard cut when a single word already exceeds the limit.
+fn truncate_subject(message: String, max_length: usize) -> String {
+  if message.chars().count() <= max_length {
+    return message;
+  }
+  let truncated: String = message.chars().take(max_length).collect();
+  match truncated.rfind(' ') {
+    Some(idx) if idx > 0 => truncated[..idx].trim_end().to_string(),
+    _ => truncated.trim_end().to_string()
+  }
+}
+
 fn generate_action_message(primary: &FileWithScore, _all_files: &[FileWithScore], max_length: usize) -> String {
   let base = match primary.operation_type.as_str() {
     "added" => "Add",
@@ -380,11 +395,7 @@ fn generate_action_message(primary: &FileWithScore, _all_files: &[FileWithScore]
   let component = extract_component_name(&primary.file_path);
   let message = format!("{base} {component}");
 
-  if message.len() > max_length {
-    message.chars().take(max_length).collect()
-  } else {
-    message
-  }
+  truncate_subject(message, max_length)
 }
 
 fn generate_component_message(primary: &FileWithScore, _all_files: &[FileWithScore], max_length: usize) -> String {
@@ -398,11 +409,7 @@ fn generate_component_message(primary: &FileWithScore, _all_files: &[FileWithSco
 
   let message = format!("{component}: {action}");
 
-  if message.len() > max_length {
-    message.chars().take(max_length).collect()
-  } else {
-    message
-  }
+  truncate_subject(message, max_length)
 }
 
 fn generate_impact_message(primary: &FileWithScore, all_files: &[FileWithScore], max_length: usize) -> String {
@@ -431,11 +438,7 @@ fn generate_impact_message(primary: &FileWithScore, all_files: &[FileWithScore],
     component
   );
 
-  if message.len() > max_length {
-    message.chars().take(max_length).collect()
-  } else {
-    message
-  }
+  truncate_subject(message, max_length)
 }
 
 fn extract_component_name(file_path: &str) -> String {
@@ -511,5 +514,15 @@ mod tests {
 
     let score = calculate_single_impact_score(&file_data);
     assert!(score > 0.0 && score <= 1.0);
+  }
+
+  #[test]
+  fn test_truncate_subject_word_boundary() {
+    // Short messages are returned unchanged.
+    assert_eq!(truncate_subject("Update auth".to_string(), 72), "Update auth");
+    // Over-limit messages trim back to the last whole word, never mid-word.
+    assert_eq!(truncate_subject("Update authentication service".to_string(), 17), "Update");
+    // A single oversized word with no boundary falls back to a hard cut.
+    assert_eq!(truncate_subject("Updateauthentication".to_string(), 6), "Update");
   }
 }
