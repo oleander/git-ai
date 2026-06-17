@@ -50,6 +50,16 @@ jobs:
           toolchain: nightly
           targets: ${{ matrix.target }}
 
+      # rust-toolchain.toml pins nightly-2026-06-15, which overrides the toolchain dtolnay
+      # installs the target for. Add the target's std to the *pinned* toolchain so cross
+      # builds don't fail with "can't find crate for `core`".
+      - name: Add target std to the pinned toolchain
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          rustup show
+          rustup target add "$TARGET"
+
       - name: Add x86_64-unknown-linux-musl target
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
