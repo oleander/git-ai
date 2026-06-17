@@ -94,10 +94,10 @@ impl Args {
       Some(Message | Template | Merge | Squash) => Ok(()),
       Some(Commit) | None => {
         let repo = Repository::open_from_env().context("Failed to open repository")?;
-        let model = config::APP_CONFIG
+        let model: ai::model::Model = config::APP_CONFIG
           .model
           .clone()
-          .unwrap_or("gpt-4o-mini".to_string())
+          .unwrap_or("gpt-4.1-mini".to_string())
           .into();
         let used_tokens = commit::token_used(&model)?;
         let max_tokens = config::APP_CONFIG
@@ -151,7 +151,7 @@ impl Args {
         }
 
         let patch = repo
-          .to_patch(tree, remaining_tokens, model)
+          .to_patch(tree, remaining_tokens, model.clone())
           .context("Failed to get patch")?;
 
         let response = commit::generate(patch.to_string(), remaining_tokens, model, None).await?;

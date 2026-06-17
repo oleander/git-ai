@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use async_openai::types::{ChatCompletionTool, ChatCompletionToolType, FunctionObjectArgs};
+use async_openai::types::chat::{ChatCompletionTool, FunctionObjectArgs};
 use anyhow::Result;
 
 /// Represents a file change in the commit
@@ -202,7 +202,7 @@ pub fn create_commit_function_tool(max_length: Option<usize>) -> Result<ChatComp
   log::debug!("Successfully created commit function tool");
   log::trace!("Function definition: {function:?}");
 
-  Ok(ChatCompletionTool { r#type: ChatCompletionToolType::Function, function })
+  Ok(ChatCompletionTool { function })
 }
 
 /// Parses the function call response to extract the commit message

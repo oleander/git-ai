@@ -89,7 +89,7 @@ fn test_create_request_preserves_model() {
   let models = vec![Model::GPT41Mini, Model::GPT45, Model::GPT41, Model::GPT41Nano];
 
   for model in models {
-    let result = create_commit_request(diff.clone(), 1000, model);
+    let result = create_commit_request(diff.clone(), 1000, model.clone());
     assert!(result.is_ok(), "Should work with model {:?}", model);
 
     let request = result.unwrap();
@@ -549,7 +549,7 @@ index 123abc..456def 100644
   let model = Model::GPT41Mini;
   let template = get_instruction_template().unwrap();
   let token_count = token_used(&model).unwrap();
-  let request = create_commit_request(simple_diff.clone(), 2000, model).unwrap();
+  let request = create_commit_request(simple_diff.clone(), 2000, model.clone()).unwrap();
 
   // Verify all components work together
   assert!(!template.is_empty(), "Template should be generated");

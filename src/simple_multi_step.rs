@@ -1,6 +1,8 @@
 use anyhow::Result;
 use async_openai::config::OpenAIConfig;
-use async_openai::types::{ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs};
+use async_openai::types::chat::{
+  ChatCompletionMessageToolCalls, ChatCompletionNamedToolChoice, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, ChatCompletionToolChoiceOption, ChatCompletionTools, CreateChatCompletionRequestArgs
+};
 use async_openai::Client;
 
 use crate::function_calling::{create_commit_function_tool, CommitFunctionArgs};
@@ -18,7 +20,7 @@ pub async fn generate_commit_message_simple(
   }
 
   // Use the commit function tool directly with the full diff
-  let tools = vec![create_commit_function_tool(max_length)?];
+  let tools = vec![ChatCompletionTools::Function(create_commit_function_tool(max_length)?)];
 
   let system_message = ChatCompletionRequestSystemMessageArgs::default()
     .content(
@@ -38,18 +40,15 @@ pub async fn generate_commit_message_simple(
     .model(model)
     .messages(vec![system_message, user_message])
     .tools(tools)
-    .tool_choice("commit")
+    .tool_choice(ChatCompletionToolChoiceOption::Function(ChatCompletionNamedToolChoice::from("commit")))
     .build()?;
 
   let response = client.chat().create(request).await?;
 
-  if let Some(tool_call) = response.choices[0]
-    .message
-    .tool_calls
-    .as_ref()
-    .and_then(|calls| calls.first())
-  {
-    let args: CommitFunctionArgs = serde_json::from_str(&tool_call.function.arguments)?;
+  let tool_call_arguments = first_function_call_arguments(&response);
+
+  if let Some(arguments) = tool_call_arguments {
+    let args: CommitFunctionArgs = serde_json::from_str(arguments)?;
 
     // Record in debug session
     if let Some(session) = debug_output::debug_session() {
@@ -63,6 +62,27 @@ pub async fn generate_commit_message_simple(
   } else {
     anyhow::bail!("No tool call in response")
   }
+}
+
+/// Extracts the arguments of the first function tool call from a chat completion response.
+///
+/// Uses `.choices.first()` instead of `choices[0]` indexing so that an empty `choices`
+/// array (which the OpenAI API can legally return) yields `None` rather than panicking.
+/// Callers treat `None` as "no tool call" and return a clean error.
+fn first_function_call_arguments(response: &async_openai::types::chat::CreateChatCompletionResponse) -> Option<&str> {
+  response
+    .choices
+    .first()?
+    .message
+    .tool_calls
+    .as_ref()
+    .and_then(|calls| calls.first())
+    .and_then(|call| {
+      match call {
+        ChatCompletionMessageToolCalls::Function(f) => Some(f.function.arguments.as_str()),
+        _ => None
+      }
+    })
 }
 
 /// Local version that doesn't require parsing
@@ -124,5 +144,29 @@ pub fn generate_commit_message_simple_local(diff_content: &str, max_length: Opti
     Ok(message.chars().take(max_len - 3).collect::<String>() + "...")
   } else {
     Ok(message)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  /// C2: An OpenAI response with an empty `choices` array must not panic. The extracted
+  /// helper returns `None` (callers then produce a clean error) instead of indexing
+  /// `choices[0]`.
+  #[test]
+  fn test_first_function_call_arguments_empty_choices_no_panic() {
+    let json = serde_json::json!({
+      "id": "chatcmpl-test",
+      "choices": [],
+      "created": 0,
+      "model": "gpt-4.1",
+      "object": "chat.completion",
+      "usage": null
+    });
+    let response: async_openai::types::chat::CreateChatCompletionResponse =
+      serde_json::from_value(json).expect("should deserialize a response with empty choices");
+
+    assert!(first_function_call_arguments(&response).is_none());
   }
 }

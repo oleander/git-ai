@@ -1,6 +1,8 @@
 use anyhow::Result;
 use async_openai::config::OpenAIConfig;
-use async_openai::types::{ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs};
+use async_openai::types::chat::{
+  ChatCompletionMessageToolCalls, ChatCompletionNamedToolChoice, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, ChatCompletionToolChoiceOption, ChatCompletionTools, CreateChatCompletionRequestArgs
+};
 use async_openai::Client;
 use serde_json::Value;
 use futures::future::join_all;
@@ -11,12 +13,72 @@ use crate::multi_step_analysis::{
 use crate::function_calling::{create_commit_function_tool, CommitFunctionArgs};
 use crate::debug_output;
 
+/// System prompt for the `analyze` step. Drives per-file analysis that feeds the
+/// `analyze` function-calling tool. Kept as a `pub const` so the prompt contract can be
+/// pinned by invariant tests without reaching into private request builders.
+pub const ANALYZE_SYSTEM_PROMPT: &str = "You are a senior software engineer analyzing one file's changes from a git diff. \
+Report only what the diff shows: count added and removed lines, classify the file's category, \
+and summarize the change in one short clause using imperative mood (\"add\", \"fix\", \"remove\"), \
+not past tense. Describe the functional impact of the change, not a mechanical line-by-line restatement. \
+Do not invent file names, symbols, or behavior that the diff does not contain. \
+Return your analysis only through the supplied function.";
+
+/// System prompt for the `score` step (impact scoring across all analyzed files).
+pub const SCORE_SYSTEM_PROMPT: &str = "You are scoring the relative impact of each changed file in a commit. \
+Weigh functional significance first: core source and behavior-changing config rank above tests, docs, \
+generated output, and binaries, and larger or higher-risk changes rank above trivial ones. \
+Assign each file a normalized impact score from 0.0 (negligible) to 1.0 (dominant change). \
+Return the scores only through the supplied function.";
+
+/// System prompt for the `generate` step (candidate commit subjects).
+pub const GENERATE_SYSTEM_PROMPT: &str = "You are an expert engineer writing git commit subject lines. \
+Produce concise candidate messages that summarize the most impactful change first. \
+Use the imperative mood (\"Add feature\", not \"Added feature\"), no trailing period, and stay within the \
+character limit given in the request. State what the change does and why it matters, not how it is implemented; \
+prioritize functional impact over mechanical file-by-file description. \
+Do not invent changes that are not supported by the provided files. \
+Return the candidates only through the supplied function.";
+
+/// System prompt for the final `commit` step (select and format the message).
+pub const COMMIT_SYSTEM_PROMPT: &str = "You are an expert engineer finalizing a git commit message from a multi-step analysis. \
+Select the single best candidate or refine one into a clear subject line. \
+Use the imperative mood (\"Fix crash\", not \"Fixed crash\"), keep the subject within the character limit, \
+use no trailing period, and lead with the change of highest impact. \
+Describe what changed and why, not how; do not invent changes absent from the diff. \
+Return the final message only through the supplied commit function.";
+
 /// Represents a parsed file from the git diff
 #[derive(Debug)]
 pub struct ParsedFile {
   pub path:         String,
   pub operation:    String,
   pub diff_content: String
+}
+
+/// Reads a `u64` field from an analysis JSON object, logging at debug level when the
+/// field is absent so silently-defaulted values are visible. The default itself is
+/// unchanged from the prior `.as_u64().unwrap_or(default)` behavior.
+fn analysis_u64(analysis: &Value, field: &str, default: u64) -> u64 {
+  match analysis.get(field).and_then(Value::as_u64) {
+    Some(v) => v,
+    None => {
+      log::debug!("analysis response missing/invalid '{field}' (u64); defaulting to {default}");
+      default
+    }
+  }
+}
+
+/// Reads a string field from an analysis JSON object, logging at debug level when the
+/// field is absent. The default itself is unchanged from the prior
+/// `.as_str().unwrap_or(default)` behavior.
+fn analysis_str(analysis: &Value, field: &str, default: &str) -> String {
+  match analysis.get(field).and_then(Value::as_str) {
+    Some(v) => v.to_string(),
+    None => {
+      log::debug!("analysis response missing/invalid '{field}' (str); defaulting to '{default}'");
+      default.to_string()
+    }
+  }
 }
 
 /// Main entry point for multi-step commit message generation
@@ -72,13 +134,10 @@ pub async fn generate_commit_message_multi_step(
 
         // Extract structured analysis data for debug
         let analysis_result = crate::multi_step_analysis::FileAnalysisResult {
-          lines_added:   analysis["lines_added"].as_u64().unwrap_or(0) as u32,
-          lines_removed: analysis["lines_removed"].as_u64().unwrap_or(0) as u32,
-          file_category: analysis["file_category"]
-            .as_str()
-            .unwrap_or("source")
-            .to_string(),
-          summary:       analysis["summary"].as_str().unwrap_or("").to_string()
+          lines_added:   analysis_u64(&analysis, "lines_added", 0) as u32,
+          lines_removed: analysis_u64(&analysis, "lines_removed", 0) as u32,
+          file_category: analysis_str(&analysis, "file_category", "source"),
+          summary:       analysis_str(&analysis, "summary", "")
         };
 
         // Record in debug session
@@ -111,13 +170,10 @@ pub async fn generate_commit_message_multi_step(
       FileDataForScoring {
         file_path:      file.path.clone(),
         operation_type: file.operation.clone(),
-        lines_added:    analysis["lines_added"].as_u64().unwrap_or(0) as u32,
-        lines_removed:  analysis["lines_removed"].as_u64().unwrap_or(0) as u32,
-        file_category:  analysis["file_category"]
-          .as_str()
-          .unwrap_or("source")
-          .to_string(),
-        summary:        analysis["summary"].as_str().unwrap_or("").to_string()
+        lines_added:    analysis_u64(analysis, "lines_added", 0) as u32,
+        lines_removed:  analysis_u64(analysis, "lines_removed", 0) as u32,
+        file_category:  analysis_str(analysis, "file_category", "source"),
+        summary:        analysis_str(analysis, "summary", "")
       }
     })
     .collect();
@@ -163,7 +219,7 @@ pub async fn generate_commit_message_multi_step(
 
   // Step 4: Select the best candidate and format final response
   let final_message_start_time = std::time::Instant::now();
-  let final_message = select_best_candidate(client, model, &candidates, &scored_files, diff_content).await?;
+  let final_message = select_best_candidate(client, model, &candidates, &scored_files, diff_content, max_length.unwrap_or(72)).await?;
   let final_message_duration = final_message_start_time.elapsed();
 
   // Record in debug session
@@ -403,10 +459,10 @@ pub fn parse_diff(diff_content: &str) -> Result<Vec<ParsedFile>> {
 
 /// Call the analyze function via OpenAI
 async fn call_analyze_function(client: &Client<OpenAIConfig>, model: &str, file: &ParsedFile) -> Result<Value> {
-  let tools = vec![create_analyze_function_tool()?];
+  let tools = vec![ChatCompletionTools::Function(create_analyze_function_tool()?)];
 
   let system_message = ChatCompletionRequestSystemMessageArgs::default()
-    .content("You are a git diff analyzer. Analyze the provided file changes and return structured data.")
+    .content(ANALYZE_SYSTEM_PROMPT)
     .build()?
     .into();
 
@@ -422,32 +478,44 @@ async fn call_analyze_function(client: &Client<OpenAIConfig>, model: &str, file:
     .model(model)
     .messages(vec![system_message, user_message])
     .tools(tools)
-    .tool_choice("analyze")
+    .tool_choice(ChatCompletionToolChoiceOption::Function(ChatCompletionNamedToolChoice::from("analyze")))
     .build()?;
 
   let response = client.chat().create(request).await?;
 
-  if let Some(tool_call) = response.choices[0]
-    .message
-    .tool_calls
-    .as_ref()
-    .and_then(|calls| calls.first())
-  {
-    let args: Value = serde_json::from_str(&tool_call.function.arguments)?;
+  if let Some(arguments) = first_function_call_arguments(&response) {
+    let args: Value = serde_json::from_str(arguments)?;
     Ok(args)
   } else {
     anyhow::bail!("No tool call in response")
   }
 }
 
+/// Extracts the arguments of the first function tool call from a chat completion response.
+fn first_function_call_arguments(response: &async_openai::types::chat::CreateChatCompletionResponse) -> Option<&str> {
+  response
+    .choices
+    .first()?
+    .message
+    .tool_calls
+    .as_ref()
+    .and_then(|calls| calls.first())
+    .and_then(|call| {
+      match call {
+        ChatCompletionMessageToolCalls::Function(f) => Some(f.function.arguments.as_str()),
+        _ => None
+      }
+    })
+}
+
 /// Call the score function via OpenAI
 async fn call_score_function(
   client: &Client<OpenAIConfig>, model: &str, files_data: Vec<FileDataForScoring>
 ) -> Result<Vec<FileWithScore>> {
-  let tools = vec![create_score_function_tool()?];
+  let tools = vec![ChatCompletionTools::Function(create_score_function_tool()?)];
 
   let system_message = ChatCompletionRequestSystemMessageArgs::default()
-    .content("You are a git commit impact scorer. Calculate impact scores for the provided file changes.")
+    .content(SCORE_SYSTEM_PROMPT)
     .build()?
     .into();
 
@@ -464,18 +532,13 @@ async fn call_score_function(
     .model(model)
     .messages(vec![system_message, user_message])
     .tools(tools)
-    .tool_choice("score")
+    .tool_choice(ChatCompletionToolChoiceOption::Function(ChatCompletionNamedToolChoice::from("score")))
     .build()?;
 
   let response = client.chat().create(request).await?;
 
-  if let Some(tool_call) = response.choices[0]
-    .message
-    .tool_calls
-    .as_ref()
-    .and_then(|calls| calls.first())
-  {
-    let args: Value = serde_json::from_str(&tool_call.function.arguments)?;
+  if let Some(arguments) = first_function_call_arguments(&response) {
+    let args: Value = serde_json::from_str(arguments)?;
     let files_with_scores: Vec<FileWithScore> = if args["files_with_scores"].is_null() {
       Vec::new() // Return empty vector if null
     } else {
@@ -491,10 +554,10 @@ async fn call_score_function(
 async fn call_generate_function(
   client: &Client<OpenAIConfig>, model: &str, files_with_scores: Vec<FileWithScore>, max_length: usize
 ) -> Result<Value> {
-  let tools = vec![create_generate_function_tool()?];
+  let tools = vec![ChatCompletionTools::Function(create_generate_function_tool()?)];
 
   let system_message = ChatCompletionRequestSystemMessageArgs::default()
-    .content("You are a git commit message generator. Generate concise, descriptive commit messages.")
+    .content(GENERATE_SYSTEM_PROMPT)
     .build()?
     .into();
 
@@ -511,18 +574,13 @@ async fn call_generate_function(
     .model(model)
     .messages(vec![system_message, user_message])
     .tools(tools)
-    .tool_choice("generate")
+    .tool_choice(ChatCompletionToolChoiceOption::Function(ChatCompletionNamedToolChoice::from("generate")))
     .build()?;
 
   let response = client.chat().create(request).await?;
 
-  if let Some(tool_call) = response.choices[0]
-    .message
-    .tool_calls
-    .as_ref()
-    .and_then(|calls| calls.first())
-  {
-    let args: Value = serde_json::from_str(&tool_call.function.arguments)?;
+  if let Some(arguments) = first_function_call_arguments(&response) {
+    let args: Value = serde_json::from_str(arguments)?;
     Ok(args)
   } else {
     anyhow::bail!("No tool call in response")
@@ -531,16 +589,14 @@ async fn call_generate_function(
 
 /// Select the best candidate and format the final response
 async fn select_best_candidate(
-  client: &Client<OpenAIConfig>, model: &str, candidates: &Value, scored_files: &[FileWithScore], original_diff: &str
+  client: &Client<OpenAIConfig>, model: &str, candidates: &Value, scored_files: &[FileWithScore], original_diff: &str, max_length: usize
 ) -> Result<String> {
-  // Use the original commit function to get the final formatted response
-  let tools = vec![create_commit_function_tool(Some(72))?];
+  // Use the original commit function to get the final formatted response,
+  // honoring the configured commit-length limit (was previously hardcoded to 72).
+  let tools = vec![ChatCompletionTools::Function(create_commit_function_tool(Some(max_length))?)];
 
   let system_message = ChatCompletionRequestSystemMessageArgs::default()
-    .content(
-      "You are a git commit message expert. Based on the multi-step analysis, \
-            select the best commit message and provide the final formatted response."
-    )
+    .content(COMMIT_SYSTEM_PROMPT)
     .build()?
     .into();
 
@@ -564,19 +620,14 @@ async fn select_best_candidate(
     .model(model)
     .messages(vec![system_message, user_message])
     .tools(tools)
-    .tool_choice("commit")
+    .tool_choice(ChatCompletionToolChoiceOption::Function(ChatCompletionNamedToolChoice::from("commit")))
     .build()?;
 
   let response = client.chat().create(request).await?;
 
-  if let Some(tool_call) = response.choices[0]
-    .message
-    .tool_calls
-    .as_ref()
-    .and_then(|calls| calls.first())
-  {
+  if let Some(arguments) = first_function_call_arguments(&response) {
     // First, parse as Value to manually handle required fields
-    let raw_args: serde_json::Value = serde_json::from_str(&tool_call.function.arguments)?;
+    let raw_args: serde_json::Value = serde_json::from_str(arguments)?;
 
     // Extract the message which is what we really need
     if let Some(message) = raw_args.get("message").and_then(|m| m.as_str()) {
@@ -584,7 +635,7 @@ async fn select_best_candidate(
     }
 
     // Fallback to full parsing if the above approach fails
-    let args: CommitFunctionArgs = serde_json::from_str(&tool_call.function.arguments)?;
+    let args: CommitFunctionArgs = serde_json::from_str(arguments)?;
     Ok(args.message)
   } else {
     anyhow::bail!("No tool call in response")
@@ -625,19 +676,39 @@ pub fn generate_commit_message_local(diff_content: &str, max_length: Option<usiz
   // Step 3: Generate candidates
   let generate_result = generate_commit_messages(score_result.files_with_scores, max_length.unwrap_or(72));
 
-  // Return the first candidate
-  Ok(
-    generate_result
-      .candidates
-      .first()
-      .cloned()
-      .unwrap_or_else(|| "Update files".to_string())
-  )
+  // Return the first candidate. Keep a safe fallback, but surface the failure so a
+  // silent "Update files" message is never mistaken for a real generated message.
+  match generate_result.candidates.first() {
+    Some(candidate) => Ok(candidate.clone()),
+    None => {
+      log::warn!("Local multi-step generation produced no candidates; falling back to 'Update files'");
+      Ok("Update files".to_string())
+    }
+  }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  /// C2: An OpenAI response with an empty `choices` array must not panic. The helper
+  /// returns `None` (so callers produce a clean error) instead of indexing `choices[0]`.
+  #[test]
+  fn test_first_function_call_arguments_empty_choices_no_panic() {
+    let json = serde_json::json!({
+      "id": "chatcmpl-test",
+      "choices": [],
+      "created": 0,
+      "model": "gpt-4.1",
+      "object": "chat.completion",
+      "usage": null
+    });
+    let response: async_openai::types::chat::CreateChatCompletionResponse =
+      serde_json::from_value(json).expect("should deserialize a response with empty choices");
+
+    // Must be None, not a panic.
+    assert!(first_function_call_arguments(&response).is_none());
+  }
 
   #[test]
   fn test_parse_diff() {

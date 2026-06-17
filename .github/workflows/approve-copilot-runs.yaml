@@ -1,0 +1,101 @@
+name: Auto-approve Copilot workflow runs
+
+# Copilot's workflow runs land in the "action_required" state and must be
+# approved before they execute. This workflow re-runs them automatically so
+# Copilot's review can run once and the PR becomes mergeable.
+#
+# TOKEN NOTE: the default GITHUB_TOKEN generally CANNOT approve/re-run
+# "action_required" runs that are waiting on maintainer approval. This needs a
+# PAT (classic, `repo` + `workflow` scope) stored as the GH_AUTO_APPROVE_TOKEN
+# secret. If that secret is absent the github-script step will fail to
+# authenticate and the auto-approval simply no-ops -- it does not block CI.
+on: # zizmor: ignore[dangerous-triggers]
+  # workflow_run is required: this workflow re-runs Copilot's pending runs after
+  # other workflows complete. It runs in a trusted context but never checks out
+  # or executes untrusted PR code -- it only calls the GitHub Actions API.
+  # Fires when one of git-ai's own workflows completes.
+  workflow_run:
+    workflows:
+      - "CI"
+      - "CD"
+      - "Copilot Setup Steps"
+      - "Enforce Issue Link in PR"
+      - "PR Automation Workflow"
+      - "Assign PR to Author on Creation"
+      - "Assign PR back to Author on Review Submission"
+      - "Assign PR to Reviewer and Unassign Author"
+      - "Code Quality"
+
+  # Sweep periodically on weekdays to catch any runs the event missed.
+  schedule:
+    - cron: "*/15 9-17 * * 1-5"
+
+  # Manual trigger for testing.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rerun-copilot:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Approve pending Copilot workflow runs
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          github-token: ${{ secrets.GH_AUTO_APPROVE_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+
+            // Direct workflow_run event: re-run immediately if it matches.
+            if (context.eventName === 'workflow_run') {
+              const run = context.payload.workflow_run;
+              if (
+                run.conclusion === 'action_required' &&
+                run.actor.login === 'Copilot' &&
+                run.run_attempt <= 1
+              ) {
+                try {
+                  core.info(`Direct match: rerunning ${run.name} (run ${run.id})`);
+                  await github.rest.actions.reRunWorkflow({ owner, repo, run_id: run.id });
+                } catch (err) {
+                  core.info(`Direct rerun skipped: ${err.message}`);
+                }
+                return;
+              }
+            }
+
+            // General scan: find all action_required runs from Copilot.
+            core.info('Scanning for action_required Copilot runs...');
+            const { data } = await github.rest.actions.listWorkflowRunsForRepo({
+              owner,
+              repo,
+              status: 'action_required',
+              per_page: 100,
+            });
+
+            // Only runs from the last 24h can still be re-run.
+            const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+            const copilotRuns = data.workflow_runs.filter(
+              (run) =>
+                run.actor.login === 'Copilot' &&
+                run.run_attempt <= 1 &&
+                run.created_at > cutoff
+            );
+
+            if (copilotRuns.length === 0) {
+              core.info('No pending Copilot runs found.');
+              return;
+            }
+
+            core.info(`Found ${copilotRuns.length} Copilot run(s) to rerun.`);
+            for (const run of copilotRuns) {
+              try {
+                core.info(`Rerunning: ${run.name} (run ${run.id})`);
+                await github.rest.actions.reRunWorkflow({ owner, repo, run_id: run.id });
+              } catch (err) {
+                core.warning(`Failed to rerun ${run.id}: ${err.message}`);
+              }
+            }

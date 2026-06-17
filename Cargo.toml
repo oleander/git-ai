@@ -1,6 +1,6 @@
 [package]
 name = "git-ai"
-version = "1.1.2"
+version = "1.2.0"
 edition = "2021"
 description = "Git AI: Automates commit messages using ChatGPT. Stage your files, and Git AI generates the messages."
 license = "MIT"
@@ -38,43 +38,43 @@ path = "examples/parallel_tool_calls_demo.rs"
 
 [dependencies]
 # Core functionality
-anyhow = { version = "1.0.98", features = ["backtrace"] }
-thiserror = "2.0.12"
-tokio = { version = "1.45.1", features = ["full"] }
+anyhow = { version = "1.0.102", features = ["backtrace"] }
+thiserror = "2.0.18"
+tokio = { version = "1.52.3", features = ["full"] }
 futures = "0.3"
-parking_lot = "0.12.3"
+parking_lot = "0.12.5"
 tracing = "0.1"
 
 # CLI and UI
 
-colored = "3.0.0"
+colored = "3.1.1"
 console = { version = "0.16", default-features = false }
 indicatif = { version = "0.18", default-features = false }
-log = "0.4.27"
-env_logger = { version = "0.11.8", default-features = false }
+log = "0.4.32"
+env_logger = { version = "0.11.10", default-features = false }
 
 # Git integration
-git2 = { version = "0.20.2", default-features = false }
+git2 = { version = "0.21.0", default-features = false }
 
 # Configuration
-config = { version = "0.15.11", default-features = false, features = ["ini"] }
+config = { version = "0.15.24", default-features = false, features = ["ini"] }
 dotenv = "0.15.0"
 serde = { version = "1.0", features = ["derive"] }
-serde_derive = "1.0.219"
+serde_derive = "1.0.228"
 serde_ini = "0.2.0"
 serde_json = "1.0"
 
 # OpenAI integration
-async-openai = { version = "0.29", default-features = false }
-tiktoken-rs = "0.7.0"
-reqwest = { version = "0.12.15", default-features = true }
+async-openai = { version = "0.41", default-features = false, features = ["rustls", "chat-completion", "model"] }
+tiktoken-rs = "0.12.0"
+reqwest = { version = "0.13.4", default-features = true }
 
 # System utilities
-rayon = "1.10.0"
-num_cpus = "1.16.0"
-rand = "0.9"
+rayon = "1.12.0"
+num_cpus = "1.17.0"
+rand = "0.10"
 lazy_static = "1.5.0"
-home = "0.5.11"
+home = "0.5.12"
 dirs = "6.0"
 
 # Syntax highlighting and markdown rendering
@@ -90,7 +90,7 @@ openssl = { version = "0.10", features = ["vendored"] }
 default = []
 
 [dev-dependencies]
-tempfile = "3.20.0"
+tempfile = "3.27.0"
 
 [profile.release]
 codegen-units = 1

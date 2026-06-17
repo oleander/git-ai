@@ -1,6 +1,8 @@
 use std::time::{Duration, Instant};
 
-use async_openai::types::{ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs};
+use async_openai::types::chat::{
+  ChatCompletionNamedToolChoice, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, ChatCompletionToolChoiceOption, ChatCompletionTools, CreateChatCompletionRequestArgs
+};
 use async_openai::config::OpenAIConfig;
 use async_openai::Client;
 use async_openai::error::OpenAIError;
@@ -111,18 +113,105 @@ pub async fn generate_commit_message(diff: &str) -> Result<String> {
 
 /// Creates an OpenAI configuration from application settings
 pub fn create_openai_config(settings: &AppConfig) -> Result<OpenAIConfig> {
-  let api_key = settings
-    .openai_api_key
-    .as_ref()
-    .ok_or_else(|| anyhow!("OpenAI API key not configured"))?;
+  // Treat whitespace-only base URLs as unset.
+  let base_url = settings
+    .openai_base_url
+    .as_deref()
+    .map(str::trim)
+    .filter(|s| !s.is_empty());
 
-  if api_key.is_empty() || api_key == "<PLACE HOLDER FOR YOUR API KEY>" {
-    return Err(anyhow!("Invalid OpenAI API key"));
+  let api_key = settings.openai_api_key.as_deref().unwrap_or("").trim();
+  let key_missing = api_key.is_empty() || api_key == "<PLACE HOLDER FOR YOUR API KEY>";
+
+  // A custom endpoint (e.g. a local ollama `/v1` server) usually needs no real key, so
+  // supply a placeholder when one isn't configured. The default OpenAI endpoint still
+  // requires a real key.
+  let effective_key = if key_missing {
+    match base_url {
+      Some(_) => "sk-no-key-required",
+      None => return Err(anyhow!("OpenAI API key not configured"))
+    }
+  } else {
+    api_key
+  };
+
+  let mut config = OpenAIConfig::new().with_api_key(effective_key);
+  if let Some(base_url) = base_url {
+    config = config.with_api_base(base_url);
   }
 
-  let config = OpenAIConfig::new().with_api_key(api_key);
-
   Ok(config)
+}
+
+/// Outcome of checking whether a model exists at the configured endpoint.
+#[derive(Debug, PartialEq, Eq)]
+pub enum ModelVerification {
+  /// The model is usable (present in the listing, or a known/deprecated alias).
+  Acceptable,
+  /// The endpoint responded and the model is definitively absent.
+  Absent
+}
+
+/// Pure decision logic for model verification, decoupled from any network IO so it
+/// can be unit-tested with an injected list of available model ids.
+///
+/// * `candidate` - the model name the user is trying to set.
+/// * `available_ids` - model ids returned by the endpoint's `/models` listing.
+/// * `known_or_deprecated` - true if `candidate` maps to a built-in/deprecated model
+///   (those are always acceptable regardless of what the endpoint advertises).
+pub fn classify_model(candidate: &str, available_ids: &[String], known_or_deprecated: bool) -> ModelVerification {
+  if known_or_deprecated {
+    return ModelVerification::Acceptable;
+  }
+
+  let candidate = candidate.trim();
+  if available_ids.iter().any(|id| id == candidate) {
+    ModelVerification::Acceptable
+  } else {
+    ModelVerification::Absent
+  }
+}
+
+/// Verifies that `candidate` exists at the configured endpoint before it is persisted.
+///
+/// Semantics (see F2):
+/// * endpoint responds and model is present (or it's a known/deprecated alias) -> `Ok(())`.
+/// * endpoint responds and model is definitively absent -> `Err(..)` (caller must not save).
+/// * endpoint unreachable / unauthorized / no key configured (can't verify) -> `log::warn!`
+///   and `Ok(())` so offline users are not hard-blocked.
+pub async fn verify_model_exists(settings: &AppConfig, candidate: &str, known_or_deprecated: bool) -> Result<()> {
+  // Known/deprecated aliases are always valid and need no round-trip.
+  if known_or_deprecated {
+    return Ok(());
+  }
+
+  // Without a usable key/config we cannot verify; warn and allow.
+  let config = match create_openai_config(settings) {
+    Ok(config) => config,
+    Err(e) => {
+      log::warn!("Could not verify model '{candidate}' (no usable OpenAI config: {e}); allowing it.");
+      return Ok(());
+    }
+  };
+
+  let client = Client::with_config(config);
+  match client.models().list().await {
+    Ok(list) => {
+      let ids: Vec<String> = list.data.into_iter().map(|m| m.id).collect();
+      match classify_model(candidate, &ids, known_or_deprecated) {
+        ModelVerification::Acceptable => Ok(()),
+        ModelVerification::Absent =>
+          Err(anyhow!(
+            "Model '{candidate}' is not available at the configured endpoint. \
+           Run `git ai config set model <name>` with a model the endpoint offers."
+          )),
+      }
+    }
+    Err(e) => {
+      log::warn!("Could not verify model '{candidate}' (endpoint unreachable/unauthorized: {e}); allowing it.");
+      Ok(())
+    }
+  }
 }
 
 /// Truncates text to fit within token limits
@@ -239,7 +328,7 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
   let commit_tool = function_calling::create_commit_function_tool(config::APP_CONFIG.max_commit_length)?;
 
   let chat_request = CreateChatCompletionRequestArgs::default()
-    .max_tokens(request.max_tokens)
+    .max_completion_tokens(request.max_tokens as u32)
     .model(request.model.to_string())
     .messages([
       ChatCompletionRequestSystemMessageArgs::default()
@@ -251,8 +340,8 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
         .build()?
         .into()
     ])
-    .tools(vec![commit_tool])
-    .tool_choice("commit")
+    .tools(vec![ChatCompletionTools::Function(commit_tool)])
+    .tool_choice(ChatCompletionToolChoiceOption::Function(ChatCompletionNamedToolChoice::from("commit")))
     .build()?;
 
   let mut last_error = None;
@@ -286,11 +375,14 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
           // Process multiple tool calls in parallel
           let tool_futures: Vec<_> = tool_calls
             .iter()
-            .filter(|tool_call| tool_call.function.name == "commit")
-            .map(|tool_call| {
-              let args = tool_call.function.arguments.clone();
-              async move { function_calling::parse_commit_function_response(&args) }
+            .filter_map(|tool_call| {
+              match tool_call {
+                async_openai::types::chat::ChatCompletionMessageToolCalls::Function(call) if call.function.name == "commit" =>
+                  Some(call.function.arguments.clone()),
+                _ => None
+              }
             })
+            .map(|args| async move { function_calling::parse_commit_function_response(&args) })
             .collect();
 
           // Execute all tool calls in parallel
@@ -340,9 +432,9 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
         log::warn!("OpenAI API attempt {attempt} failed");
 
         // Check if it's an API key error - fail immediately without retrying
-        if let OpenAIError::ApiError(ref api_err) = &last_error.as_ref().unwrap() {
-          if api_err.code.as_deref() == Some("invalid_api_key") {
-            let error_msg = format!("Invalid OpenAI API key: {}", api_err.message);
+        if let Some(OpenAIError::ApiError(ref api_err)) = last_error.as_ref() {
+          if api_err.api_error.code.as_deref() == Some("invalid_api_key") {
+            let error_msg = format!("Invalid OpenAI API key: {}", api_err.api_error.message);
             log::error!("{error_msg}");
             return Err(anyhow!(error_msg));
           }
@@ -362,9 +454,9 @@ pub async fn call_with_config(request: Request, config: OpenAIConfig) -> Result<
     Some(OpenAIError::ApiError(api_err)) => {
       let error_msg = format!(
         "OpenAI API error: {} (type: {:?}, code: {:?})",
-        api_err.message,
-        api_err.r#type.as_deref().unwrap_or("unknown"),
-        api_err.code.as_deref().unwrap_or("unknown")
+        api_err.api_error.message,
+        api_err.api_error.r#type.as_deref().unwrap_or("unknown"),
+        api_err.api_error.code.as_deref().unwrap_or("unknown")
       );
       log::error!("{error_msg}");
       Err(anyhow!(error_msg))
@@ -386,4 +478,87 @@ pub async fn call(request: Request) -> Result<Response> {
 
   // Use the call_with_config function with the default config
   call_with_config(request, config).await
+}
+
+#[cfg(test)]
+mod tests {
+  use async_openai::config::{Config, OpenAIConfig};
+
+  use super::*;
+
+  fn settings_with(api_key: Option<&str>, base_url: Option<&str>) -> AppConfig {
+    AppConfig {
+      openai_api_key:    api_key.map(|s| s.to_string()),
+      openai_base_url:   base_url.map(|s| s.to_string()),
+      model:             Some("gpt-4.1-mini".to_string()),
+      max_tokens:        Some(1024),
+      max_commit_length: Some(72),
+      timeout:           Some(30)
+    }
+  }
+
+  /// F1: when no base URL is set, the config keeps async-openai's default api_base.
+  #[test]
+  fn test_create_openai_config_omits_base_when_absent() {
+    let settings = settings_with(Some("sk-test-key"), None);
+    let config = create_openai_config(&settings).unwrap();
+    let default_base = OpenAIConfig::new().api_base().to_string();
+    assert_eq!(config.api_base(), default_base);
+  }
+
+  /// F1: when a base URL is set, the config applies it via with_api_base.
+  #[test]
+  fn test_create_openai_config_applies_base_when_present() {
+    let settings = settings_with(Some("sk-test-key"), Some("http://localhost:11434/v1"));
+    let config = create_openai_config(&settings).unwrap();
+    assert_eq!(config.api_base(), "http://localhost:11434/v1");
+  }
+
+  /// F1: an empty base URL string is treated as unset.
+  #[test]
+  fn test_create_openai_config_ignores_empty_base() {
+    let settings = settings_with(Some("sk-test-key"), Some(""));
+    let config = create_openai_config(&settings).unwrap();
+    let default_base = OpenAIConfig::new().api_base().to_string();
+    assert_eq!(config.api_base(), default_base);
+  }
+
+  /// F2: known/deprecated names are acceptable regardless of the endpoint listing.
+  #[test]
+  fn test_classify_model_known_is_acceptable() {
+    assert_eq!(classify_model("gpt-4.1", &[], true), ModelVerification::Acceptable);
+  }
+
+  /// F2: an unknown model present in the endpoint listing is acceptable.
+  #[test]
+  fn test_classify_model_present_is_acceptable() {
+    let ids = vec!["llama3.1:8b".to_string(), "mistral".to_string()];
+    assert_eq!(classify_model("llama3.1:8b", &ids, false), ModelVerification::Acceptable);
+  }
+
+  /// F2: an unknown model definitively absent from the listing is Absent.
+  #[test]
+  fn test_classify_model_absent() {
+    let ids = vec!["llama3.1:8b".to_string()];
+    assert_eq!(classify_model("nonexistent-model", &ids, false), ModelVerification::Absent);
+  }
+
+  /// F2: when there is no usable config (no/placeholder key) we cannot verify, so allow.
+  #[tokio::test]
+  async fn test_verify_model_exists_allows_when_no_config() {
+    let settings = settings_with(None, None);
+    // Unknown model, but no key means we can't verify -> warn + allow (Ok).
+    assert!(verify_model_exists(&settings, "some-model", false)
+      .await
+      .is_ok());
+  }
+
+  /// F2: known/deprecated names short-circuit without any network round-trip.
+  #[tokio::test]
+  async fn test_verify_model_exists_known_short_circuits() {
+    let settings = settings_with(None, None);
+    assert!(verify_model_exists(&settings, "gpt-4.1", true)
+      .await
+      .is_ok());
+  }
 }

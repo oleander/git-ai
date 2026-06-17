@@ -1,12 +1,10 @@
 use ai::function_calling;
-use async_openai::types::ChatCompletionToolType;
 use serde_json::json;
 
 #[test]
 fn test_create_commit_function_tool_default() {
   let tool = function_calling::create_commit_function_tool(None).unwrap();
 
-  assert_eq!(tool.r#type, ChatCompletionToolType::Function);
   assert_eq!(tool.function.name, "commit");
   assert_eq!(
     tool.function.description.as_deref(),

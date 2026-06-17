@@ -3,7 +3,6 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::fs::File;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 use rayon::prelude::*;
 use git2::{Diff, DiffFormat, DiffOptions, Repository, Tree};
@@ -17,7 +16,6 @@ use crate::profile;
 // Constants
 
 const DEFAULT_STRING_CAPACITY: usize = 8192;
-const PARALLEL_CHUNK_SIZE: usize = 25;
 const ESTIMATED_FILES_COUNT: usize = 100;
 
 // Types
@@ -120,11 +118,20 @@ impl PatchDiff for Diff<'_> {
   fn to_patch(&self, max_tokens: usize, model: Model) -> Result<String> {
     profile!("Generating patch diff");
 
-    // Step 1: Collect diff data (non-parallel)
+    // Step 1: Collect diff data (non-parallel).
+    //
+    // `collect_diff_data` returns a `HashMap`, whose iteration order is randomized per
+    // instance (std `RandomState`). Iterating it directly made the combined patch's file
+    // order non-deterministic, so identical staged input could yield different patches and
+    // therefore different commit messages. We sort by path *once* here and feed the ordered
+    // `Vec` to every downstream path, making all of them deterministic. (C4)
     let files = self.collect_diff_data()?;
     if files.is_empty() {
       return Ok(String::new());
     }
+
+    let mut files: Vec<(PathBuf, String)> = files.into_iter().collect();
+    files.sort_by(|a, b| a.0.cmp(&b.0));
 
     // Fast path for small diffs - skip tokenization entirely
     if files.len() == 1 {
@@ -147,8 +154,8 @@ impl PatchDiff for Diff<'_> {
     // Optimization: Skip token counting entirely for small diffs
     if files.len() <= 5 && max_tokens > 500 {
       profile!("Small diff fast path");
+      let file_count = files.len(); // Capture before consuming `files`.
       let mut result = String::new();
-      let files_clone = files.clone(); // Clone files for use after iteration
 
       // Just combine the files with a limit on total size
       for (i, (_, content)) in files.into_iter().enumerate() {
@@ -156,7 +163,7 @@ impl PatchDiff for Diff<'_> {
           result.push('\n');
         }
         // Only add as much as we can estimate will fit
-        let limit = (max_tokens / files_clone.len()) * 4; // ~4 chars per token
+        let limit = (max_tokens / file_count) * 4; // ~4 chars per token
         let truncated = if content.len() > limit {
           let truncated = content.chars().take(limit).collect::<String>();
           // Find last space to avoid cutting words
@@ -177,7 +184,11 @@ impl PatchDiff for Diff<'_> {
       return Ok(result);
     }
 
-    // Step 2: Prepare files for processing - optimized path for medium diffs
+    // Step 2: Prepare files for processing - optimized path for medium diffs.
+    //
+    // Files are already in deterministic path order. We keep a stable secondary sort by
+    // estimated token count (smaller files first, to fit as many whole files as possible)
+    // while preserving path order among equal-sized files via `sort_by_key`'s stability.
     if files.len() <= 20 {
       profile!("Medium diff optimized path");
 
@@ -191,7 +202,7 @@ impl PatchDiff for Diff<'_> {
         })
         .collect();
 
-      // Sort by estimated size
+      // Stable sort by estimated size (path order preserved among ties => deterministic).
       files_vec.sort_by_key(|(_, _, count)| *count);
 
       // Allocate tokens to files and process
@@ -227,38 +238,38 @@ impl PatchDiff for Diff<'_> {
       return Ok(result);
     }
 
-    // Step 3: Complex diff path - use parallel processing with optimizations
+    // Step 3: Complex diff path - parallel processing with deterministic output.
+    //
+    // CPU-bound work (token counting, truncation) runs on rayon. The previous design used a
+    // shared atomic token budget plus a shared result `Vec` written from `try_for_each`, which
+    // made both the *truncation* (budget races) and the *output order* (completion order)
+    // non-deterministic. We replace that with:
+    //   1. order-preserving parallel token counting (`par_iter().map().collect()`),
+    //   2. a sequential budget pass over the path-sorted files (cheap arithmetic),
+    //   3. order-preserving parallel truncation,
+    // so identical input always yields byte-identical output. (C3b + C4)
     profile!("Converting files to vector");
-    let files_vec: Vec<_> = files.into_iter().collect();
-    let total_files = files_vec.len();
+    let total_files = files.len();
 
-    // Use rayon for parallel token counting - with batching for performance
     let thread_pool = rayon::ThreadPoolBuilder::new()
       .num_threads(num_cpus::get())
       .build()
       .context("Failed to create thread pool")?;
 
+    // Token counting (CPU-bound, parallel, order-preserving).
     profile!("Parallel token counting");
-    // Use chunked processing for token counting to reduce contention
-    let chunk_size = (total_files / num_cpus::get().max(1)).max(10);
     let files_with_tokens: DiffData = thread_pool.install(|| {
-      files_vec
-        .chunks(chunk_size)
-        .collect::<Vec<_>>()
-        .into_par_iter()
-        .flat_map(|chunk| {
-          chunk
-            .iter()
-            .map(|(path, content)| {
-              let token_count = model.count_tokens(content).unwrap_or_default();
-              (path.clone(), content.clone(), token_count)
-            })
-            .collect::<Vec<_>>()
+      files
+        .par_iter()
+        .map(|(path, content)| {
+          let token_count = model.count_tokens(content).unwrap_or_default();
+          (path.clone(), content.clone(), token_count)
         })
         .collect()
     });
 
-    // Skip sorting for very large diffs - it's not worth the time
+    // Stable sort by token count (smaller first), preserving path order among ties. For very
+    // large diffs we skip the sort but keep the deterministic path order from Step 1.
     profile!("Sorting files by token count");
     let sorted_files = if total_files > 500 {
       files_with_tokens
@@ -268,45 +279,60 @@ impl PatchDiff for Diff<'_> {
       sorted
     };
 
-    // Step 4: Process files with optimized token allocation
-    let remaining_tokens = Arc::new(AtomicUsize::new(max_tokens));
-    let results = Arc::new(parking_lot::RwLock::new(Vec::with_capacity(total_files)));
-    let processed_files = Arc::new(AtomicUsize::new(0));
+    // Step 4: Sequential budget allocation (deterministic). Decide how many tokens each file
+    // may keep, in order, with no cross-thread races. We carry the already-computed
+    // `token_count` forward so the truncation pass does not recount.
+    profile!("Allocating token budget");
+    let mut remaining = max_tokens;
+    // (path, content, token_count, allocated)
+    let mut allocations: Vec<(PathBuf, String, usize, usize)> = Vec::with_capacity(sorted_files.len());
+    let mut files_left = sorted_files.len();
+    for (path, content, token_count) in sorted_files.into_iter() {
+      if remaining == 0 {
+        break;
+      }
+      // Even share of the remaining budget, capped at what the file actually needs.
+      let fair_share = remaining / files_left.max(1);
+      let allocated = token_count.min(fair_share.max(1)).min(remaining);
+      remaining -= allocated;
+      files_left = files_left.saturating_sub(1);
+      allocations.push((path, content, token_count, allocated));
+    }
 
-    // Optimize chunking - use larger chunks for better performance
-    let adaptive_chunk_size = (total_files / (2 * num_cpus::get().max(1))).max(PARALLEL_CHUNK_SIZE);
-
-    let chunks: Vec<_> = sorted_files
-      .chunks(adaptive_chunk_size)
-      .map(|chunk| chunk.to_vec())
-      .collect();
-
+    // Truncation (CPU-bound, parallel, order-preserving). Errors propagate rather than being
+    // silently swallowed into an empty file.
+    profile!("Parallel truncation");
     let model = Arc::new(model);
-
-    profile!("Parallel chunk processing");
-    thread_pool.install(|| {
-      chunks
+    let processed: Vec<(PathBuf, String)> = thread_pool.install(|| {
+      allocations
         .par_iter()
-        .try_for_each(|chunk| process_chunk(chunk, &model, total_files, &processed_files, &remaining_tokens, &results))
+        .map(|(path, content, token_count, allocated)| {
+          let out = if *token_count <= *allocated {
+            content.clone()
+          } else if content.len() < 2000 || *allocated > 500 {
+            // Character-based truncation is much faster than tokenization.
+            content.chars().take(allocated * 4).collect::<String>()
+          } else {
+            model.truncate(content, *allocated)?
+          };
+          Ok((path.clone(), out))
+        })
+        .collect::<Result<Vec<_>>>()
     })?;
 
-    // Step 5: Combine results efficiently
+    // Step 5: Combine results in the (deterministic) order produced above.
     profile!("Combining results");
-    let results_guard = results.read();
-
-    // Fast path for empty results
-    if results_guard.is_empty() {
+    if processed.is_empty() {
       return Ok(String::new());
     }
 
-    // Optimize string allocation
-    let total_len = results_guard
+    let total_len = processed
       .iter()
-      .map(|(_, content): &(PathBuf, String)| content.len())
+      .map(|(_, content)| content.len())
       .sum::<usize>();
-    let mut final_result = String::with_capacity(total_len + results_guard.len());
+    let mut final_result = String::with_capacity(total_len + processed.len());
 
-    for (i, (_, content)) in results_guard.iter().enumerate() {
+    for (i, (_, content)) in processed.iter().enumerate() {
       if i > 0 {
         final_result.push('\n');
       }
@@ -402,149 +428,6 @@ impl PatchDiff for Diff<'_> {
 
     Ok(!has_changes)
   }
-}
-
-fn process_chunk(
-  chunk: &[(PathBuf, String, usize)], model: &Arc<Model>, total_files: usize, processed_files: &AtomicUsize,
-  remaining_tokens: &AtomicUsize, result_chunks: &Arc<parking_lot::RwLock<Vec<(PathBuf, String)>>>
-) -> Result<()> {
-  profile!("Processing chunk");
-  // Fast path for empty chunks
-  if chunk.is_empty() {
-    return Ok(());
-  }
-
-  // Fast path for no tokens remaining
-  let total_remaining = remaining_tokens.load(Ordering::Acquire);
-  if total_remaining == 0 {
-    return Ok(());
-  }
-
-  // Ultra-fast path for small chunks that will likely fit
-  if chunk.len() <= 3 {
-    let total_token_count = chunk.iter().map(|(_, _, count)| *count).sum::<usize>();
-    // If entire chunk is small enough, process it in one go
-    if total_token_count <= total_remaining {
-      // Try to allocate all tokens at once
-      if remaining_tokens
-        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
-          if current >= total_token_count {
-            Some(current - total_token_count)
-          } else {
-            None
-          }
-        })
-        .is_ok()
-      {
-        // Update processed files counter once
-        processed_files.fetch_add(chunk.len(), Ordering::AcqRel);
-
-        // Collect all results without truncation
-        let chunk_results: Vec<_> = chunk
-          .iter()
-          .map(|(path, content, _)| (path.clone(), content.clone()))
-          .collect();
-
-        if !chunk_results.is_empty() {
-          result_chunks.write().extend(chunk_results);
-        }
-
-        return Ok(());
-      }
-    }
-  }
-
-  // Fast path for small files that don't need tokenization
-  let mut chunk_results = Vec::with_capacity(chunk.len());
-  let mut local_processed = 0;
-
-  for (path, content, token_count) in chunk {
-    local_processed += 1;
-
-    // Recheck remaining tokens to allow early exit
-    let current_remaining = remaining_tokens.load(Ordering::Acquire);
-    if current_remaining == 0 {
-      break;
-    }
-
-    // For very small files or text, don't bother with complex calculations
-    let token_count = *token_count;
-
-    // If small content is less than threshold, just clone without tokenization
-    if token_count <= 100
-      && token_count <= current_remaining
-      && remaining_tokens
-        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
-          if current >= token_count {
-            Some(current - token_count)
-          } else {
-            None
-          }
-        })
-        .is_ok()
-    {
-      chunk_results.push((path.clone(), content.clone()));
-      continue;
-    }
-
-    // For larger content, do the normal allocation
-    // Batch update processed files counter - just once at the end
-    let current_file_num = processed_files.load(Ordering::Acquire);
-    let files_remaining = total_files.saturating_sub(current_file_num + local_processed);
-
-    // Calculate tokens per file
-    let max_tokens_per_file = if files_remaining > 0 {
-      current_remaining.saturating_div(files_remaining)
-    } else {
-      current_remaining
-    };
-
-    if max_tokens_per_file == 0 {
-      continue;
-    }
-
-    let allocated_tokens = token_count.min(max_tokens_per_file);
-
-    if remaining_tokens
-      .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
-        if current >= allocated_tokens {
-          Some(current - allocated_tokens)
-        } else {
-          None
-        }
-      })
-      .is_ok()
-    {
-      // Fast path for content that doesn't need truncation
-      if token_count <= allocated_tokens {
-        chunk_results.push((path.clone(), content.clone()));
-      } else {
-        // Use fast character-based truncation for most cases
-        if content.len() < 2000 || allocated_tokens > 500 {
-          // Character-based truncation is much faster than tokenization
-          let char_limit = allocated_tokens * 4;
-          let truncated: String = content.chars().take(char_limit).collect();
-          chunk_results.push((path.clone(), truncated));
-        } else {
-          // Use proper truncation for complex cases
-          let truncated = model.truncate(content, allocated_tokens)?;
-          chunk_results.push((path.clone(), truncated));
-        }
-      }
-    }
-  }
-
-  // Update processed files counter once at the end
-  if local_processed > 0 {
-    processed_files.fetch_add(local_processed, Ordering::AcqRel);
-  }
-
-  // Batch update the result collection
-  if !chunk_results.is_empty() {
-    result_chunks.write().extend(chunk_results);
-  }
-
-  Ok(())
 }
 
 pub trait PatchRepository {

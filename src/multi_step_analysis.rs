@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use async_openai::types::{ChatCompletionTool, ChatCompletionToolType, FunctionObjectArgs};
+use async_openai::types::chat::{ChatCompletionTool, FunctionObjectArgs};
 use anyhow::Result;
 // TODO: Migrate to unified types from generation module
 
@@ -77,7 +77,7 @@ pub fn create_analyze_function_tool() -> Result<ChatCompletionTool> {
     }))
     .build()?;
 
-  Ok(ChatCompletionTool { r#type: ChatCompletionToolType::Function, function })
+  Ok(ChatCompletionTool { function })
 }
 
 /// Creates the score function tool definition
@@ -133,7 +133,7 @@ pub fn create_score_function_tool() -> Result<ChatCompletionTool> {
     }))
     .build()?;
 
-  Ok(ChatCompletionTool { r#type: ChatCompletionToolType::Function, function })
+  Ok(ChatCompletionTool { function })
 }
 
 /// Creates the generate function tool definition
@@ -189,7 +189,7 @@ pub fn create_generate_function_tool() -> Result<ChatCompletionTool> {
     }))
     .build()?;
 
-  Ok(ChatCompletionTool { r#type: ChatCompletionToolType::Function, function })
+  Ok(ChatCompletionTool { function })
 }
 
 /// Analyzes a single file's changes

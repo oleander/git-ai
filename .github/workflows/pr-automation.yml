@@ -1,0 +1,77 @@
+name: PR Automation Workflow
+
+# Routes open PRs through the Copilot review loop:
+#   - CI completion (check_suite / status): triage conflicting / failing /
+#     passing PRs and either ping Copilot or request its review.
+#   - Copilot review comment (issue_comment): decide whether to hand the PR
+#     back to the human author or ask Copilot to keep fixing.
+on:
+  check_suite:
+    types: [completed]
+  status:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+jobs:
+  route_pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: read
+      statuses: read
+    steps:
+      - name: Route PRs on CI completion
+        if: github.event_name == 'check_suite' || github.event_name == 'status'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Conflicting PRs: ask Copilot to resolve the merge conflict.
+          gh pr list \
+            --state open \
+            --search '-label:copilot' \
+            --json number,mergeable \
+            --jq '.[] | select(.mergeable == "CONFLICTING") | .number' \
+            | xargs -r -I {} sh -c \
+              'gh pr comment "$1" --body "@copilot Resolve merge conflict" && gh pr edit "$1" --add-label copilot' _ {}
+
+          # Failing CI: ask Copilot to fix the broken build.
+          gh pr list \
+            --state open \
+            --search '-label:copilot' \
+            --json number,statusCheckRollup \
+            --jq '.[] | select((.statusCheckRollup // []) | any(.conclusion == "FAILURE")) | .number' \
+            | xargs -r -I {} sh -c \
+              'gh pr comment "$1" --body "@copilot Fix broken CI" && gh pr edit "$1" --add-label copilot' _ {}
+
+          # All CI green and not yet under Copilot review: request a Copilot review.
+          gh pr list \
+            --state open \
+            --search '-review-requested:@copilot' \
+            --json number,statusCheckRollup \
+            --jq '.[] | select((.statusCheckRollup // []) | all(.conclusion == "SUCCESS")) | .number' \
+            | xargs -r -I {} gh api \
+              --method POST \
+              "/repos/${REPO}/pulls/{}/requested_reviewers" \
+              -f "reviewers[]=copilot-pull-request-reviewer[bot]"
+
+      - name: Handle Copilot review comment
+        if: github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.comment.user.login == 'copilot-pull-request-reviewer[bot]'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Untrusted GitHub event data is passed via env vars (never interpolated
+          # directly into the script) to avoid shell/script injection.
+          PR_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          if printf '%s' "$COMMENT_BODY" | grep -q "no new comments"; then
+            # Copilot has nothing more to say: hand the PR back to the author.
+            gh pr edit "$PR_NUMBER" --remove-assignee @copilot --add-reviewer oleander --add-assignee oleander
+          else
+            # Copilot raised review comments: ask it to address them.
+            gh pr comment "$PR_NUMBER" --body "@copilot Fix review comments"
+          fi

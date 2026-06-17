@@ -220,7 +220,8 @@ mod tests {
     // Create settings with no API key
     let settings = AppConfig {
       openai_api_key:    None,
-      model:             Some("gpt-4o-mini".to_string()),
+      openai_base_url:   None,
+      model:             Some("gpt-4.1-mini".to_string()),
       max_tokens:        Some(1024),
       max_commit_length: Some(72),
       timeout:           Some(30)
@@ -258,7 +259,8 @@ mod tests {
     // Create settings with invalid API key
     let settings = AppConfig {
       openai_api_key:    Some("<PLACE HOLDER FOR YOUR API KEY>".to_string()),
-      model:             Some("gpt-4o-mini".to_string()),
+      openai_base_url:   None,
+      model:             Some("gpt-4.1-mini".to_string()),
       max_tokens:        Some(1024),
       max_commit_length: Some(72),
       timeout:           Some(30)

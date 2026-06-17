@@ -8,6 +8,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -15,32 +18,39 @@ env:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v5
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      # rust-toolchain.toml pins the nightly version; install clippy+rustfmt for
+      # *that* toolchain (not floating nightly, whose components wouldn't match).
+      - name: Install pinned toolchain + components
+        run: |
+          rustup show
+          rustup component add clippy rustfmt
+
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
         with:
           cache-on-failure: true
 
-      - name: Setup nightly toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          components: rustfmt, clippy
-          toolchain: nightly
-
       - name: Run clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings
 
       - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: -- --check
+        run: cargo fmt -- --check
+
+      - name: Security audit
+        run: |
+          cargo install cargo-audit --locked || true
+          cargo audit || true
 
   test:
     needs: lint
+    permissions:
+      contents: read
     strategy:
       fail-fast: true
       matrix:
@@ -49,17 +59,17 @@ jobs:
     runs-on: ${{ matrix.os }}
     continue-on-error: false
     steps:
-      - uses: actions/checkout@v5
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
         with:
           cache-on-failure: true
 
       - name: Set up Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master
         with:
           toolchain: ${{ matrix.rust }}
-          override: true
-          profile: minimal
 
       - name: Install fish (Linux)
         if: startsWith(matrix.os, 'ubuntu')
@@ -73,6 +83,4 @@ jobs:
         run: fish ./scripts/integration-tests
 
       - name: Run cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
+        run: cargo test

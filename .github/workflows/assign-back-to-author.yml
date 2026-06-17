@@ -1,0 +1,43 @@
+name: Assign PR back to Author on Review Submission
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+
+jobs:
+  assign_back_to_author:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    if: ${{ !contains(github.event.review.user.login, '[bot]') }}
+    steps:
+      - name: Assign PR back to Author
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const prAuthor = context.payload.pull_request.user.login;
+            const reviewer = context.payload.review.user.login;
+
+            // Assign the PR back to the author.
+            await github.rest.issues.addAssignees({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              assignees: [prAuthor],
+            });
+            console.log(`Assigned PR #${prNumber} back to author @${prAuthor}`);
+
+            // Unassign the reviewer only if they are not the PR author.
+            if (reviewer !== prAuthor) {
+              await github.rest.issues.removeAssignees({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                assignees: [reviewer],
+              });
+              console.log(`Unassigned reviewer @${reviewer} from PR #${prNumber}`);
+            }

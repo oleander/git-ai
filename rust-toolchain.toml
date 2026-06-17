@@ -1,2 +1,5 @@
 [toolchain]
-channel = "nightly"
+# Pinned to a dated nightly for reproducibility. rustfmt.toml relies on nightly-only
+# options, so this project requires nightly. Pinning avoids surprise breakage when new
+# nightly lints land (e.g. float_literal_f32_fallback). Bump deliberately.
+channel = "nightly-2026-06-15"

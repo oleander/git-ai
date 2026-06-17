@@ -1,0 +1,36 @@
+name: Enforce Issue Link in PR
+
+on:
+  pull_request:
+    types: [opened, edited, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  check-issue-link:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Check for Linked Issue
+        if: ${{ !contains(fromJson('["dependabot[bot]"]'), github.event.pull_request.user.login) }}
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const prBody = context.payload.pull_request.body || "";
+            const issueLinkRegex = /\b(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved) #[0-9]+\b/i;
+            const labels = context.payload.pull_request.labels.map(label => label.name);
+            const exclusionLabel = "no-issue";
+
+            // Allow opting out with the "no-issue" label.
+            if (labels.includes(exclusionLabel)) {
+              console.log(`Skipping issue link check due to "${exclusionLabel}" label.`);
+              return;
+            }
+
+            if (!issueLinkRegex.test(prBody)) {
+              core.setFailed('PR must link an issue (e.g. "Closes #123") or carry the "no-issue" label.');
+            } else {
+              console.log("Issue linked in the PR description.");
+            }

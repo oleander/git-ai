@@ -401,6 +401,169 @@ fn test_collect_diff_data_multi_file_headers() {
 }
 
 #[test]
+fn test_to_patch_is_deterministic_across_runs() {
+  // C4: Identical staged input must produce a byte-for-byte identical patch every time.
+  // Previously the patch's file order followed HashMap iteration / thread-completion order,
+  // so the same staged tree could yield different patches and thus different commit messages.
+  let repo = TestRepo::default();
+
+  // Several files so multi-file ordering is meaningfully exercised. Names are intentionally
+  // out of alphabetical insertion order to catch ordering that depends on insertion.
+  let names = ["zeta.rs", "alpha.rs", "mid.rs", "beta.rs", "gamma.rs", "delta.rs"];
+  for name in names {
+    let f = repo
+      .create_file(name, &format!("// initial {name}\nfn {}() {{}}\n", name.replace('.', "_")))
+      .unwrap();
+    f.stage().unwrap();
+  }
+  // Commit the initial versions via the last file handle's commit.
+  let first = repo
+    .create_file(names[0], &format!("// initial {}\nfn zeta_rs() {{}}\n", names[0]))
+    .unwrap();
+  first.stage().unwrap();
+  first.commit().unwrap();
+
+  // Modify every file so each appears in the diff.
+  for name in names {
+    let f = repo
+      .create_file(name, &format!("// changed {name}\nfn {}() {{ 1 + 1; }}\n", name.replace('.', "_")))
+      .unwrap();
+    f.stage().unwrap();
+  }
+
+  let repo_path = repo.repo_path.path().to_path_buf();
+
+  use ai::hook::PatchRepository;
+  use ai::model::Model;
+
+  // Generate the patch many times, each via a freshly opened repo (fresh HashMap each time).
+  let mut patches = Vec::new();
+  for _ in 0..10 {
+    let git_repo = git2::Repository::open(&repo_path).unwrap();
+    let tree = git_repo.head().unwrap().peel_to_tree().unwrap();
+    let patch = git_repo
+      .to_patch(Some(tree), 4096, Model::default())
+      .unwrap();
+    patches.push(patch);
+  }
+
+  // All runs must be byte-identical.
+  let first_patch = &patches[0];
+  for (i, p) in patches.iter().enumerate() {
+    assert_eq!(p, first_patch, "patch run {i} differs from run 0 — output is non-deterministic");
+  }
+
+  // The patch must contain all files and parse into the expected set (order may follow the
+  // token-packing sort, but it is stable: the byte-identical assertion above proves the
+  // ordering itself is deterministic across runs).
+  use ai::multi_step_integration::parse_diff;
+  let parsed = parse_diff(first_patch).unwrap();
+  let mut paths: Vec<String> = parsed.iter().map(|f| f.path.clone()).collect();
+  paths.sort();
+  let mut expected: Vec<String> = names.iter().map(|s| s.to_string()).collect();
+  expected.sort();
+  assert_eq!(paths, expected, "patch should contain exactly the staged files, got {paths:?}");
+}
+
+/// Stages `count` modified files (each with `body_lines` of changed content) and returns the
+/// repo path. The files go through an initial commit then a modification, so all appear in the
+/// diff against HEAD. Used to drive the >20-file *parallel* path in `to_patch`.
+fn build_many_file_repo(count: usize, body_lines: usize) -> (TestRepo, std::path::PathBuf) {
+  let repo = TestRepo::default();
+
+  let make_body = |name: &str, marker: &str| {
+    let mut s = format!("// {marker} {name}\n");
+    for i in 0..body_lines {
+      s.push_str(&format!("fn {}_{i}() {{ let x = {i}; let y = x + 1; }}\n", name.replace('.', "_")));
+    }
+    s
+  };
+
+  // Initial versions, committed.
+  for n in 0..count {
+    let name = format!("file_{n:03}.rs");
+    let f = repo
+      .create_file(&name, &make_body(&name, "initial"))
+      .unwrap();
+    f.stage().unwrap();
+  }
+  let first = repo
+    .create_file("file_000.rs", &make_body("file_000.rs", "initial"))
+    .unwrap();
+  first.stage().unwrap();
+  first.commit().unwrap();
+
+  // Modify every file so each shows up in the diff.
+  for n in 0..count {
+    let name = format!("file_{n:03}.rs");
+    let f = repo
+      .create_file(&name, &make_body(&name, "changed"))
+      .unwrap();
+    f.stage().unwrap();
+  }
+
+  let path = repo.repo_path.path().to_path_buf();
+  (repo, path)
+}
+
+#[test]
+fn test_to_patch_parallel_path_deterministic_no_truncation() {
+  // C4 / C3b: drives the >20-file PARALLEL path. With a generous token budget no truncation
+  // happens, so this isolates output-ordering determinism in the parallel branch.
+  let (_repo, repo_path) = build_many_file_repo(30, 3);
+
+  use ai::hook::PatchRepository;
+  use ai::model::Model;
+
+  let mut patches = Vec::new();
+  for _ in 0..10 {
+    let git_repo = git2::Repository::open(&repo_path).unwrap();
+    let tree = git_repo.head().unwrap().peel_to_tree().unwrap();
+    let patch = git_repo
+      .to_patch(Some(tree), 100_000, Model::default())
+      .unwrap();
+    patches.push(patch);
+  }
+
+  let first_patch = &patches[0];
+  assert!(!first_patch.is_empty(), "parallel-path patch should not be empty");
+  for (i, p) in patches.iter().enumerate() {
+    assert_eq!(p, first_patch, "parallel-path patch run {i} differs — non-deterministic output");
+  }
+}
+
+#[test]
+fn test_to_patch_parallel_path_deterministic_with_truncation() {
+  // C4 / C3b: drives the >20-file PARALLEL path with a SMALL budget so total content far
+  // exceeds max_tokens and per-file truncation actually triggers. This is exactly the scenario
+  // where the old shared-atomic token budget raced across threads and produced non-deterministic
+  // bytes; the sequential-budget + order-preserving rewrite must yield byte-identical output.
+  let (_repo, repo_path) = build_many_file_repo(40, 12);
+
+  use ai::hook::PatchRepository;
+  use ai::model::Model;
+
+  let mut patches = Vec::new();
+  for _ in 0..10 {
+    let git_repo = git2::Repository::open(&repo_path).unwrap();
+    let tree = git_repo.head().unwrap().peel_to_tree().unwrap();
+    // Small budget relative to the ~40 files * 12 lines of content => forces truncation.
+    let patch = git_repo
+      .to_patch(Some(tree), 300, Model::default())
+      .unwrap();
+    patches.push(patch);
+  }
+
+  let first_patch = &patches[0];
+  for (i, p) in patches.iter().enumerate() {
+    assert_eq!(
+      p, first_patch,
+      "parallel-path patch with truncation run {i} differs — truncation/order is non-deterministic"
+    );
+  }
+}
+
+#[test]
 fn test_to_patch_output_parseable_by_parse_diff() {
   // End-to-end test: the output of to_patch() must be parseable by
   // parse_diff() into correct per-file sections. This tests the full
