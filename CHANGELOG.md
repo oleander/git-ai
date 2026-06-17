@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-06-17
+
+### Fixed
+
+- **Commit hook now uses the configured API key**: the default generation path only
+  attempted the OpenAI multi-step request when the `OPENAI_API_KEY` environment variable
+  was set, silently ignoring a key stored via `git ai config set openai-api-key`. As a
+  result every commit fell through to the local programmatic generator and emitted
+  filename-derived subjects like `Update <file>`. The client is now built from the stored
+  configuration (honoring a custom `openai-base-url` too), falling back to the environment
+  variable only when the config holds no usable key.
+- **Local-fallback truncation no longer splits words**: oversized fallback subjects are
+  trimmed to the last whole word (no more `Update controlle`) instead of a hard mid-word cut.
+
 ## [1.2.0] - 2026-06-17
 
 ### Added
